@@ -1,8 +1,8 @@
-# XML Transformation: xml_parsed → fmxmlsnippet
+# XML Transformation: Save As XML → fmxmlsnippet
 
 ## Overview
 
-`fm_xml_to_snippet.py` converts FileMaker's "Save As XML" export format (stored in `agent/xml_parsed/scripts/`) into the fmxmlsnippet clipboard format (used in `agent/scripts/` and `agent/sandbox/`). These two formats are structurally distinct and not interchangeable — see `SKILL.md` in `.cursor/skills/script-review/` for the full breakdown.
+`fm_xml_to_snippet.py` converts FileMaker's "Save As XML" export format (a script from the solution's fm-saxml docs, `-s <solution> --script <name>`, or a SaXML script file) into the fmxmlsnippet clipboard format (used in `agent/scripts/` and `agent/sandbox/`). These two formats are structurally distinct and not interchangeable — see `SKILL.md` in `.cursor/skills/script-review/` for the full breakdown.
 
 ---
 

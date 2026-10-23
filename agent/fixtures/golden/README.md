@@ -39,14 +39,16 @@ POSTed to `/explode`, and `fmparse.sh` ran with its defaults (`--output_tree dom
 
 ### golden/ (outputs)
 
-Made by this fork's tools, run by `golden_fixture.py` from a temporary copy of the repo layout
-that holds the inputs above:
+Made by this fork's tools before they were ported, run by `golden_fixture.py` from a temporary
+copy of the repo layout that holds the inputs above. Every one is ported now (P2-06 to P2-12), so
+the files are frozen (below) and `golden_fixture.py` no longer runs any tool:
 
 | Folder | Commands |
 |---|---|
 | `layout_to_summary/` | `layout_to_summary.py --solution EverythingBagel` |
 | `trace/` | `trace.py build`; `trace.py query` for each type (list in `QUERIES`); `trace.py dead` for each type; the built `xref.index` (compared ignoring line order) |
 | `saxmlpreview/` | `saxmlpreview.py` on each `xml_parsed/scripts/` file: the line map |
+| `extract_theme/` | `extract_theme.py` on each custom theme: sha256 of `theme.css`, `theme-web.css`, `theme-classes.json` and `theme-manifest.json` (that one key-sorted), recorded at the port (P2-10) |
 
 Differences from the Mac run's own default path, on purpose:
 
@@ -88,6 +90,9 @@ own test compares with them.
 |---|---|---|
 | `trace.py build` (P2-06) | `trace/build.txt`, `trace/xref.index` | `test_trace_build.py` (differences listed with reasons in `GOLDEN_DIFFERENCES`) |
 | `trace.py query` and `dead` (P2-07) | `trace/query_*.txt`, `trace/dead_*.txt` | `test_trace_query_dead.py` (changed outputs and reasons in `GOLDEN_CHANGES`) |
+| `layout_to_summary.py` (P2-09) | `layout_to_summary/*.json` | `test_layout_to_summary.py` (byte-identical, no differences) |
+| `saxmlpreview.py` input (P2-12) | `saxmlpreview/*.txt` | `test_script_input.py` (identical from unscrubbed docs; from scrubbed docs, two lines of OneOfEverything differ, listed in `SCRUBBED_LINES`) |
+| `extract_theme.py` (P2-10) | `extract_theme/*.sha256` | `test_extract_theme.py` (same four files; the manifest's color palette is in swatch order, so its sum is taken key-sorted) |
 
 `analyze.py` was deleted, not ported (P2-14), and its golden profile with it: fm-saxml's
 `Reports/profile.md` replaces it. The comparison is in the Phase 2 roadmap, unit P2-08.

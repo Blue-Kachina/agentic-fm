@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
 """
-saxmlpreview.py — Convert a FileMaker SaXML script file to Script Workspace format.
+saxmlpreview.py — Convert a FileMaker SaXML script to Script Workspace format.
 
 Usage:
+    python3 agent/scripts/saxmlpreview.py -s <solution> --script "<name>"
+    python3 agent/scripts/saxmlpreview.py -s <solution> --doc-id "script:<name>"
     python3 agent/scripts/saxmlpreview.py <path-to-script.xml>
+
+With -s (plus --docs-root, or --file for a multi-file build; see solution_context.py) the
+script is read from the solution's fm-saxml docs: fm-saxml's raw copy of the export
+(roadmap P2-12). A name matching several scripts, or none, fails with a message listing
+candidates.
 
 Each <Step> element in the SaXML produces exactly one output line, so line numbers
 are deterministic and 1:1 with what a developer sees in FileMaker Script Workspace.
@@ -24,6 +31,7 @@ Block indentation follows Script Workspace rules:
 Disabled steps are prefixed with '// '. Blank comment steps render as blank lines.
 """
 
+import argparse
 import os
 import sys
 import xml.etree.ElementTree as ET
@@ -166,15 +174,17 @@ def convert(xml_path):
     except ET.ParseError as e:
         print(f'ERROR: Could not parse XML: {e}', file=sys.stderr)
         sys.exit(1)
+    print_preview(tree.getroot())
 
-    root = tree.getroot()
+
+def preview_lines(root):
+    """(script name, Script Workspace lines) for a <Script> element."""
     script_ref = root.find('.//ScriptReference')
     script_name = script_ref.get('name', 'Unknown') if script_ref is not None else 'Unknown'
 
     object_list = root.find('.//ObjectList')
     if object_list is None:
-        print('ERROR: No <ObjectList> found in XML.', file=sys.stderr)
-        sys.exit(1)
+        raise ValueError('No <ObjectList> found in XML.')
 
     lines = []
     indent = 0
@@ -185,6 +195,15 @@ def convert(xml_path):
         lines.append(INDENT * indent + text)
         if open_after:
             indent += 1
+    return script_name, lines
+
+
+def print_preview(root):
+    try:
+        script_name, lines = preview_lines(root)
+    except ValueError as e:
+        print(f'ERROR: {e}', file=sys.stderr)
+        sys.exit(1)
 
     print(f'Script: {script_name}')
     print()
@@ -192,8 +211,31 @@ def convert(xml_path):
         print(f'{i}\t{line}')
 
 
+def main(argv=None):
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import solution_context as sc
+
+    ap = argparse.ArgumentParser(description='Preview a FileMaker script as Script Workspace lines.')
+    ap.add_argument('xml_path', nargs='?', help='a Save-As-XML script file (instead of -s and --script)')
+    sc.add_script_arguments(ap)
+    args = ap.parse_args(argv)
+
+    if sc.wants_script(args):
+        if args.xml_path:
+            ap.error('give either an XML file or -s with --script/--doc-id, not both')
+        try:
+            ctx, script = sc.script_from_args(args)
+            root = ET.fromstring(ctx.raw_xml(script.doc_id))
+        except sc.SolutionContextError as e:
+            print(f'ERROR: {e}', file=sys.stderr)
+            return 1
+        print_preview(root)
+    elif args.xml_path:
+        convert(args.xml_path)
+    else:
+        ap.error('name a script (-s <solution> --script <name>) or an XML file')
+    return 0
+
+
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print(f'Usage: python3 {sys.argv[0]} <path-to-script.xml>', file=sys.stderr)
-        sys.exit(1)
-    convert(sys.argv[1])
+    sys.exit(main())

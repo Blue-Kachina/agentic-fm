@@ -2,27 +2,34 @@
 """
 Extract FileMaker theme data into web-usable CSS and a JSON manifest.
 
-Parses theme XML from xml_parsed/themes/{solution}/ and layout XML from
-xml_parsed/layouts/{solution}/ to produce:
+Reads the solution's fm-saxml docs (roadmap P2-10), through solution_context.py: the
+theme's metadata (names, ID, base theme, color palette, layout builder constants,
+charting, named styles) from the model, its CSS from the theme's raw XML, and the
+style classes from every layout's raw XML. It produces:
   - theme.css           — full CSS from the theme's CDATA block
+  - theme-web.css       — web-compatible translation for preview rendering
   - theme-manifest.json — structured metadata (palette, layout builder, named styles)
-  - theme-classes.json  — named style classes found across all layout files
+  - theme-classes.json  — named style classes found across all layouts
 
-Output is written to agent/context/{solution}/.
+Output is written to agent/context/{solution}/ (-o names another folder).
 
 Usage:
-  python3 agent/scripts/extract_theme.py                        # auto-detect solution
-  python3 agent/scripts/extract_theme.py "Invoice Solution"     # explicit solution
-  python3 agent/scripts/extract_theme.py --list                 # list available solutions/themes
+  python3 agent/scripts/extract_theme.py -s "Invoice Solution" --docs-root <folder>   # default theme
+  python3 agent/scripts/extract_theme.py -s exports/Invoices_docs --theme "Apex Blue"
+  python3 agent/scripts/extract_theme.py -s "Invoice Solution" --list                 # list the themes
+
+-s also takes the docs folder; --file picks a file of a multi-file build.
 """
 
 import argparse
 import json
-import os
 import re
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import solution_context as sc  # noqa: E402
 
 
 def get_agent_root():
@@ -31,68 +38,38 @@ def get_agent_root():
     return script_dir.parent
 
 
-def list_solutions(themes_dir):
-    """List all solutions that have theme data."""
-    if not themes_dir.is_dir():
-        print("No themes directory found at:")
-        print(f"  {themes_dir}")
-        print("\nRun Explode XML in FileMaker to generate theme data.")
-        sys.exit(1)
-
-    solutions = sorted(
-        d.name for d in themes_dir.iterdir() if d.is_dir()
-    )
-    if not solutions:
-        print("No solution folders found in themes directory.")
-        sys.exit(1)
-
-    for sol in solutions:
-        theme_files = sorted(themes_dir / sol / f for f in os.listdir(themes_dir / sol) if f.endswith(".xml"))
-        print(f"\n{sol}:")
-        for tf in theme_files:
-            try:
-                tree = ET.parse(tf)
-                root = tree.getroot()
-                display = root.get("Display", "?")
-                tid = root.get("id", "?")
-                default = " (default)" if root.get("defaultTheme") == "True" else ""
-                print(f"  - {display} (ID {tid}){default}")
-            except ET.ParseError:
-                print(f"  - {tf.name} (parse error)")
+def list_themes(ctx):
+    """Print the solution's themes, the default marked."""
+    print(f"{ctx.name} ({ctx.path}):")
+    for theme in sorted(ctx.themes.values(), key=_theme_order):
+        default = " (default)" if theme.default_theme else ""
+        print(f"  - {theme.display_name or theme.name} (ID {theme.fmp_id}, {theme.doc_id}){default}")
 
 
-def pick_theme(solution_dir):
-    """Pick the best theme file from a solution's theme directory.
+def _theme_order(theme):
+    return ((theme.display_name or theme.name or "").casefold(), int(theme.fmp_id or 0))
 
-    Prefers defaultTheme="True", otherwise picks the theme referenced by the
-    most layouts, otherwise picks the first alphabetically.
-    """
-    theme_files = sorted(
-        f for f in solution_dir.iterdir() if f.suffix == ".xml"
-    )
-    if not theme_files:
+
+def pick_theme(ctx, key=None):
+    """The theme to extract: ``key`` (display name, internal name or docId), else the default
+    theme, else the first by display name. None when the file has no themes."""
+    themes = ctx.themes
+    if key:
+        if key in themes:
+            return themes[key]
+        hits = [t for t in themes.values()
+                if key.casefold() in ((t.display_name or "").casefold(), (t.name or "").casefold())]
+        if len(hits) == 1:
+            return hits[0]
+        listed = "\n".join(f"  {t.display_name} ({t.doc_id})" for t in sorted(themes.values(), key=_theme_order))
+        raise sc.SolutionContextError(f"{'Several themes' if hits else 'No theme'} {key!r} in {ctx.name}; "
+                                      f"its themes:\n{listed}")
+    if not themes:
         return None
-
-    # Parse all themes
-    parsed = []
-    for tf in theme_files:
-        try:
-            tree = ET.parse(tf)
-            root = tree.getroot()
-            parsed.append((tf, root))
-        except ET.ParseError:
-            continue
-
-    if not parsed:
-        return None
-
-    # Prefer defaultTheme="True"
-    for tf, root in parsed:
-        if root.get("defaultTheme") == "True":
-            return tf, root
-
-    # Fall back to first
-    return parsed[0]
+    for theme in themes.values():
+        if theme.default_theme:
+            return theme
+    return sorted(themes.values(), key=_theme_order)[0]
 
 
 def extract_css(theme_root):
@@ -536,25 +513,24 @@ def _consolidate_block(block_lines):
     return output
 
 
-def scan_layout_classes(layouts_dir):
-    """Scan all layout XML files for LocalCSS references.
+def scan_layout_classes(ctx):
+    """Scan every layout's raw XML for LocalCSS references.
 
-    Returns a dict of {class_name: {"displayName": ..., "css": ..., "layouts": [...]}}
+    Returns a dict of {class_name: {"displayName": ..., "css": ..., "layouts": [...]}}.
+    Layouts are named "<name> - ID <id>", as the exploded files were.
     """
     classes = {}
 
-    if not layouts_dir.is_dir():
-        return classes
-
-    for xml_file in sorted(layouts_dir.rglob("*.xml")):
+    layouts = sorted(ctx.layouts.values(), key=lambda lay: (lay.name.casefold(), int(lay.fmp_id or 0)))
+    for lay in layouts:
         try:
-            tree = ET.parse(xml_file)
-        except ET.ParseError:
+            root = ET.fromstring(ctx.raw_xml(lay.doc_id))
+        except (ET.ParseError, sc.SolutionContextError):
             continue
 
-        layout_name = xml_file.stem
+        layout_name = f"{lay.name} - ID {lay.fmp_id}"
 
-        for local_css in tree.iter("LocalCSS"):
+        for local_css in root.iter("LocalCSS"):
             name = local_css.get("name", "")
             display_name = local_css.get("displayName", "")
             css_content = (local_css.text or "").strip()
@@ -581,8 +557,8 @@ def scan_layout_classes(layouts_dir):
     return classes
 
 
-def build_theme_manifest(theme_root, css_text):
-    """Build the structured theme-manifest.json data."""
+def build_theme_manifest_from_xml(theme_root, css_text):
+    """Build the structured theme-manifest.json data from the theme XML alone."""
     manifest = {
         "theme": {
             "name": theme_root.get("Display", ""),
@@ -623,72 +599,74 @@ def build_theme_manifest(theme_root, css_text):
     return manifest
 
 
-def main():
+def build_theme_manifest(theme_root, css_text, theme=None):
+    """Build the structured theme-manifest.json data.
+
+    With ``theme`` (the fm-saxml model's theme entity), the metadata comes from the model;
+    the CSS of each named style is always cut from the theme's CSS.
+    """
+    manifest = build_theme_manifest_from_xml(theme_root, css_text)
+    if theme is None:
+        return manifest
+
+    manifest["theme"]["name"] = theme.display_name or ""
+    manifest["theme"]["id"] = int(theme.fmp_id or 0)
+    manifest["theme"]["internalName"] = theme.name or ""
+    if theme.base_name:
+        manifest["theme"]["baseTheme"] = theme.base_name
+    if theme.color_palette is not None:
+        manifest["colorPalette"] = dict(theme.color_palette)
+    if theme.layout_builder is not None:
+        manifest["layoutBuilder"] = {k: _int_or_text(v) for k, v in theme.layout_builder.items()}
+    if theme.charting is not None:
+        manifest["charting"] = dict(theme.charting)
+    if theme.named_styles is not None:
+        manifest["namedStyles"] = [{"name": name, "displayName": display or "",
+                                    "css": extract_css_for_style(css_text, name) or ""}
+                                   for name, display in theme.named_styles.items()]
+    return manifest
+
+
+def _int_or_text(value):
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return value or ""
+
+
+def main(argv=None):
     parser = argparse.ArgumentParser(
-        description="Extract FileMaker theme data into CSS and JSON manifest."
+        description="Extract FileMaker theme data from a solution's fm-saxml docs into CSS and a JSON manifest."
     )
-    parser.add_argument(
-        "solution",
-        nargs="?",
-        default=None,
-        help="Solution name (auto-detected if only one exists)"
-    )
+    sc.add_arguments(parser)
+    parser.add_argument("--theme", help="theme display name, internal name or docId "
+                                        "(default: the file's default theme)")
+    parser.add_argument("-o", "--output", help="output folder (default: agent/context/{solution}/)")
     parser.add_argument(
         "--list",
         action="store_true",
-        help="List available solutions and their themes"
+        help="List the solution's themes"
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
-    agent_root = get_agent_root()
-    themes_dir = agent_root / "xml_parsed" / "themes"
-    layouts_base = agent_root / "xml_parsed" / "layouts"
-    context_dir = agent_root / "context"
+    try:
+        ctx = sc.from_args(args)
+        if args.list:
+            list_themes(ctx)
+            return 0
+        theme = pick_theme(ctx, args.theme)
+        if theme is None:
+            print(f"Error: {ctx.name} has no themes ({ctx.path})", file=sys.stderr)
+            return 1
+        theme_root = ET.fromstring(ctx.raw_xml(theme.doc_id))
+        layout_classes = scan_layout_classes(ctx)
+    except sc.SolutionContextError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
 
-    # --list mode
-    if args.list:
-        list_solutions(themes_dir)
-        sys.exit(0)
-
-    # Check themes directory exists
-    if not themes_dir.is_dir():
-        print("Error: No themes directory found at:")
-        print(f"  {themes_dir}")
-        print("\nRun Explode XML in FileMaker to generate theme data.")
-        sys.exit(1)
-
-    # Determine solution name
-    solution = args.solution
-    if solution is None:
-        solutions = [d.name for d in themes_dir.iterdir() if d.is_dir()]
-        if len(solutions) == 0:
-            print("Error: No solution folders found in themes directory.")
-            sys.exit(1)
-        elif len(solutions) == 1:
-            solution = solutions[0]
-            print(f"Auto-detected solution: {solution}")
-        else:
-            print("Multiple solutions found. Please specify one:")
-            for s in sorted(solutions):
-                print(f"  - {s}")
-            print(f"\nUsage: python3 {sys.argv[0]} \"Solution Name\"")
-            sys.exit(1)
-
-    solution_themes_dir = themes_dir / solution
-    if not solution_themes_dir.is_dir():
-        print(f"Error: No themes found for solution '{solution}'")
-        print(f"  Looked in: {solution_themes_dir}")
-        sys.exit(1)
-
-    # Pick theme
-    result = pick_theme(solution_themes_dir)
-    if result is None:
-        print(f"Error: No valid theme XML files found for '{solution}'")
-        sys.exit(1)
-
-    theme_file, theme_root = result
-    theme_name = theme_root.get("Display", "Unknown")
-    theme_id = theme_root.get("id", "?")
+    solution = ctx.name
+    theme_name = theme.display_name or "Unknown"
+    theme_id = theme.fmp_id or "?"
     print(f"Using theme: {theme_name} (ID {theme_id})")
 
     # Extract CSS
@@ -707,17 +685,7 @@ def main():
     rule_count = len(re.findall(r'\{', css_text))
 
     # Build manifest
-    manifest = build_theme_manifest(theme_root, css_text)
-
-    # Scan layout classes
-    layouts_dir = layouts_base / solution
-    layout_classes = {}
-    if layouts_dir.is_dir():
-        layout_classes = scan_layout_classes(layouts_dir)
-    else:
-        print(f"Warning: No layouts directory found for '{solution}'")
-        print(f"  Looked in: {layouts_dir}")
-        print("  Theme CSS and manifest will still be extracted.")
+    manifest = build_theme_manifest(theme_root, css_text, theme)
 
     # Build theme-classes.json
     theme_classes = {}
@@ -733,28 +701,28 @@ def main():
         theme_classes[class_name] = entry
 
     # Create output directory
-    output_dir = context_dir / solution
+    output_dir = Path(args.output) if args.output else get_agent_root() / "context" / solution
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Write theme.css (faithful extraction with FM-specific annotations)
     css_path = output_dir / "theme.css"
-    with open(css_path, "w", encoding="utf-8") as f:
+    with open(css_path, "w", encoding="utf-8", newline="\n") as f:
         f.write(css_output)
 
     # Write theme-web.css (web-compatible translation for preview rendering)
     css_web_path = output_dir / "theme-web.css"
-    with open(css_web_path, "w", encoding="utf-8") as f:
+    with open(css_web_path, "w", encoding="utf-8", newline="\n") as f:
         f.write(css_web)
 
     # Write theme-manifest.json
     manifest_path = output_dir / "theme-manifest.json"
-    with open(manifest_path, "w", encoding="utf-8") as f:
+    with open(manifest_path, "w", encoding="utf-8", newline="\n") as f:
         json.dump(manifest, f, indent=2, ensure_ascii=False)
         f.write("\n")
 
     # Write theme-classes.json
     classes_path = output_dir / "theme-classes.json"
-    with open(classes_path, "w", encoding="utf-8") as f:
+    with open(classes_path, "w", encoding="utf-8", newline="\n") as f:
         json.dump(theme_classes, f, indent=2, ensure_ascii=False)
         f.write("\n")
 
@@ -765,12 +733,13 @@ def main():
     print(f"  Named styles:  {len(manifest.get('namedStyles', []))}")
     print(f"  Color swatches: {len(manifest.get('colorPalette', {}))}")
     print(f"  Layout classes: {len(theme_classes)}")
-    print(f"\nOutput files:")
+    print("\nOutput files:")
     print(f"  {css_path}")
     print(f"  {css_web_path}  (web-compatible)")
     print(f"  {manifest_path}")
     print(f"  {classes_path}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

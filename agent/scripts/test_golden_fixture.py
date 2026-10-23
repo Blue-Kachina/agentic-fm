@@ -1,8 +1,7 @@
 """test_golden_fixture.py - the exploder-path golden fixture and its compare helper (roadmap P2-05).
 
-- Today's exploder-path tools still produce golden/ on the fixture's inputs, so the golden
-  files are reproducible and every port is compared with output these tools really give.
-  Golden files of tools already ported (golden_fixture.FROZEN) are kept as they are.
+- Every golden file is accounted for: golden_fixture.FROZEN lists those of ported tools (all
+  of them since P2-12), which are kept as they are; run_tools() reproduces the rest.
 - compare() reports differences as a unified diff, and ignores order where asked.
 - The fixture's export converts with the installed fm-saxml and holds the same scripts and
   layouts as the exploded tree, so ported tools read the same solution the golden came from.

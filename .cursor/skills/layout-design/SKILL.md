@@ -46,7 +46,7 @@ Also read `companion_url` and `webviewer_url` from `automation.json` — these a
 
 4. If no theme data exists, inform the developer and suggest extracting it:
 
-   > No theme data found for this solution. Run `python3 agent/scripts/extract_theme.py` to extract the theme CSS, manifest, and style classes. This enables accurate layout previews and ensures generated objects use valid theme styles.
+   > No theme data found for this solution. Run `python3 agent/scripts/extract_theme.py -s "{solution}" --docs-root <folder>` (it reads the solution's fm-saxml docs; `--theme <name>` for a theme other than the default, `--list` to see them) to extract the theme CSS, manifest, and style classes. This enables accurate layout previews and ensures generated objects use valid theme styles.
 
    Proceed with reasonable defaults if the developer wants to continue without theme data.
 

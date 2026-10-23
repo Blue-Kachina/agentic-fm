@@ -30,7 +30,6 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -59,10 +58,20 @@ UNORDERED = {"trace/xref.index"}
 # Golden files of tools already ported off the exploder: their exploder version is gone, so
 # run_tools() no longer makes them and --update keeps them as they are. Each port's own test
 # compares its output with them (trace build: test_trace_build.py; trace query and dead:
-# test_trace_query_dead.py).
+# test_trace_query_dead.py; layout_to_summary: test_layout_to_summary.py; extract_theme:
+# test_extract_theme.py; saxmlpreview: test_script_input.py). Every exploder-path tool is
+# ported now (P2-12), so run_tools() makes nothing; the golden files are the reference.
+LAYOUTS = ["CustomMenuSetLayout - ID 2", "EverythingBagel - ID 1"]
+# extract_theme.py had no golden output; before the port (P2-10) its output for each custom
+# theme was recorded as sha256 sums (the manifest's in key-sorted form; see the golden README).
+THEMES = ["Apex Blue Copy", "Vibrant Custom"]
+SCRIPTS = ["Explode XML - ID 4", "Get agentic-fm path - ID 3", "Just Beep - ID 2", "OneOfEverything - ID 1"]
 FROZEN = ({"trace/build.txt", "trace/xref.index"}
           | {f"trace/query_{name}.txt" for name, *_ in QUERIES}
-          | {f"trace/dead_{kind}.txt" for kind in DEAD_TYPES})
+          | {f"trace/dead_{kind}.txt" for kind in DEAD_TYPES}
+          | {f"layout_to_summary/{name}.json" for name in LAYOUTS}
+          | {f"extract_theme/{name}.sha256" for name in THEMES}
+          | {f"saxmlpreview/{name}.txt" for name in SCRIPTS})
 
 
 def _shadow_root(tmp: Path) -> Path:
@@ -97,22 +106,14 @@ def _run(root: Path, *args: str) -> str:
 
 
 def run_tools() -> dict[str, str]:
-    """Today's exploder-path output on the fixture, by golden name (relative path in golden/)."""
-    out: dict[str, str] = {}
-    with tempfile.TemporaryDirectory() as tmp:
-        # resolved: the tools print resolved paths (macOS /var -> /private/var, Windows 8.3 names)
-        root = _shadow_root(Path(tmp).resolve())
-        ctx = root / "agent" / "context" / SOLUTION
-        scripts = "agent/scripts/"
+    """Today's exploder-path output on the fixture, by golden name (relative path in golden/).
 
-        _run(root, scripts + "layout_to_summary.py", "--solution", SOLUTION)
-        for p in sorted((ctx / "layouts").glob("*.json")):
-            out[f"layout_to_summary/{p.name}"] = p.read_text(encoding="utf-8")
-
-        for p in sorted((root / "agent" / "xml_parsed" / "scripts" / SOLUTION).glob("*.xml")):
-            out[f"saxmlpreview/{p.stem}.txt"] = _run(root, scripts + "saxmlpreview.py", str(p))
-
-        return {name: _normalise(text, root) for name, text in out.items()}
+    Empty since P2-12: every tool that read the exploder's output is ported, and its golden
+    files are in FROZEN. To record a tool again, run it here from a _shadow_root() in a
+    temporary folder (resolved: the tools print resolved paths, macOS /var -> /private/var,
+    Windows 8.3 names) with _run(), and pass its output through _normalise().
+    """
+    return {}
 
 
 def compare(name: str, actual: str, sort_lines: bool | None = None, golden_dir: Path = GOLDEN) -> str | None:
@@ -135,10 +136,15 @@ def compare(name: str, actual: str, sort_lines: bool | None = None, golden_dir: 
                                         f"golden/{name}", f"actual/{name}"))
 
 
-def build_docs(dest: Path) -> Path:
-    """Convert the fixture's export with the installed fm-saxml; return the docs folder."""
+def build_docs(dest: Path, scrub: bool = True) -> Path:
+    """Convert the fixture's export with the installed fm-saxml; return the docs folder.
+
+    ``scrub=False`` builds without fm-saxml's redaction, for byte-for-byte comparisons with
+    the exploded files (scrubbing redacts the export's sample credentials in raw/ too).
+    """
+    extra = [] if scrub else ["--disable-scrubbing"]
     r = subprocess.run([sys.executable, "-m", "fm_saxml", "build", str(FIXTURE / "saxml" / f"{SOLUTION}.xml"),
-                        "--docs-root", str(dest), "--solution", SOLUTION],
+                        "--docs-root", str(dest), "--solution", SOLUTION, *extra],
                        capture_output=True, text=True, encoding="utf-8", env={**os.environ, "PYTHONUTF8": "1"})
     if r.returncode != 0:
         raise RuntimeError(f"fm-saxml build exited {r.returncode}:\n{r.stdout}{r.stderr}")

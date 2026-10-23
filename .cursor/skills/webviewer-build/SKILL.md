@@ -41,7 +41,7 @@ Also read `companion_url` from `automation.json` for preview pushes.
    - `theme.css` — inline this into the HTML for visual consistency with the FM solution
    - `theme-manifest.json` — color palette for matching FM's visual language
 
-4. If no theme data exists, note this and suggest running `python3 agent/scripts/extract_theme.py`. Proceed with a clean, neutral stylesheet if the developer wants to continue.
+4. If no theme data exists, note this and suggest running `python3 agent/scripts/extract_theme.py -s "{solution}" --docs-root <folder>`. Proceed with a clean, neutral stylesheet if the developer wants to continue.
 
 ---
 

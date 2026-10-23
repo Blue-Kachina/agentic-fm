@@ -28,7 +28,7 @@ Design a complete layout specification through a structured conversation with th
    ```
    If theme data exists, read `theme-manifest.json` for the color palette and layout builder constants (default margins, field heights, label widths, portal row heights). Read `theme-classes.json` for available named style classes.
 
-4. If theme data does not exist, note this to the developer and proceed with generic spacing recommendations. Suggest running `python3 agent/scripts/extract_theme.py` to extract theme data from the solution.
+4. If theme data does not exist, note this to the developer and proceed with generic spacing recommendations. Suggest running `python3 agent/scripts/extract_theme.py -s "{solution}" --docs-root <folder>` to extract theme data from the solution's fm-saxml docs.
 
 ---
 

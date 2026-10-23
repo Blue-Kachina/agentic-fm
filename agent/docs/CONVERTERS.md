@@ -62,10 +62,12 @@ This document catalogues every converter in the agentic-fm project — tools tha
 Converts a FileMaker "Save As XML" script file into fmxmlsnippet clipboard format. This is the bridge between what FileMaker exports and what gets pasted back in.
 
 ```bash
-python3 agent/scripts/fm_xml_to_snippet.py \
-  "agent/xml_parsed/scripts/{solution}/{path}.xml" \
-  "agent/sandbox/OutputName.xml"
+python3 agent/scripts/fm_xml_to_snippet.py -s "{solution}" --docs-root <folder> \
+  --script "{script name}" -o "agent/sandbox/OutputName.xml"     # or --doc-id "script:{name}"
+python3 agent/scripts/fm_xml_to_snippet.py "{script}.xml" "agent/sandbox/OutputName.xml"   # any SaXML script file
 ```
+
+- **Input.** With `-s`, the script comes from the solution's fm-saxml docs (fm-saxml's raw copy of the export, through `solution_context.py`); a name that matches several scripts, or none, fails and lists the candidates. fm-saxml scrubs credentials by default, so the snippet carries its `[REDACTED:...]` markers where the script held one.
 
 - **Catalog-driven.** Every non-control step is decoded from the SaXML `<ParameterValues>` into the shared step instance by `saxml_read.py`, then emitted to fmxmlsnippet by `catalog_emit.py` — both working purely from the catalog `params[]` grammar. No per-step emit logic remains.
 - The only hand-coded steps are the control-flow set: `# (comment)`, If/Else If/Else/End If, Loop/Exit Loop If/End Loop, Exit Script, Set Variable.
@@ -247,9 +249,11 @@ python3 agent/scripts/snippet_to_hr.py agent/sandbox/MyScript.xml --raw -o outpu
 Converts SaXML (not fmxmlsnippet) to Script Workspace format. Used by the `script-preview` skill to display existing scripts before modification.
 
 ```bash
-python3 agent/scripts/saxmlpreview.py \
-  "agent/xml_parsed/scripts/{solution}/{path}.xml"
+python3 agent/scripts/saxmlpreview.py -s "{solution}" --docs-root <folder> --script "{script name}"
+python3 agent/scripts/saxmlpreview.py "{script}.xml"      # any SaXML script file
 ```
+
+- **Input.** As `fm_xml_to_snippet.py`: `-s` with `--script` or `--doc-id`, or a SaXML script file.
 
 - **Catalog-driven.** Non-control steps are decoded by `saxml_read.read_saxml_step` and rendered by `catalog_grammar.render_step_hr` — the same grammar the fmxmlsnippet → HR path uses; only control-flow is hand-coded.
 - Reads from the SaXML `<ParameterValues>` structure (different from fmxmlsnippet)

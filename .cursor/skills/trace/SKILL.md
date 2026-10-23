@@ -184,7 +184,7 @@ When the same field name exists in multiple tables (e.g., `Status` in `Clients`,
 
 Review dead object results and filter:
 - Fields whose only auto-enter references `Self` (active even with no external refs)
-- Scripts likely triggered by buttons — check layout summaries for button scripts
+- Scripts likely triggered by buttons — trace already counts button and trigger scripts from the docs; to look at a layout's buttons, `python3 agent/scripts/layout_to_summary.py -s "{solution}" --layout "<layout>" --print`
 - Custom functions used only by other custom functions — trace the chain to see if it leads to active code
 - Fields that serve as UI display only (on a layout, not in scripts) — flag as medium confidence, not truly dead
 

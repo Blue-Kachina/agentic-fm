@@ -182,10 +182,10 @@ Once the root cause is identified:
 
 ### Restore safety
 
-If the fix doesn't work or the developer wants to revert, the original script is always available in `agent/xml_parsed/scripts_sanitized/`. At Tier 3, the agent can convert and redeploy the original:
+If the fix doesn't work or the developer wants to revert, the original script is always available in the solution's fm-saxml docs (`python3 agent/scripts/saxmlpreview.py -s "{solution}" --script "{ScriptName}"` shows it). At Tier 3, the agent can convert and redeploy the original:
 
 ```bash
-python3 agent/scripts/fm_xml_to_snippet.py "agent/xml_parsed/scripts/{solution}/{path}.xml" "agent/sandbox/{ScriptName}.xml"
+python3 agent/scripts/fm_xml_to_snippet.py -s "{solution}" --docs-root <folder> --script "{ScriptName}" -o "agent/sandbox/{ScriptName}.xml"
 ```
 
 ---

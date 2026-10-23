@@ -23,6 +23,9 @@ In a tool's command line:
     sc.add_arguments(parser)        # -s/--solution, --docs-root, --file
     ctx = sc.from_args(parser.parse_args())
 
+    sc.add_script_arguments(parser) # the same plus --script / --doc-id
+    ctx, script = sc.script_from_args(parser.parse_args())
+
 Check where a solution's docs are found:
     python3 agent/scripts/solution_context.py -s Invoices [--docs-root exports]
 
@@ -276,6 +279,36 @@ def add_arguments(parser: argparse.ArgumentParser, solution_required: bool = Tru
 
 def from_args(args: argparse.Namespace) -> SolutionContext:
     return load_solution(args.solution, args.docs_root, args.file)
+
+
+def add_script_arguments(parser: argparse.ArgumentParser) -> None:
+    """--script / --doc-id plus the solution options, for tools that read one script
+    (fm_xml_to_snippet.py, saxmlpreview.py). The solution is optional here, because those
+    tools also take an XML file instead."""
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--script", help="script name (or docId)")
+    group.add_argument("--doc-id", help="script docId, e.g. 'script:Post Invoice'")
+    add_arguments(parser, solution_required=False)
+
+
+def wants_script(args: argparse.Namespace) -> bool:
+    """True when the command line names a script of a solution (rather than an XML file)."""
+    return bool(args.script or args.doc_id or args.solution)
+
+
+def script_from_args(args: argparse.Namespace):
+    """(SolutionContext, script entity) named by -s/--docs-root/--file and --script or --doc-id.
+
+    A name matching several scripts, or none, raises SolutionContextError listing candidates.
+    """
+    if not args.solution:
+        raise SolutionContextError("--script and --doc-id need the solution: pass -s <solution> "
+                                   f"(with --docs-root <folder> or ${DOCS_ROOT_ENV}).")
+    key = args.doc_id or args.script
+    if not key:
+        raise SolutionContextError("Name the script: --script <name> or --doc-id <docId>.")
+    ctx = from_args(args)
+    return ctx, ctx.pick("script", key)
 
 
 def main(argv: list[str] | None = None) -> int:

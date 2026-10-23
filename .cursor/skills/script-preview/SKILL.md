@@ -12,10 +12,12 @@ Produce a human-readable script outline for review and iteration before generati
 Before generating a preview of an existing script (or when verifying line numbers), run:
 
 ```bash
-python3 agent/scripts/saxmlpreview.py agent/xml_parsed/scripts/<solution>/<path/to/script.xml>
+python3 agent/scripts/saxmlpreview.py -s "<solution>" --docs-root <folder> --script "<script name>"
 ```
 
-This parses the SaXML file and produces **one output line per `<Step>` element**, numbered from 1. Because each step maps to exactly one Script Workspace row, the line numbers are 1:1 with what a developer sees in FileMaker. Use this as the authoritative line map when discussing specific steps or referencing insertion points.
+It reads the script from the solution's fm-saxml docs. `--script` takes the name or the docId (`--doc-id "script:<name>"`); a name that matches several scripts, or none, fails and lists the candidates. `-s` also takes the docs folder; add `--file` for a multi-file build. A Save-As-XML script file still works as the only argument.
+
+This parses the script's SaXML and produces **one output line per `<Step>` element**, numbered from 1. Because each step maps to exactly one Script Workspace row, the line numbers are 1:1 with what a developer sees in FileMaker. Use this as the authoritative line map when discussing specific steps or referencing insertion points.
 
 The script uses `xml.etree.ElementTree` (standard library, no dependencies). Output format matches Script Workspace (Script Workspace–format syntax, disabled steps prefixed with `//`, blank comment steps rendered as `# `).
 

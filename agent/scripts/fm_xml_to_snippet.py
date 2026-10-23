@@ -2,15 +2,24 @@
 """
 fm_xml_to_snippet.py
 
-Translate a FileMaker "Save As XML" (SaXML) script export (xml_parsed/scripts/
-format) into the fmxmlsnippet clipboard format used by FileMaker for pasting.
+Translate a FileMaker "Save As XML" (SaXML) script into the fmxmlsnippet clipboard
+format used by FileMaker for pasting.
 
 Usage:
+    python3 agent/scripts/fm_xml_to_snippet.py -s <solution> --script "<name>" [-o output.xml]
+    python3 agent/scripts/fm_xml_to_snippet.py -s <solution> --doc-id "script:<name>" [-o output.xml]
     python3 agent/scripts/fm_xml_to_snippet.py <input.xml> [output.xml]
 
 Arguments:
-    input.xml   Path to the Save-As-XML script file (from xml_parsed/scripts/)
-    output.xml  Optional output path. Defaults to stdout.
+    -s, --docs-root, --file   The solution's fm-saxml docs (see solution_context.py); the
+                              script's XML is fm-saxml's raw copy of the export (roadmap P2-11)
+    --script / --doc-id       The script, by name or docId. A name matching several scripts,
+                              or none, fails with a message listing candidates.
+    input.xml                 Or: a Save-As-XML script file
+    output.xml, -o            Optional output path. Defaults to stdout.
+
+fm-saxml scrubs credentials from the docs by default, so a snippet made from them carries
+the redaction markers ("[REDACTED:...]") where the script held a credential.
 
 Architecture (P6.4 — catalog unification):
     Every non-control step is decoded by ``saxml_read.read_saxml_step`` into the
@@ -36,12 +45,15 @@ Notes:
     - Step types absent from the catalog emit a self-closing Step and a TODO comment.
 """
 
+import argparse
 import os
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import solution_context as sc
 
 from catalog_emit import EmptyResolver, convert_step_with_catalog
 from catalog_grammar import load_catalog
@@ -343,14 +355,21 @@ def tx_engine(step, stats: dict) -> str:
 # ---------------------------------------------------------------------------
 
 def translate_script(input_path: Path, stats: dict | None = None) -> str:
+    return translate_root(ET.parse(str(input_path)).getroot(), stats, str(input_path))
+
+
+def translate_xml(xml_text: str, stats: dict | None = None, label: str = 'the script XML') -> str:
+    """The fmxmlsnippet for a script's Save-As-XML text (e.g. fm-saxml's raw XML)."""
+    return translate_root(ET.fromstring(xml_text), stats, label)
+
+
+def translate_root(root, stats: dict | None = None, label: str = 'the script XML') -> str:
     if stats is None:
         stats = {'unknown': 0, 'unsupported': 0}
-    tree = ET.parse(str(input_path))
-    root = tree.getroot()
 
     object_list = root.find('.//ObjectList')
     if object_list is None:
-        raise ValueError(f'No <ObjectList> found in {input_path}')
+        raise ValueError(f'No <ObjectList> found in {label}')
 
     parts = ['<?xml version="1.0"?>', '<fmxmlsnippet type="FMObjectList">']
     for step_el in object_list.findall('Step'):
@@ -369,21 +388,37 @@ def translate_script(input_path: Path, stats: dict | None = None) -> str:
 # CLI
 # ---------------------------------------------------------------------------
 
-def main():
-    if len(sys.argv) < 2 or sys.argv[1] in ('-h', '--help'):
-        print(__doc__)
-        sys.exit(0)
-
-    input_path = Path(sys.argv[1])
-    if not input_path.exists():
-        print(f'Error: {input_path} not found', file=sys.stderr)
-        sys.exit(1)
-
-    output_path = Path(sys.argv[2]) if len(sys.argv) > 2 else None
+def main(argv=None):
+    ap = argparse.ArgumentParser(
+        description='Translate a FileMaker Save-As-XML script into fmxmlsnippet (clipboard) XML.')
+    ap.add_argument('input', nargs='?', help='a Save-As-XML script file (instead of -s and --script)')
+    ap.add_argument('output', nargs='?', help='output path (default: stdout)')
+    ap.add_argument('-o', '--output-file', help='output path (default: stdout)')
+    sc.add_script_arguments(ap)
+    args = ap.parse_args(argv)
 
     stats = {'unknown': 0, 'unsupported': 0}
-    result = translate_script(input_path, stats)
+    if sc.wants_script(args):
+        if args.input or args.output:
+            ap.error('give either an XML file or -s with --script/--doc-id, not both '
+                     '(use -o for the output path)')
+        try:
+            ctx, script = sc.script_from_args(args)
+            result = translate_xml(ctx.raw_xml(script.doc_id), stats, script.doc_id)
+        except sc.SolutionContextError as e:
+            print(f'ERROR: {e}', file=sys.stderr)
+            return 1
+    elif args.input:
+        input_path = Path(args.input)
+        if not input_path.exists():
+            print(f'Error: {input_path} not found', file=sys.stderr)
+            return 1
+        result = translate_script(input_path, stats)
+    else:
+        ap.error('name a script (-s <solution> --script <name>) or an XML file')
 
+    out = args.output_file or args.output
+    output_path = Path(out) if out else None
     if output_path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(result, encoding='utf-8')
@@ -394,6 +429,7 @@ def main():
     if stats['unknown'] or stats['unsupported']:
         print(f'NOTE: {stats["unknown"]} unknown, {stats["unsupported"]} unsupported step(s)',
               file=sys.stderr)
+    return 0
 
 
 # Kept for the emptyresolver id-normalized path (tests / no-context conversion).
@@ -401,4 +437,4 @@ _EMPTY = EmptyResolver()
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

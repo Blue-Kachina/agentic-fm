@@ -22,13 +22,15 @@ Read `agent/config/automation.json` and check `project_tier` (preferred) or `def
 
 If the developer has not already identified the script, use the `script-lookup` skill to find it.
 
-Once identified, read the human-readable version from `agent/xml_parsed/scripts_sanitized/` to understand the current logic. Also check if an fmxmlsnippet version already exists in `agent/sandbox/`.
+Once identified, read the human-readable version to understand the current logic (`python3 agent/scripts/saxmlpreview.py -s "{solution}" --docs-root <folder> --script "{ScriptName}"`, numbered as in Script Workspace). Also check if an fmxmlsnippet version already exists in `agent/sandbox/`.
 
-If neither exists, convert the SaXML version to fmxmlsnippet:
+If none exists, convert the script from the solution's fm-saxml docs to fmxmlsnippet:
 
 ```bash
-python3 agent/scripts/fm_xml_to_snippet.py "agent/xml_parsed/scripts/{solution}/{path}.xml" "agent/sandbox/{ScriptName}.xml"
+python3 agent/scripts/fm_xml_to_snippet.py -s "{solution}" --docs-root <folder> --script "{ScriptName}" -o "agent/sandbox/{ScriptName}.xml"
 ```
+
+`--script` takes the name or the docId (`--doc-id "script:{ScriptName}"`); a name that matches several scripts, or none, fails and lists the candidates. `-s` also takes the docs folder; add `--file` for a multi-file build.
 
 Read `agent/CONTEXT.json` or index files for any field/layout/script references needed.
 

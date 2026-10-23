@@ -105,10 +105,11 @@ Then use `AskUserQuestion`: "Is this the correct script? — {Script Name} (ID: 
 **If confirmed:**
 
 - If an fmxmlsnippet already exists in `agent/sandbox/`, use it as the editable base.
-- If none exists, convert the Save-As-XML source:
+- If none exists, convert the script from the solution's fm-saxml docs:
   ```bash
-  python3 agent/scripts/fm_xml_to_snippet.py "agent/xml_parsed/scripts/{solution}/{folder}/{ScriptName} - ID {ScriptID}.xml" "agent/sandbox/{ScriptName}.xml"
+  python3 agent/scripts/fm_xml_to_snippet.py -s "{solution}" --docs-root <folder> --script "{ScriptName}" -o "agent/sandbox/{ScriptName}.xml"
   ```
+  `--script` takes the name or the docId (`--doc-id "script:{ScriptName}"`); a name that matches several scripts, or none, fails and lists the candidates. `-s` also takes the docs folder; add `--file` for a multi-file build.
 - Proceed with the next action (handoff to review/refactor, or simply present the script).
 
 **If declined:**

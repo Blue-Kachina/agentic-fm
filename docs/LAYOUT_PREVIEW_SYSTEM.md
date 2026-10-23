@@ -10,8 +10,8 @@ How the agent designs, previews, and produces FileMaker layout objects. This doc
                                     ┌─────────────────────────┐
                                     │   FileMaker Solution    │
                                     │                         │
-                                    │  xml_parsed/themes/     │──── Theme XML (CSS + metadata)
-                                    │  xml_parsed/layouts/    │──── Layout XML (objects + positions)
+                                    │  fm-saxml docs: model   │──── Theme metadata, layout objects
+                                    │  and raw/ XML           │──── Theme CSS, layout XML
                                     └─────────────────────────┘
                                                 │
                                     ┌───────────┴───────────┐
@@ -80,14 +80,14 @@ How the agent designs, previews, and produces FileMaker layout objects. This doc
 
 **Tool**: `agent/scripts/extract_theme.py`
 
-FileMaker themes define the visual language of a solution — fonts, colors, borders, padding, icon styles. The extraction tool reads the theme XML from `xml_parsed/themes/{solution}/` and produces web-usable output files in `agent/context/{solution}/`.
+FileMaker themes define the visual language of a solution — fonts, colors, borders, padding, icon styles. The extraction tool reads the solution's fm-saxml docs (theme metadata from the model, the CSS from the theme's raw XML, style classes from the layouts' raw XML) and produces web-usable output files in `agent/context/{solution}/`.
 
 ### Usage
 
 ```bash
-python3 agent/scripts/extract_theme.py                          # auto-detect solution
-python3 agent/scripts/extract_theme.py "Invoice Solution"       # explicit solution
-python3 agent/scripts/extract_theme.py --list                   # list available themes
+python3 agent/scripts/extract_theme.py -s "Invoice Solution" --docs-root <folder>    # the default theme
+python3 agent/scripts/extract_theme.py -s "Invoice Solution" --theme "Apex Blue"     # another theme
+python3 agent/scripts/extract_theme.py -s "Invoice Solution" --list                  # list the themes
 ```
 
 ### Output Files
@@ -156,10 +156,12 @@ FileMaker layout XML is extremely verbose — a 52-object layout produces 2,310 
 ### Usage
 
 ```bash
-python3 agent/scripts/layout_to_summary.py <layout.xml>                              # single file to stdout
-python3 agent/scripts/layout_to_summary.py --solution "Invoice Solution"              # all layouts
-python3 agent/scripts/layout_to_summary.py --solution "Invoice Solution" --layout "Invoices Details"
+python3 agent/scripts/layout_to_summary.py -s "Invoice Solution" --docs-root <folder>                     # all layouts
+python3 agent/scripts/layout_to_summary.py -s "Invoice Solution" --layout "Invoices Details" --print      # one, to stdout
+python3 agent/scripts/layout_to_summary.py <layout.xml>                                                   # any layout XML file
 ```
+
+It reads the solution's fm-saxml docs (through `solution_context.py`; `-s` also takes the docs folder, and `--file` picks a file of a multi-file build): object positions, field bindings, display styles, value lists, portals and button scripts from the model, the rest (styles, text, icons, conditions, triggers) from the layout's raw XML. `--layout` takes a name or docId, or part of a name.
 
 ### What It Extracts
 
@@ -167,7 +169,7 @@ For each layout object:
 - **Type**: Edit Box, Text, Button, Button Bar, Portal, Rectangle, Container, Drop-down, Radio Button Set, etc.
 - **Bounds**: `[top, left, bottom, right]` — absolute pixel coordinates
 - **Field binding**: `"Invoices::Number"` with field ID
-- **Display style**: editBox, dropDown, radioButtons, calendar, popUp
+- **Display style**: editBox, dropDown, popUp, checkbox, radioButtons, calendar, concealedEditBox
 - **Style class**: the LocalCSS class name (e.g., `medium_strong_field`)
 - **Button wiring**: script name, script ID, parameter, tooltip
 - **Portal config**: related TO, visible row count, nested objects
@@ -354,6 +356,6 @@ This path is recommended for new solutions, complex UI interactions, or solution
 
 - **The agent cannot create layout containers** — only the objects on them. The developer must create the layout in FM first (name, base TO, dimensions).
 - **The agent must only suggest styles that exist in `theme-classes.json`** — creating new theme classes requires manual work in FM's Theme editor.
-- **Layout XML in `xml_parsed/layouts/` is read-only** — never modified by the agent.
+- **Layout XML in the fm-saxml docs is read-only** — never modified by the agent.
 - **The preview is approximate** — FM renders objects through its own engine; the web preview uses CSS approximations. Pixel-perfect fidelity is not the goal; design decision fidelity is.
 - **SVG icons in layout objects** are decoded from base64 for the preview but the agent does not generate new icon data — buttons in XML2 output use empty `<IconData>` unless the developer provides icon content.
