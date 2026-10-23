@@ -1,0 +1,2 @@
+# Exports exactly as FileMaker wrote them (one has a CR inside a calc): no line-ending conversion.
+*.xml -text
