@@ -82,12 +82,16 @@ def test_build_matches_golden_with_listed_differences(built):
 
 
 @needs_fm_saxml
-def test_query_and_dead_read_the_new_index(built):
+def test_query_and_dead_agree_with_the_index(built):
+    """query and dead read the docs, not xref.index (P2-07), and report the rows build writes."""
     root, docs = built
     assert _run(root, "agent/scripts/trace.py", "build", "-s", "EverythingBagel", "--docs-root", str(docs)).returncode == 0
-    q = _run(root, "agent/scripts/trace.py", "query", "-s", "EverythingBagel", "-t", "script", "-n", "Just Beep")
+    index = (root / "agent" / "context" / "EverythingBagel" / "xref.index").read_text(encoding="utf-8")
+    assert "layout|EverythingBagel (ID 1)|button script|script|Just Beep|" in index
+    docs_args = ("-s", "EverythingBagel", "--docs-root", str(docs))
+    q = _run(root, "agent/scripts/trace.py", "query", *docs_args, "-t", "script", "-n", "Just Beep")
     assert q.returncode == 0 and "EverythingBagel (ID 1), button script" in q.stdout
-    d = _run(root, "agent/scripts/trace.py", "dead", "-s", "EverythingBagel", "-t", "scripts")
+    d = _run(root, "agent/scripts/trace.py", "dead", *docs_args, "-t", "scripts")
     assert d.returncode == 0 and "OneOfEverything" in d.stdout and "Just Beep" not in d.stdout
 
 

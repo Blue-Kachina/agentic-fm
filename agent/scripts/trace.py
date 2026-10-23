@@ -2,28 +2,29 @@
 """
 Cross-reference tracer for FileMaker solutions.
 
-Builds a cross-reference index from the solution's fm-saxml docs (the typed
-references in references.json, read through solution_context.py) and supports
-targeted queries and dead-object detection.
+Reads the solution's fm-saxml docs (the typed references in references.json,
+through solution_context.py) for targeted queries and dead-object detection, and
+can write the cross-reference as an index file.
 
-Usage:
-  python3 trace.py build  -s "Solution Name" [--docs-root <folder>] [--file <name>] [--context <name>]
+Usage (every command takes -s, plus --docs-root <folder> or $FM_SAXML_DOCS_ROOT;
+-s can also be a docs folder; --file <name> picks one file of a multi-file build):
   python3 trace.py query  -s "Solution Name" -t field -n "Clients::Name"
   python3 trace.py query  -s "Solution Name" -t script -n "Print Invoice"
   python3 trace.py dead   -s "Solution Name" -t fields
   python3 trace.py dead   -s "Solution Name" -t scripts
   python3 trace.py dead   -s "Solution Name" -t custom_functions
+  python3 trace.py build  -s "Solution Name" [--context <name>]
 
 Output:
-  build  → writes agent/context/{solution}/xref.index
   query  → prints references to/from the named object
   dead   → prints unreferenced objects with confidence levels
+  build  → writes agent/context/{solution}/xref.index (query and dead don't need it:
+           they read the docs each time)
 """
 
 import argparse
 import json
 import os
-import re
 import sys
 from collections import namedtuple
 from pathlib import Path
@@ -39,7 +40,6 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent.parent  # agent/scripts/ → project root
 
 CONTEXT_DIR = PROJECT_ROOT / "agent" / "context"
-XML_PARSED_DIR = PROJECT_ROOT / "agent" / "xml_parsed"
 CONFIG_DIR = PROJECT_ROOT / "agent" / "config"
 
 
@@ -65,95 +65,6 @@ SYSTEM_FIELDS = {
     "PrimaryKey", "CreationTimestamp", "CreatedBy",
     "ModificationTimestamp", "ModifiedBy",
 }
-
-
-# ---------------------------------------------------------------------------
-# Index loaders (query and dead; build reads the fm-saxml model instead)
-# ---------------------------------------------------------------------------
-
-def _parse_index(path, columns):
-    """Parse a pipe-delimited index file into a list of dicts."""
-    rows = []
-    if not path.exists():
-        return rows
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.rstrip("\n")
-            if not line or line.startswith("#"):
-                continue
-            parts = line.split("|")
-            row = {}
-            for i, col in enumerate(columns):
-                row[col] = parts[i] if i < len(parts) else ""
-            rows.append(row)
-    return rows
-
-
-def load_fields_index(solution_dir):
-    return _parse_index(
-        solution_dir / "fields.index",
-        ["table", "table_id", "field", "field_id", "datatype",
-         "fieldtype", "auto_enter", "flags"],
-    )
-
-
-def load_table_occurrences_index(solution_dir):
-    return _parse_index(
-        solution_dir / "table_occurrences.index",
-        ["to_name", "to_id", "base_table", "base_table_id"],
-    )
-
-
-def load_scripts_index(solution_dir):
-    return _parse_index(
-        solution_dir / "scripts.index",
-        ["name", "id", "folder"],
-    )
-
-
-def load_layouts_index(solution_dir):
-    return _parse_index(
-        solution_dir / "layouts.index",
-        ["name", "id", "base_to", "base_to_id", "folder"],
-    )
-
-
-def load_value_lists_index(solution_dir):
-    return _parse_index(
-        solution_dir / "value_lists.index",
-        ["name", "id", "source_type", "values"],
-    )
-
-
-def build_to_map(to_index):
-    """Build {TOName: BaseTableName} mapping."""
-    return {row["to_name"]: row["base_table"] for row in to_index}
-
-
-def build_cf_names(solution_name):
-    """Get list of custom function names and IDs from directory listing."""
-    cf_dir = XML_PARSED_DIR / "custom_functions_sanitized" / solution_name
-    cfs = []
-    if not cf_dir.exists():
-        return cfs
-    # rglob (not iterdir) so functions nested inside custom-function group
-    # folders (e.g. "Object Functions - ID 53/") are found, not missed.
-    for f in cf_dir.rglob("*.txt"):
-        # Parse "FuncName - ID NNN.txt"
-        m = re.match(r'^(.+?)\s*-\s*ID\s+(\d+)\.txt$', f.name)
-        if not m:
-            continue
-        # Skip empty / whitespace-only stubs — these are custom-function group
-        # or folder headers (and separators like "--"), not real functions.
-        # Without this, their names get counted as CFs and then flagged as
-        # dead by the unused-CF scan.
-        try:
-            if not f.read_text(encoding="utf-8").strip():
-                continue
-        except OSError:
-            continue
-        cfs.append({"name": m.group(1), "id": m.group(2), "path": f})
-    return cfs
 
 
 # ---------------------------------------------------------------------------
@@ -206,6 +117,7 @@ LOCATION_FOR_ROLE = {
     "sourceTableOccurrence": "table occurrence", "external": "external values",
     "menuItem": "menu item", "installCondition": "install condition",
     "defaultLayout": "default layout",
+    "callee": "Perform Script", "target": "step target",
 }
 # Roles a layout or layout object gives a script trigger are event names (OnRecordLoad...)
 TRIGGER_RELATIONSHIP = "triggersScript"
@@ -397,36 +309,9 @@ def _context_name(args, ctx):
     return args.solution
 
 
-def _default_solution(docs_root):
-    """The only solution under the docs root, for `build` without -s."""
-    root = docs_root or os.environ.get(solution_context.DOCS_ROOT_ENV)
-    if root and Path(root).is_dir():
-        found = [d.name for d in Path(root).iterdir() if d.is_dir()
-                 and ((d / "docs.json").is_file() or (d / "entities.json").is_file())]
-        if len(found) == 1:
-            return found[0]
-        if found:
-            print("Multiple solutions found. Specify one with -s:", file=sys.stderr)
-            for s in sorted(found):
-                print(f"  {s}", file=sys.stderr)
-            sys.exit(1)
-    return None
-
-
 def cmd_build(args):
     """Build xref.index for the solution from its fm-saxml docs."""
-    if not args.solution:
-        args.solution = _default_solution(args.docs_root)
-        if not args.solution:
-            print("ERROR: no solution given: pass -s <solution> (and --docs-root or "
-                  f"${solution_context.DOCS_ROOT_ENV})", file=sys.stderr)
-            sys.exit(1)
-    try:
-        ctx = solution_context.from_args(args)
-        all_refs = build_xrefs(ctx)
-    except solution_context.SolutionContextError as e:
-        print(f"ERROR: {e}", file=sys.stderr)
-        sys.exit(1)
+    ctx, all_refs = load_solution(args)
 
     solution_name = _context_name(args, ctx)
     solution_dir = CONTEXT_DIR / solution_name
@@ -460,54 +345,117 @@ def cmd_build(args):
     print(f"  Output: {xref_path}")
 
 
-
 def _escape_pipe(s):
     """Escape pipe characters in index values."""
     return s.replace("|", "\\|")
 
 
-def _unescape_pipe(s):
-    """Unescape pipe characters in index values."""
-    return s.replace("\\|", "|")
+# ---------------------------------------------------------------------------
+# Loading a solution (every command)
+# ---------------------------------------------------------------------------
+
+def _default_solution(docs_root):
+    """The only solution under the docs root, for a command run without -s."""
+    root = docs_root or os.environ.get(solution_context.DOCS_ROOT_ENV)
+    if root and Path(root).is_dir():
+        found = [d.name for d in Path(root).iterdir() if d.is_dir()
+                 and ((d / "docs.json").is_file() or (d / "entities.json").is_file())]
+        if len(found) == 1:
+            return found[0]
+        if found:
+            print("Multiple solutions found. Specify one with -s:", file=sys.stderr)
+            for s in sorted(found):
+                print(f"  {s}", file=sys.stderr)
+            sys.exit(1)
+    return None
+
+
+def load_solution(args):
+    """(SolutionContext, XRef rows) for the command's -s / --docs-root / --file; exits with one message."""
+    if not args.solution:
+        args.solution = _default_solution(args.docs_root)
+        if not args.solution:
+            print("ERROR: no solution given: pass -s <solution> (and --docs-root or "
+                  f"${solution_context.DOCS_ROOT_ENV})", file=sys.stderr)
+            sys.exit(1)
+    try:
+        ctx = solution_context.from_args(args)
+        return ctx, build_xrefs(ctx)
+    except solution_context.SolutionContextError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 # ---------------------------------------------------------------------------
 # Query command
 # ---------------------------------------------------------------------------
 
-def load_xref(solution_dir):
-    """Load xref.index into list of XRef tuples."""
-    xref_path = solution_dir / "xref.index"
-    if not xref_path.exists():
-        print(f"ERROR: xref.index not found. Run 'build' first.", file=sys.stderr)
-        sys.exit(1)
+def _is_external(ref):
+    """A row whose target is in another file: it never makes a same-named object here used."""
+    return "external file" in ref.ref_context
 
-    refs = []
-    with open(xref_path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.rstrip("\n")
-            if not line or line.startswith("#"):
+
+def _other_file_source(doc_id):
+    """'xfile:Invoices/scriptStep:Post:0012' -> ('Invoices', 'Post (line 13)')."""
+    scope, _, local = doc_id.partition("/")
+    file_label = scope.split(":", 1)[1] if scope.startswith(("xfile:", "file:")) else scope
+    kind, _, rest = local.partition(":")
+    if kind == "scriptStep" and rest.rpartition(":")[2].isdigit():
+        script, _, index = rest.rpartition(":")
+        return file_label, f"{script} (line {int(index) + 1})"
+    if kind == "layoutObject":
+        return file_label, rest.rsplit("::", 1)[0]
+    return file_label, rest
+
+
+def other_file_uses(ctx):
+    """XRef rows for uses of this file's objects from other files of a multi-file build.
+
+    fm-saxml's backlinks.json holds them (sources scoped "xfile:<folder>/..." or by file);
+    references.json, which build reads, only has this file's own references.
+    """
+    try:
+        backlinks = ctx.docs.backlinks
+    except (OSError, ValueError):      # no backlinks.json (older or partial docs): nothing to add
+        return []
+    names = {}
+    for prefix, ref_type in (("field", "field"), ("script", "script"), ("layout", "layout"),
+                             ("valueList", "value_list"), ("customFunction", "custom_func"),
+                             ("to", "table_occurrence")):
+        for doc_id, e in ctx.collection(prefix).items():
+            names[doc_id] = (ref_type, getattr(e, "qualified_name", None) or e.name)
+    rows = []
+    for target, links in backlinks.items():
+        if target not in names:
+            continue
+        ref_type, name = names[target]
+        for b in links:
+            if "/" not in b.source_doc_id or b.relationship_type in STRUCTURAL:
                 continue
-            # Split on unescaped pipes
-            parts = re.split(r'(?<!\\)\|', line)
-            if len(parts) < 6:
-                continue
-            refs.append(XRef(
-                _unescape_pipe(parts[0]),
-                _unescape_pipe(parts[1]),
-                _unescape_pipe(parts[2]),
-                _unescape_pipe(parts[3]),
-                _unescape_pipe(parts[4]),
-                _unescape_pipe(parts[5]),
-            ))
-    return refs
+            file_label, source = _other_file_source(b.source_doc_id)
+            role = b.role or ""
+            if b.source_entity_type == "relationship":
+                location = "sort field" if role.endswith("Sort") else "join field"
+            elif b.relationship_type == TRIGGER_RELATIONSHIP and role and role not in LOCATION_FOR_ROLE:
+                location = f"trigger: {role}"
+            else:
+                location = LOCATION_FOR_ROLE.get(role, role or b.relationship_type)
+            rows.append(XRef("other_file", f"{file_label}: {source}", location, ref_type, name, ""))
+    return rows
 
 
-def cmd_query(solution_name, ref_type, ref_name, direction):
+def _to_map(ctx):
+    """{TO name: base table name}."""
+    tables = ctx.collection("table")
+    return {to.name: _named(tables.get(to.base_table_doc_id), _doc_name(to.base_table_doc_id or ""))
+            for to in ctx.collection("to").values() if getattr(to, "base_table_doc_id", None)}
+
+
+def cmd_query(args):
     """Query references to/from an object."""
-    solution_dir = CONTEXT_DIR / solution_name
-    to_index = load_table_occurrences_index(solution_dir)
-    to_map = build_to_map(to_index)
+    ctx, xrefs = load_solution(args)
+    ref_type, ref_name, direction = args.type, args.name, args.direction
+    to_map = _to_map(ctx)
 
     # Resolve TO-qualified input to canonical form
     canonical_name = ref_name
@@ -517,12 +465,10 @@ def cmd_query(solution_name, ref_type, ref_name, direction):
         base = to_map.get(to_name, to_name)
         canonical_name = f"{base}::{field_name}"
 
-    xrefs = load_xref(solution_dir)
-
     if direction == "inbound":
-        # Who references this object?
-        matches = [x for x in xrefs
-                   if x.ref_type == ref_type and x.ref_name == canonical_name]
+        # Who references this object? (here, and from other files of a multi-file build)
+        matches = [x for x in xrefs + other_file_uses(ctx)
+                   if x.ref_type == ref_type and x.ref_name == canonical_name and not _is_external(x)]
     else:
         # What does this object reference?
         matches = [x for x in xrefs
@@ -553,6 +499,9 @@ def cmd_query(solution_name, ref_type, ref_name, direction):
         "custom_func": "CUSTOM FUNCTIONS",
         "relationship": "RELATIONSHIPS",
         "value_list": "VALUE LISTS",
+        "file": "FILE",
+        "custom_menu": "CUSTOM MENUS",
+        "other_file": "OTHER FILES",
         "field": "FIELDS",
         "table_occurrence": "TABLE OCCURRENCES",
     }
@@ -564,11 +513,11 @@ def cmd_query(solution_name, ref_type, ref_name, direction):
         print(f"{type_labels[group_key]} ({len(items)}):")
         for ref in items:
             if direction == "inbound":
-                ctx = f" \u2014 {ref.ref_context}" if ref.ref_context else ""
-                print(f"  {ref.source_name}, {ref.source_location}{ctx}")
+                note = f" — {ref.ref_context}" if ref.ref_context else ""
+                print(f"  {ref.source_name}, {ref.source_location}{note}")
             else:
-                ctx = f" \u2014 {ref.ref_context}" if ref.ref_context else ""
-                print(f"  {ref.ref_type}: {ref.ref_name} ({ref.source_location}){ctx}")
+                note = f" — {ref.ref_context}" if ref.ref_context else ""
+                print(f"  {ref.ref_type}: {ref.ref_name} ({ref.source_location}){note}")
         print()
 
     print(f"Summary: {len(matches)} references across {len(groups)} source type(s)")
@@ -578,42 +527,21 @@ def cmd_query(solution_name, ref_type, ref_name, direction):
 # Dead object scan
 # ---------------------------------------------------------------------------
 
-def cmd_dead(solution_name, obj_type, verbose):
+def cmd_dead(args):
     """Find unreferenced objects."""
-    solution_dir = CONTEXT_DIR / solution_name
-    xrefs = load_xref(solution_dir)
+    ctx, xrefs = load_solution(args)
+    obj_type, verbose = args.type, args.verbose
+    solution_name = ctx.name
 
-    # Reliability guard: dead-object detection for scripts/fields/value_lists
-    # leans on layout references (placements, button scripts, triggers). If the
-    # xref has no layout-sourced refs, those edges are missing and the results
-    # will over-report "dead" objects. Warn loudly rather than mislead a
-    # human about to delete things.
-    if obj_type in ("scripts", "fields", "value_lists"):
-        has_layout_refs = any(ref.source_type == "layout" for ref in xrefs)
-        if not has_layout_refs:
-            print(
-                "⚠️  WARNING: xref.index contains NO layout references — "
-                f"'{obj_type}' dead results are UNRELIABLE.\n"
-                "    Layout placements, button scripts and script triggers are "
-                "missing, so trigger-only / layout-only objects will be "
-                "falsely flagged as dead.\n"
-                "    Regenerate layout summaries and rebuild before trusting "
-                "this output:\n"
-                f"      python3 agent/scripts/layout_to_summary.py --solution \"{solution_name}\"\n"
-                f"      python3 agent/scripts/trace.py build -s \"{solution_name}\"\n",
-                file=sys.stderr,
-            )
-
-    # Build set of all referenced objects by type
+    # Build set of all referenced objects by type: from this file (not its references into
+    # other files) and from other files of a multi-file build
     referenced = set()
-    for ref in xrefs:
-        if ref.ref_type == _dead_ref_type(obj_type):
+    for ref in xrefs + other_file_uses(ctx):
+        if ref.ref_type == _dead_ref_type(obj_type) and not _is_external(ref):
             referenced.add(ref.ref_name)
 
     # Build set of all objects of this type
-    all_objects, on_layout, system_excluded, module_objects = _get_all_objects(
-        solution_dir, solution_name, obj_type, xrefs,
-    )
+    all_objects, on_layout, system_excluded, module_objects = _get_all_objects(ctx, obj_type, xrefs)
 
     # Compute dead = all - referenced
     unreferenced = all_objects - referenced
@@ -650,7 +578,7 @@ def cmd_dead(solution_name, obj_type, verbose):
             layout_str = ", ".join(layouts[:3])
             if len(layouts) > 3:
                 layout_str += f" (+{len(layouts) - 3} more)"
-            print(f"  {obj} \u2014 on layout: {layout_str}")
+            print(f"  {obj} — on layout: {layout_str}")
         print()
 
     if module:
@@ -735,32 +663,33 @@ def match_module(name, folder, modules):
     return None
 
 
-def _get_all_objects(solution_dir, solution_name, obj_type, xrefs):
-    """Get all objects, plus layout-only, system-excluded and module objects."""
+def _get_all_objects(ctx, obj_type, xrefs):
+    """Get all objects (from the model), plus layout-only, system-excluded and module objects."""
     system_excluded = set()
     on_layout = {}  # {obj_name: [layout_names]}
     module_objects = {}  # {obj_name: module_label}
     modules = load_modules()
+    all_objects = set()
 
     if obj_type == "fields":
-        fields_index = load_fields_index(solution_dir)
-        all_objects = set()
-        for row in fields_index:
-            canonical = f"{row['table']}::{row['field']}"
+        for f in ctx.collection("field").values():
+            canonical = f.qualified_name
+            table = canonical.split("::", 1)[0]
             all_objects.add(canonical)
 
-            label = match_module(row["field"], "", modules) or match_module(row["table"], "", modules)
+            label = match_module(f.name, "", modules) or match_module(table, "", modules)
             if label:
                 module_objects[canonical] = label
 
             # System exclusions
-            if row["field"] in SYSTEM_FIELDS:
+            storage = getattr(f, "storage", None)
+            if f.name in SYSTEM_FIELDS:
                 system_excluded.add(canonical)
-            elif row["field"].startswith("ForeignKey") or row["field"].startswith("FK"):
+            elif f.name.startswith("ForeignKey") or f.name.startswith("FK"):
                 system_excluded.add(canonical)
-            elif "global" in row.get("flags", ""):
+            elif storage is not None and storage.global_storage:
                 system_excluded.add(canonical)
-            elif row["fieldtype"] == "Summary":
+            elif f.field_type == "Summary":
                 system_excluded.add(canonical)
 
         # Find fields that are only on layouts
@@ -771,13 +700,11 @@ def _get_all_objects(solution_dir, solution_name, obj_type, xrefs):
                 )
 
     elif obj_type == "scripts":
-        scripts_index = load_scripts_index(solution_dir)
-        all_objects = set()
-        for row in scripts_index:
-            all_objects.add(row["name"])
-            label = match_module(row["name"], row.get("folder", ""), modules)
+        for s in ctx.scripts.values():
+            all_objects.add(s.name)
+            label = match_module(s.name, getattr(s, "folder_path", None) or "", modules)
             if label:
-                module_objects[row["name"]] = label
+                module_objects[s.name] = label
 
         # Find scripts only on layouts
         for ref in xrefs:
@@ -787,67 +714,30 @@ def _get_all_objects(solution_dir, solution_name, obj_type, xrefs):
                 )
 
     elif obj_type == "custom_functions":
-        cf_names = build_cf_names(solution_name)
-        all_objects = set()
-        for cf in cf_names:
-            all_objects.add(cf["name"])
-            label = match_module(cf["name"], "", modules)
+        for cf in ctx.collection("customFunction").values():
+            # Skip group / folder headers and separators ("--"): they have no body.
+            if not (getattr(cf, "calculation", None) or "").strip():
+                continue
+            all_objects.add(cf.name)
+            label = match_module(cf.name, "", modules)
             if label:
-                module_objects[cf["name"]] = label
+                module_objects[cf.name] = label
 
     elif obj_type == "layouts":
-        layouts_index = load_layouts_index(solution_dir)
-        all_objects = set()
-        for row in layouts_index:
-            all_objects.add(row["name"])
-            label = match_module(row["name"], row.get("folder", ""), modules)
+        for lay in ctx.layouts.values():
+            all_objects.add(lay.name)
+            label = match_module(lay.name, getattr(lay, "folder_path", None) or "", modules)
             if label:
-                module_objects[row["name"]] = label
+                module_objects[lay.name] = label
 
     elif obj_type == "value_lists":
-        vl_index = load_value_lists_index(solution_dir)
-        all_objects = set()
-        for row in vl_index:
-            all_objects.add(row["name"])
-            label = match_module(row["name"], "", modules)
+        for vl in ctx.collection("valueList").values():
+            all_objects.add(vl.name)
+            label = match_module(vl.name, "", modules)
             if label:
-                module_objects[row["name"]] = label
-
-    else:
-        all_objects = set()
+                module_objects[vl.name] = label
 
     return all_objects, on_layout, system_excluded, module_objects
-
-
-# ---------------------------------------------------------------------------
-# Solution discovery
-# ---------------------------------------------------------------------------
-
-def discover_solutions():
-    """List available solutions in agent/context/."""
-    if not CONTEXT_DIR.exists():
-        return []
-    return [d.name for d in CONTEXT_DIR.iterdir()
-            if d.is_dir() and not d.name.startswith(".")]
-
-
-def resolve_solution(args_solution):
-    """Resolve the solution name, auto-selecting if only one exists."""
-    if args_solution:
-        return args_solution
-
-    solutions = discover_solutions()
-    if len(solutions) == 0:
-        print("ERROR: No solutions found in agent/context/", file=sys.stderr)
-        print("  Run fmcontext.sh first to generate index files.", file=sys.stderr)
-        sys.exit(1)
-    elif len(solutions) == 1:
-        return solutions[0]
-    else:
-        print("Multiple solutions found. Specify one with -s:", file=sys.stderr)
-        for s in sorted(solutions):
-            print(f"  {s}", file=sys.stderr)
-        sys.exit(1)
 
 
 # ---------------------------------------------------------------------------
@@ -866,13 +756,12 @@ def main():
     solution_context.add_arguments(build_parser, solution_required=False)
     build_parser.add_argument(
         "--context", default=None,
-        help="folder under agent/context/ to write xref.index to, the name query and dead "
-             "take with -s (default: -s, or the FileMaker file name when -s is a docs folder "
-             "or --file is given)")
+        help="folder under agent/context/ to write xref.index to (default: -s, or the "
+             "FileMaker file name when -s is a docs folder or --file is given)")
 
     # query
     query_parser = subparsers.add_parser("query", help="Query references")
-    query_parser.add_argument("-s", "--solution", help="Solution name")
+    solution_context.add_arguments(query_parser, solution_required=False)
     query_parser.add_argument(
         "-t", "--type", required=True,
         choices=["field", "script", "layout", "value_list", "custom_func",
@@ -889,7 +778,7 @@ def main():
 
     # dead
     dead_parser = subparsers.add_parser("dead", help="Find unreferenced objects")
-    dead_parser.add_argument("-s", "--solution", help="Solution name")
+    solution_context.add_arguments(dead_parser, solution_required=False)
     dead_parser.add_argument(
         "-t", "--type", required=True,
         choices=["fields", "scripts", "custom_functions", "layouts", "value_lists"],
@@ -901,13 +790,10 @@ def main():
     args = parser.parse_args()
     if args.command == "build":
         cmd_build(args)
-        return
-    solution = resolve_solution(args.solution)
-
-    if args.command == "query":
-        cmd_query(solution, args.type, args.name, args.direction)
+    elif args.command == "query":
+        cmd_query(args)
     elif args.command == "dead":
-        cmd_dead(solution, args.type, args.verbose)
+        cmd_dead(args)
 
 
 if __name__ == "__main__":

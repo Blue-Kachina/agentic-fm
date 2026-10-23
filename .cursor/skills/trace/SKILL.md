@@ -11,26 +11,26 @@ This skill traces references to FileMaker objects (fields, scripts, custom funct
 
 ### Layer 1: Deterministic engine (`trace.py`)
 
-Reads the solution's fm-saxml docs and builds `agent/context/{solution}/xref.index` — a compact cross-reference index. Supports three commands:
+Reads the solution's fm-saxml docs (the references fm-saxml resolved) for every command. Supports three commands:
 
 ```bash
-python3 agent/scripts/trace.py build  -s "Solution Name" --docs-root <folder>   # build xref.index
-python3 agent/scripts/trace.py query  -s "Solution Name" -t TYPE -n "Name"  # query refs
-python3 agent/scripts/trace.py dead   -s "Solution Name" -t TYPE  # find unused objects
+python3 agent/scripts/trace.py query  -s "Solution Name" --docs-root <folder> -t TYPE -n "Name"  # query refs
+python3 agent/scripts/trace.py dead   -s "Solution Name" --docs-root <folder> -t TYPE            # find unused objects
+python3 agent/scripts/trace.py build  -s "Solution Name" --docs-root <folder>                     # write xref.index
 ```
 
 Query types: `field`, `script`, `layout`, `value_list`, `custom_func`, `table_occurrence`
 Dead types: `fields`, `scripts`, `custom_functions`, `layouts`, `value_lists`
 
-The `query` and `dead` commands read from the pre-built `xref.index` file — they do not re-scan source files. This means queries are fast (single file read) and the expensive `build` step only needs to run once per schema change.
+`query` and `dead` read the docs each time; they need no `build` and no index file. `build` writes the same rows to `agent/context/{solution}/xref.index` for anyone who wants the file (`--context <name>` names that folder).
 
 ### Layer 2: Agentic correlation (this skill)
 
 Adds judgment for things static analysis cannot handle: ExecuteSQL strings, dynamic references, ambiguity resolution, severity classification, and false positive filtering.
 
-## What trace.py build reads
+## What trace.py reads
 
-`build` reads the references fm-saxml resolved (`references.json`, through `agent/scripts/solution_context.py`): pass the solution's name with `--docs-root <folder>` (or set `FM_SAXML_DOCS_ROOT`), or its docs folder as `-s`. For a multi-file build add `--file <FileMaker file>`. `--context <name>` names the folder under `agent/context/` it writes to, which is the name `query` and `dead` take with `-s`.
+Every command reads the references fm-saxml resolved (`references.json`, through `agent/scripts/solution_context.py`): pass the solution's name with `--docs-root <folder>` (or set `FM_SAXML_DOCS_ROOT`), or its docs folder as `-s`. For a multi-file build add `--file <FileMaker file>`.
 
 | Source in the docs | xref rows |
 |--------|---------------|
@@ -44,6 +44,17 @@ Adds judgment for things static analysis cannot handle: ExecuteSQL strings, dyna
 
 All field references are in **canonical form** (`BaseTable::FieldName`); the TO used is kept in the reference context (`via TO "..."`). References into another file, by name (indirection) or unresolved say so in the context.
 
+In a multi-file build, `query` (inbound) also lists uses **from other files** under `OTHER FILES` (from fm-saxml's `backlinks.json`), and `dead` counts them: an object used only by another file is not dead. A reference **into** another file never makes a same-named object of this file look used.
+
+### Compared with fm-saxml's own "Used By"
+
+fm-saxml's pages list each object's backlinks ("Used By") and flag fields with none as unused candidates. On a 17-file real solution (2026-10-23), trace and those backlinks agree on 7,408 of 7,413 objects. The rest:
+
+- **Duplicate names** (3): trace matches by name, so two scripts with the same name count each other's callers; fm-saxml tracks each by docId.
+- **A data source pointing at its own file** (2): fm-saxml resolves such a reference back to the local script; trace treats it as a reference into another file.
+
+Other differences are on purpose: `dead` ranks results (high, medium = only on a layout, low = system or global fields, module = installed tools) where fm-saxml has one list, for fields only; and trace counts only usage, not structure (a table containing its field, a TO based on a table).
+
 ---
 
 ## Workflow
@@ -53,30 +64,19 @@ All field references are in **canonical form** (`BaseTable::FieldName`); the TO 
 Run all of these checks **in a single parallel batch** — they are independent:
 
 ```bash
-# 1a. Discover solutions
-ls agent/context/
-
-# 1b. Check xref.index existence and age
-stat agent/context/{solution}/xref.index
-
-# 1c. Check where the solution's fm-saxml docs are (for build)
+# 1a. Find the solution's fm-saxml docs (docs root: --docs-root or $FM_SAXML_DOCS_ROOT)
 python3 agent/scripts/solution_context.py -s "{solution}" --docs-root <folder>
 
-# 1d. Check webviewer status (for later visualization offer)
+# 1b. Check webviewer status (for later visualization offer)
 curl -s http://localhost:8765/webviewer/status
 ```
 
 **Solution resolution:**
-- If one subfolder exists, use it automatically.
-- If multiple exist, ask the developer which solution.
-- If none exist, instruct the developer to run `fmcontext.sh`.
+- With `-s` omitted, trace uses the only solution under the docs root; with several, ask the developer which one.
+- If none is found, the developer converts the Save a Copy as XML export with fm-saxml (`solution_context.py` prints the command).
+- A multi-file build needs `--file <FileMaker file>` for the file to trace.
 
-**xref.index caching — avoid unnecessary rebuilds:**
-- If `xref.index` **exists** and the developer has not mentioned schema changes (new fields, renamed tables, new scripts, etc.), **use it directly** — skip the build. This is the single biggest time saver.
-- If `xref.index` is **missing**, build it: `python3 agent/scripts/trace.py build -s "{solution}" --docs-root <folder>`
-- If the developer explicitly says the schema changed (after converting a new export with fm-saxml), or if trace results look wrong, **rebuild** with the same command.
-
-`build` takes layout references from the fm-saxml docs, so it no longer needs layout summaries.
+No build step: `query` and `dead` read the docs as they are. After a schema change, the developer exports and converts again; nothing else to refresh.
 
 Save the webviewer status result for Step 5b — do not check again later.
 
@@ -200,7 +200,7 @@ Format the combined results as a structured report appropriate to the mode:
 
 ### Step 5b — Webviewer visualization (conditional)
 
-Use the webviewer status captured in Step 1d (do not re-check).
+Use the webviewer status captured in Step 1b (do not re-check).
 
 If `"running": true`, prompt the developer:
 
@@ -250,9 +250,9 @@ curl -s -X POST http://localhost:8765/webviewer/push \
 
 ---
 
-## xref.index format
+## Reference rows (xref.index format)
 
-Pipe-delimited, one line per reference:
+What `query` prints and `build` writes to `xref.index` (pipe-delimited, one line per reference):
 
 ```
 # SourceType|SourceName|SourceLocation|RefType|RefName|RefContext
@@ -260,12 +260,12 @@ Pipe-delimited, one line per reference:
 
 | Column | Description |
 |--------|-------------|
-| SourceType | `field_calc`, `field_auto`, `script`, `layout`, `custom_func`, `relationship`, `value_list` |
-| SourceName | Canonical ID: `Invoices::Client Name`, `Print Invoice (ID 158)` |
-| SourceLocation | Where: `calc:Clients Primary::Name`, `line 14: Set Field`, `field placement` |
+| SourceType | `field_calc`, `field_auto`, `script`, `layout`, `custom_func`, `relationship`, `value_list`, `file`, `custom_menu`; `other_file` (query and dead only: a use from another file of a multi-file build) |
+| SourceName | Canonical ID: `Invoices::Client Name`, `Print Invoice (ID 158)`, `Invoices: Post (line 13)` (other file) |
+| SourceLocation | Where: `calc`, `line 14: Set Field` (Script Workspace line), `field placement`, `trigger: OnRecordLoad` |
 | RefType | `field`, `script`, `layout`, `value_list`, `custom_func`, `table_occurrence` |
 | RefName | Canonical (base table for fields): `Clients::Name` |
-| RefContext | Detail: `via TO "Clients Primary"`, `same table`, `left side`, empty |
+| RefContext | Detail: `via TO "Clients Primary"`, `same table`, `left side`, `external file "Sales"`, `by name`, `unresolved`, empty |
 
 ---
 
@@ -273,13 +273,13 @@ Pipe-delimited, one line per reference:
 
 Target tool calls from invocation to results presented:
 
-| Mode | Without cache | With xref.index cached |
-|------|---------------|------------------------|
-| Usage | 3 (preflight + build, query+grep, report) | 2 (preflight+query+grep, report) |
-| Dead | 3 (preflight + build, dead, report) | 2 (preflight+dead, report) |
-| Impact | 4 (preflight + build, parallel queries+grep, reads, report) | 3 (preflight+queries+grep, reads, report) |
+| Mode | Tool calls |
+|------|------------|
+| Usage | 2 (preflight+query+grep, report) |
+| Dead | 2 (preflight+dead, report) |
+| Impact | 3 (preflight+queries+grep, reads, report) |
 
-The key savings come from: (1) skipping `build` when xref.index exists, (2) running the deterministic query and agentic grep passes in the same parallel batch, (3) batching all preflight checks together, (4) caching the webviewer status from preflight instead of checking it after analysis.
+The key savings come from: (1) no build step (`query` and `dead` read the docs directly), (2) running the deterministic query and agentic grep passes in the same parallel batch, (3) batching all preflight checks together, (4) caching the webviewer status from preflight instead of checking it after analysis.
 
 ---
 
@@ -289,7 +289,7 @@ The key savings come from: (1) skipping `build` when xref.index exists, (2) runn
 
 Developer: "Where is `Clients::Name` used?"
 
-1. **Parallel preflight**: `ls agent/context/`, `stat xref.index`, `curl webviewer/status` -- xref.index exists, skip build
+1. **Parallel preflight**: `solution_context.py -s ...`, `curl webviewer/status`
 2. **Parallel query+grep**: `trace.py query -t field -n "Clients::Name"` + `grep -rl "ExecuteSQL" scripts_sanitized/` + `grep -rn "GetField" scripts_sanitized/` -- all in one batch
 3. Correlate: no ExecuteSQL hits reference Clients table, no dynamic refs
 4. Present report: 2 field calcs, 7 layout placements, 0 scripts
@@ -300,7 +300,7 @@ Developer: "Where is `Clients::Name` used?"
 
 Developer: "Show me all unused fields"
 
-1. **Parallel preflight+dead**: `ls agent/context/`, `stat xref.index`, `trace.py dead -t fields` -- xref.index exists, run dead immediately alongside preflight
+1. **Parallel preflight+dead**: `solution_context.py -s ...`, `trace.py dead -t fields` -- run dead immediately alongside preflight
 2. Verify: `Invoices::FoundCount` and `Line Items::FoundCount` are unstored calcs for `Get(FoundCount)` — used only at runtime on layouts with the field present
 3. Check layouts for FoundCount fields -- if present, downgrade to medium
 4. Present report with confidence levels
@@ -311,9 +311,9 @@ Developer: "Show me all unused fields"
 
 Developer: "What breaks if I rename the Clients table to Companies?"
 
-1. **Parallel preflight**: confirm xref.index exists, check webviewer
+1. **Parallel preflight**: find the docs, check webviewer
 2. **Parallel queries+grep** (single batch):
-   - `trace.py query -t field -n "Clients::*"` for each field (or grep xref.index directly for all Clients:: refs)
+   - `trace.py query -t field -n "Clients::<field>"` for each field (or `trace.py build` once and grep its xref.index for all `Clients::` refs)
    - `trace.py query -t table_occurrence -n "Clients"`
    - `grep -rl "ExecuteSQL" scripts_sanitized/`
 3. Read matched ExecuteSQL scripts in parallel to check for `Clients` table references

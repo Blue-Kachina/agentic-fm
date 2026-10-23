@@ -159,6 +159,18 @@ def test_newer_contract_major(roots, tmp_path):
         sc.load_solution(str(folder))
 
 
+@needs_fm_saxml
+def test_docs_not_in_the_contract_shape(roots, tmp_path):
+    folder = tmp_path / "Edited"
+    shutil.copytree(sc.locate("EverythingBagel", roots["single"]), folder)
+    data = json.loads((folder / "entities.json").read_text(encoding="utf-8"))
+    del next(iter(data["scriptSteps"].values()))["stepId"]       # a hand edit drops a required key
+    (folder / "entities.json").write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(sc.SolutionContextError, match="doesn't match the fm-saxml docs format") as e:
+        sc.load_solution(str(folder))
+    assert "stepId" in str(e.value)
+
+
 # -- missing fm-saxml and the command line -------------------------------------------
 
 def test_missing_fm_saxml_is_one_message(tmp_path):

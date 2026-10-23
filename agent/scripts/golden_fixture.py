@@ -58,8 +58,11 @@ UNORDERED = {"trace/xref.index"}
 
 # Golden files of tools already ported off the exploder: their exploder version is gone, so
 # run_tools() no longer makes them and --update keeps them as they are. Each port's own test
-# compares its output with them (trace build: test_trace_build.py).
-FROZEN = {"trace/build.txt", "trace/xref.index"}
+# compares its output with them (trace build: test_trace_build.py; trace query and dead:
+# test_trace_query_dead.py).
+FROZEN = ({"trace/build.txt", "trace/xref.index"}
+          | {f"trace/query_{name}.txt" for name, *_ in QUERIES}
+          | {f"trace/dead_{kind}.txt" for kind in DEAD_TYPES})
 
 
 def _shadow_root(tmp: Path) -> Path:
@@ -122,14 +125,8 @@ def run_tools() -> dict[str, str]:
         for p in sorted((ctx / "layouts").glob("*.json")):
             out[f"layout_to_summary/{p.name}"] = p.read_text(encoding="utf-8")
 
-        # trace.py build is ported (P2-06): query, dead and analyze.py read the golden xref.index
+        # trace.py is ported (P2-06, P2-07): analyze.py reads the golden xref.index
         shutil.copy2(GOLDEN / "trace" / "xref.index", ctx / "xref.index")
-        for name, kind, obj, direction in QUERIES:
-            out[f"trace/query_{name}.txt"] = _run(root, scripts + "trace.py", "query", "-s", SOLUTION,
-                                                  "-t", kind, "-n", obj, "--direction", direction)
-        for kind in DEAD_TYPES:
-            out[f"trace/dead_{kind}.txt"] = _run(root, scripts + "trace.py", "dead", "-s", SOLUTION,
-                                                 "-t", kind)
 
         # analyze.py's stdout is progress and timings: only its profile files are golden.
         _run(root, scripts + "analyze.py", "-s", SOLUTION, "--format", "all")

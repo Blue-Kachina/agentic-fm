@@ -144,7 +144,17 @@ def load_solution(solution: str, docs_root: str | os.PathLike | None = None,
                                    "rerun tools/setup.py).") from None
     except fm_saxml.DocsNotFoundError as e:
         raise SolutionContextError(f"{e}\n" + _convert_hint(solution)) from None
+    except ValueError as e:     # pydantic's ValidationError: the file isn't in the contract's shape
+        raise _invalid(docs.path, "entities.json", e) from None
     return ctx
+
+
+def _invalid(path: Path, file_name: str, error: Exception) -> SolutionContextError:
+    """One message for a docs file that doesn't match the fm-saxml contract (hand-edited, truncated...)."""
+    first = "\n    ".join(str(error).strip().splitlines()[:3])
+    return SolutionContextError(f"{path / file_name} doesn't match the fm-saxml docs format "
+                                f"(fm-saxml {_version()}):\n    {first}\n"
+                                "Build the docs again with fm-saxml instead of editing them.")
 
 
 def _version() -> str:
@@ -199,7 +209,10 @@ class SolutionContext:
 
     @property
     def references(self) -> list:
-        return self.docs.references
+        try:
+            return self.docs.references
+        except ValueError as e:     # read on first use: a malformed file fails here
+            raise _invalid(self.path, "references.json", e) from None
 
     def refs_from(self, doc_id: str) -> list:
         return self.docs.refs_from(doc_id)

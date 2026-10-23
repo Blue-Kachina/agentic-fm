@@ -90,5 +90,6 @@ own test compares with them.
 | Ported | Frozen golden files | Compared by |
 |---|---|---|
 | `trace.py build` (P2-06) | `trace/build.txt`, `trace/xref.index` | `test_trace_build.py` (differences listed with reasons in `GOLDEN_DIFFERENCES`) |
+| `trace.py query` and `dead` (P2-07) | `trace/query_*.txt`, `trace/dead_*.txt` | `test_trace_query_dead.py` (changed outputs and reasons in `GOLDEN_CHANGES`) |
 
-`trace.py query` and `dead` and `analyze.py` still run here, on the golden `xref.index`.
+`analyze.py` still runs here, on the golden `xref.index`.
