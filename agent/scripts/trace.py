@@ -2,12 +2,12 @@
 """
 Cross-reference tracer for FileMaker solutions.
 
-Builds a cross-reference index by scanning all solution data sources
-(fields, scripts, custom functions, layouts, relationships, value lists)
-and supports targeted queries and dead-object detection.
+Builds a cross-reference index from the solution's fm-saxml docs (the typed
+references in references.json, read through solution_context.py) and supports
+targeted queries and dead-object detection.
 
 Usage:
-  python3 trace.py build  -s "Solution Name"
+  python3 trace.py build  -s "Solution Name" [--docs-root <folder>] [--file <name>] [--context <name>]
   python3 trace.py query  -s "Solution Name" -t field -n "Clients::Name"
   python3 trace.py query  -s "Solution Name" -t script -n "Print Invoice"
   python3 trace.py dead   -s "Solution Name" -t fields
@@ -25,9 +25,10 @@ import json
 import os
 import re
 import sys
-import xml.etree.ElementTree as ET
 from collections import namedtuple
 from pathlib import Path
+
+import solution_context
 
 
 # ---------------------------------------------------------------------------
@@ -57,17 +58,9 @@ XRef = namedtuple("XRef", [
 
 
 # ---------------------------------------------------------------------------
-# Built-in auto-enter type keywords (not field references)
+# System fields excluded from dead-object scans
 # ---------------------------------------------------------------------------
 
-BUILTIN_AUTO_ENTER = {
-    "constantdata", "serialnumber", "creationtimestamp", "creationdate",
-    "creationtime", "creationaccountname", "creationname",
-    "modificationtimestamp", "modificationdate", "modificationtime",
-    "modificationaccountname", "modificationname", "lastvisitedtimestamp",
-}
-
-# System fields excluded from dead-object scans
 SYSTEM_FIELDS = {
     "PrimaryKey", "CreationTimestamp", "CreatedBy",
     "ModificationTimestamp", "ModifiedBy",
@@ -75,32 +68,7 @@ SYSTEM_FIELDS = {
 
 
 # ---------------------------------------------------------------------------
-# Regex patterns
-# ---------------------------------------------------------------------------
-
-# Matches TO::Field references — allows spaces in both TO and field names
-# Requires :: separator. Captures (TO_name, Field_name).
-RE_TO_FIELD = re.compile(
-    r'(?<![A-Za-z0-9_])'           # not preceded by word char
-    r'([A-Za-z][A-Za-z0-9_ ]*?)'   # TO name (lazy, allows spaces)
-    r'::'
-    r'([A-Za-z][A-Za-z0-9_ ]*)'    # Field name (greedy, allows spaces)
-)
-
-# Script name in Perform Script step: "ScriptName"
-RE_PERFORM_SCRIPT = re.compile(r'Perform Script\s*\[.*?"([^"]+)"', re.DOTALL)
-
-# Layout name in Go to Layout / New Window: Layout: "Name"
-RE_LAYOUT_REF = re.compile(r'Layout:\s*"([^"]+)"')
-
-# Go to Related Record table reference: Show only related records: "TOName"
-RE_GTRR_TABLE = re.compile(
-    r'Go to Related Record\s*\[.*?From table:\s*"([^"]+)"', re.DOTALL
-)
-
-
-# ---------------------------------------------------------------------------
-# Index loaders
+# Index loaders (query and dead; build reads the fm-saxml model instead)
 # ---------------------------------------------------------------------------
 
 def _parse_index(path, columns):
@@ -126,14 +94,6 @@ def load_fields_index(solution_dir):
         solution_dir / "fields.index",
         ["table", "table_id", "field", "field_id", "datatype",
          "fieldtype", "auto_enter", "flags"],
-    )
-
-
-def load_relationships_index(solution_dir):
-    return _parse_index(
-        solution_dir / "relationships.index",
-        ["left_to", "left_to_id", "right_to", "right_to_id",
-         "join_type", "join_fields", "cascade_create", "cascade_delete"],
     )
 
 
@@ -165,47 +125,10 @@ def load_value_lists_index(solution_dir):
     )
 
 
-# ---------------------------------------------------------------------------
-# TO resolution
-# ---------------------------------------------------------------------------
-
 def build_to_map(to_index):
     """Build {TOName: BaseTableName} mapping."""
     return {row["to_name"]: row["base_table"] for row in to_index}
 
-
-def resolve_to_field(to_name, field_name, to_map):
-    """Resolve TO::Field to BaseTable::Field. Returns (canonical, context)."""
-    base_table = to_map.get(to_name)
-    if base_table:
-        canonical = f"{base_table}::{field_name}"
-        if base_table != to_name:
-            context = f'via TO "{to_name}"'
-        else:
-            context = ""
-        return canonical, context
-    # TO not found in map — use as-is
-    return f"{to_name}::{field_name}", f'unknown TO "{to_name}"'
-
-
-# ---------------------------------------------------------------------------
-# Build table of fields per base table (for unqualified field matching)
-# ---------------------------------------------------------------------------
-
-def build_fields_by_table(fields_index):
-    """Build {BaseTable: [field_name, ...]} sorted by name length desc."""
-    table_fields = {}
-    for row in fields_index:
-        table_fields.setdefault(row["table"], []).append(row["field"])
-    # Sort each list by length descending for longest-match-first
-    for table in table_fields:
-        table_fields[table].sort(key=len, reverse=True)
-    return table_fields
-
-
-# ---------------------------------------------------------------------------
-# Build custom function name list
-# ---------------------------------------------------------------------------
 
 def build_cf_names(solution_name):
     """Get list of custom function names and IDs from directory listing."""
@@ -234,522 +157,292 @@ def build_cf_names(solution_name):
 
 
 # ---------------------------------------------------------------------------
-# Parsers
+# Build: fm-saxml references -> XRef rows
 # ---------------------------------------------------------------------------
+#
+# fm-saxml's references.json already resolves every reference (script steps,
+# calculations, layout objects, triggers, relationships, value lists, custom
+# menus) to a target docId. Build keeps the ones whose target is a kind trace
+# reports and names them the way xref.index always has:
+#
+#   source entity           SourceType     SourceName              SourceLocation
+#   scriptStep              script         "Script (ID n)"         "line N: <step>" (N = Script Workspace line)
+#   field (calculation)     field_calc     "Table::Field"          "calc" | "validation" | "summary" ...
+#   field (auto-enter)      field_auto     "Table::Field"          "auto-enter" | "lookup"
+#   layout, layoutObject    layout         "Layout (ID n)"         "field placement" | "button script" | "trigger: <event>" ...
+#   relationship            relationship   "LeftTO→RightTO"        "join field" | "sort field"
+#   customFunction          custom_func    "Function (ID n)"       "calc body"
+#   valueList               value_list     "List (ID n)"           "primary field" | "secondary field" | "table occurrence"
+#   fileOptions             file           "File"                  "trigger: <event>" | "default layout"
+#   customMenu              custom_menu    "Menu (ID n)"           "menu item" | "install condition"
+#
+# RefName is the target's name; a field is "BaseTable::Field". RefContext says how
+# a field was reached ('via TO "X"', "same table", "left side"/"right side") and
+# flags references fm-saxml marks as by name, unresolved or in another file.
+# Not kept: structure (contains, based on, joins to), privileges and accounts.
 
-def parse_field_calcs(fields_index, to_map, fields_by_table, cf_names):
-    """Parse field calculations and auto-enter calcs for references."""
-    refs = []
-    cf_name_set = {cf["name"] for cf in cf_names}
-
-    for row in fields_index:
-        auto = row["auto_enter"]
-        if not auto:
-            continue
-
-        # Determine source type and calc text
-        if auto.startswith("auto:"):
-            calc_text = auto[5:]
-            source_type = "field_auto"
-        elif auto.startswith("calc:"):
-            calc_text = auto[5:]
-            source_type = "field_calc"
-        else:
-            continue
-
-        # Skip built-in auto-enter types
-        if calc_text.strip().lower() in BUILTIN_AUTO_ENTER:
-            continue
-
-        source_name = f"{row['table']}::{row['field']}"
-        source_location = auto
-
-        # Extract TO::Field references
-        for m in RE_TO_FIELD.finditer(calc_text):
-            to_name, field_name = m.group(1).strip(), m.group(2).strip()
-            canonical, context = resolve_to_field(to_name, field_name, to_map)
-            refs.append(XRef(
-                source_type, source_name, source_location,
-                "field", canonical, context,
-            ))
-
-        # Extract unqualified field names (same-table references)
-        # Only if no :: found — calcs with :: are cross-table
-        if "::" not in calc_text:
-            table_name = row["table"]
-            field_list = fields_by_table.get(table_name, [])
-            # Remove Self references
-            calc_clean = re.sub(r'\bSelf\b', '', calc_text)
-            # Match longest field names first, masking them to prevent
-            # shorter names from matching as substrings
-            matched_fields = []
-            masked = calc_clean
-            for fname in field_list:  # already sorted by length desc
-                if fname == row["field"]:
-                    continue  # skip self
-                pattern = re.compile(
-                    r'(?<![A-Za-z0-9_])'
-                    + re.escape(fname)
-                    + r'(?![A-Za-z0-9_])'
-                )
-                if pattern.search(masked):
-                    matched_fields.append(fname)
-                    # Mask matched text to prevent substring matches
-                    masked = pattern.sub("\x00" * len(fname), masked)
-            for fname in matched_fields:
-                refs.append(XRef(
-                    source_type, source_name, source_location,
-                    "field", f"{table_name}::{fname}", "same table",
-                ))
-
-        # Extract custom function references
-        for cf in cf_name_set:
-            # Match CF name followed by ( or as standalone for zero-param
-            pattern = re.compile(
-                r'(?<![A-Za-z0-9_])'
-                + re.escape(cf)
-                + r'(?:\s*\(|(?![A-Za-z0-9_(]))'
-            )
-            if pattern.search(calc_text):
-                refs.append(XRef(
-                    source_type, source_name, source_location,
-                    "custom_func", cf, "",
-                ))
-
-    return refs
+REF_TYPE_FOR_TARGET = {
+    "field": "field",
+    "script": "script",
+    "layout": "layout",
+    "valueList": "value_list",
+    "customFunction": "custom_func",
+    "to": "table_occurrence",
+    "tableOccurrence": "table_occurrence",
+}
+STRUCTURAL = {"contains", "basedOnTableOccurrence", "basedOnBaseTable", "joinsTo",
+              "assignedPrivilegeSet", "grantedTo"}
+FIELD_AUTO_ROLES = {"autoEnter", "lookupSource"}
+LOCATION_FOR_ROLE = {
+    "calculation": "calc", "autoEnter": "auto-enter", "lookupSource": "lookup",
+    "validation": "validation", "validationMessage": "validation message",
+    "display": "field placement", "button": "button script", "control": "value list control",
+    "hideCondition": "hide condition", "tooltip": "tooltip", "placeholder": "placeholder",
+    "conditionalFormatting": "conditional formatting", "buttonParameter": "button parameter",
+    "buttonAction": "button action", "scriptTriggerParameter": "trigger parameter",
+    "portalSort": "portal sort", "portalFilter": "portal filter", "webViewer": "web viewer",
+    "tabLabel": "tab label", "popoverTitle": "popover title", "relatedFrom": "related values from",
+    "source": "primary field", "second": "secondary field",
+    "sourceTableOccurrence": "table occurrence", "external": "external values",
+    "menuItem": "menu item", "installCondition": "install condition",
+    "defaultLayout": "default layout",
+}
+# Roles a layout or layout object gives a script trigger are event names (OnRecordLoad...)
+TRIGGER_RELATIONSHIP = "triggersScript"
 
 
-def parse_scripts(solution_name, scripts_index, to_map, cf_names):
-    """Parse sanitized script files for references."""
-    refs = []
-    cf_name_set = {cf["name"] for cf in cf_names}
-    scripts_dir = XML_PARSED_DIR / "scripts_sanitized" / solution_name
-
-    if not scripts_dir.exists():
-        return refs
-
-    # Build script name set for validating Perform Script targets
-    script_name_set = {row["name"] for row in scripts_index}
-
-    # Walk all .txt files
-    for txt_path in sorted(scripts_dir.rglob("*.txt")):
-        # Extract script name and ID from filename
-        m = re.match(r'^(.+?)\s*-\s*ID\s+(\d+)\.txt$', txt_path.name)
-        if not m:
-            continue
-        script_name = m.group(1)
-        script_id = m.group(2)
-        source_name = f"{script_name} (ID {script_id})"
-
-        with open(txt_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-
-        for line_num, line in enumerate(lines, 1):
-            line = line.rstrip("\n")
-            stripped = line.strip()
-
-            # Skip blank lines and pure comments
-            if not stripped or stripped.startswith("# =") or stripped.startswith("# \t"):
-                continue
-
-            # --- TO::Field references anywhere in the line ---
-            for fm in RE_TO_FIELD.finditer(line):
-                to_name, field_name = fm.group(1).strip(), fm.group(2).strip()
-                canonical, context = resolve_to_field(to_name, field_name, to_map)
-                # Determine step type from line content
-                step_type = _extract_step_type(stripped)
-                refs.append(XRef(
-                    "script", source_name,
-                    f"line {line_num}: {step_type}",
-                    "field", canonical, context,
-                ))
-
-            # --- Layout references ---
-            for lm in RE_LAYOUT_REF.finditer(line):
-                layout_name = lm.group(1)
-                if layout_name == "<original layout>":
-                    continue
-                step_type = _extract_step_type(stripped)
-                refs.append(XRef(
-                    "script", source_name,
-                    f"line {line_num}: {step_type}",
-                    "layout", layout_name, "",
-                ))
-
-            # --- Perform Script references ---
-            for pm in RE_PERFORM_SCRIPT.finditer(line):
-                target_script = pm.group(1)
-                refs.append(XRef(
-                    "script", source_name,
-                    f"line {line_num}: Perform Script",
-                    "script", target_script, "",
-                ))
-
-            # --- Go to Related Record table ref ---
-            for gm in RE_GTRR_TABLE.finditer(line):
-                to_name = gm.group(1)
-                refs.append(XRef(
-                    "script", source_name,
-                    f"line {line_num}: Go to Related Record",
-                    "table_occurrence", to_name, "",
-                ))
-
-            # --- Custom function references in expressions ---
-            # Scan every non-blank/non-comment line: a CF call need not contain
-            # "[" (e.g. `Set Variable [ $x ; SQLFieldName ( T::F ) ]` or a bare
-            # continuation line `_x = SQLFieldName( T::F ) ;`), so no bracket
-            # prefilter — it silently dropped real references.
-            for cf in cf_name_set:
-                # Match CF name with parens (function call) or standalone (zero-param)
-                pattern = re.compile(
-                    r'(?<![A-Za-z0-9_])'
-                    + re.escape(cf)
-                    + r'(?:\s*\(|(?![A-Za-z0-9_(]))'
-                )
-                if pattern.search(line):
-                    step_type = _extract_step_type(stripped)
-                    refs.append(XRef(
-                        "script", source_name,
-                        f"line {line_num}: {step_type}",
-                        "custom_func", cf, "",
-                    ))
-
-    return refs
+def _named(entity, fallback):
+    return getattr(entity, "name", None) or fallback
 
 
-def _extract_step_type(line):
-    """Extract the FM script step type from the beginning of a line."""
-    # Strip leading comment markers and whitespace
-    line = line.lstrip()
-    if line.startswith("#"):
-        return "Comment"
-    # Step type is everything before the first [
-    bracket = line.find("[")
-    if bracket > 0:
-        return line[:bracket].strip()
-    return line.split()[0] if line.split() else "Unknown"
+def _with_id(entity, fallback):
+    name = _named(entity, fallback)
+    fmp_id = getattr(entity, "fmp_id", None)
+    return f"{name} (ID {fmp_id})" if fmp_id else name
 
 
-def parse_custom_functions(solution_name, to_map, cf_names):
-    """Parse custom function bodies for references."""
-    refs = []
-    cf_name_set = {cf["name"] for cf in cf_names}
-
-    for cf in cf_names:
-        if not cf["path"].exists():
-            continue
-
-        with open(cf["path"], "r", encoding="utf-8") as f:
-            body = f.read()
-
-        source_name = f"{cf['name']} (ID {cf['id']})"
-
-        # TO::Field references
-        for m in RE_TO_FIELD.finditer(body):
-            to_name, field_name = m.group(1).strip(), m.group(2).strip()
-            canonical, context = resolve_to_field(to_name, field_name, to_map)
-            refs.append(XRef(
-                "custom_func", source_name, "calc body",
-                "field", canonical, context,
-            ))
-
-        # CF-to-CF references
-        for other_cf in cf_name_set:
-            if other_cf == cf["name"]:
-                continue
-            # Match with parens (function call) or standalone (zero-param)
-            pattern = re.compile(
-                r'(?<![A-Za-z0-9_])'
-                + re.escape(other_cf)
-                + r'(?:\s*\(|(?![A-Za-z0-9_(]))'
-            )
-            if pattern.search(body):
-                refs.append(XRef(
-                    "custom_func", source_name, "calc body",
-                    "custom_func", other_cf, "",
-                ))
-
-    return refs
+def _doc_name(doc_id):
+    """The name part of a docId: "script:Print" -> "Print", "field:T::F" -> "T::F"."""
+    return doc_id.split(":", 1)[1] if ":" in doc_id else doc_id
 
 
-def parse_layouts(solution_dir, solution_name, to_map):
-    """Parse layout summary JSON files for field and script references."""
-    refs = []
-    layouts_dir = solution_dir / "layouts"
+def _field_context(ref, source_type, to_name):
+    """How a field was reached: via another TO, same table, or nothing to add.
 
-    if not layouts_dir.exists():
-        return refs
-
-    for json_path in sorted(layouts_dir.glob("*.json")):
-        try:
-            with open(json_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, OSError):
-            continue
-
-        layout_name = data.get("layout", json_path.stem)
-        layout_id = data.get("id", "?")
-        source_name = f"{layout_name} (ID {layout_id})"
-
-        # Recursively walk the JSON for field and script keys
-        _walk_layout_json(data, source_name, to_map, refs)
-
-    return refs
-
-
-def _walk_layout_json(obj, source_name, to_map, refs):
-    """Recursively walk layout JSON for field/script references."""
-    if isinstance(obj, dict):
-        # Field reference
-        if "field" in obj and isinstance(obj["field"], str):
-            field_ref = obj["field"]
-            m = RE_TO_FIELD.match(field_ref)
-            if m:
-                to_name, field_name = m.group(1).strip(), m.group(2).strip()
-                canonical, context = resolve_to_field(to_name, field_name, to_map)
-                refs.append(XRef(
-                    "layout", source_name, "field placement",
-                    "field", canonical, context,
-                ))
-
-        # Script reference (button action or script trigger). Trigger dicts
-        # carry an "event" key (OnObjectSave, OnLayoutKeystroke, …); buttons do
-        # not. A trigger is a live caller — recording it stops trigger-only
-        # scripts from being false-flagged as dead.
-        if "script" in obj and isinstance(obj["script"], str) and obj["script"]:
-            location = f"trigger: {obj['event']}" if obj.get("event") else "button script"
-            refs.append(XRef(
-                "layout", source_name, location,
-                "script", obj["script"], "",
-            ))
-
-        # Recurse into all values
-        for v in obj.values():
-            _walk_layout_json(v, source_name, to_map, refs)
-
-    elif isinstance(obj, list):
-        for item in obj:
-            _walk_layout_json(item, source_name, to_map, refs)
-
-
-def parse_file_triggers(solution_name):
-    """Parse file-level script triggers from metadata.xml.
-
-    File triggers (OnFirstWindowOpen, OnWindowOpen, OnLastWindowClose, …) bind a
-    script to a file-level event. Such a script has no caller in any script,
-    button or layout — it is invoked by the file itself — so without this it is
-    false-flagged as dead. Emits file → script references.
+    SaXML stores every calculation field reference with its TO, even when the formula
+    names the field unqualified, so "same table" means: a field calculation reaching a
+    field of its own table through the TO named after that table.
     """
-    refs = []
-    meta_path = XML_PARSED_DIR / "_" / solution_name / "metadata.xml"
-    if not meta_path.exists():
-        return refs
+    base = _doc_name(ref.target_doc_id).split("::", 1)[0]
+    if to_name and to_name != base:
+        return f'via TO "{to_name}"'
+    if source_type in ("field_calc", "field_auto") and _doc_name(ref.source_doc_id).split("::", 1)[0] == base:
+        return "same table"
+    return ""
+
+
+def _to_name_from_raw(raw_text):
+    """'Invoices Lines::Amount' -> 'Invoices Lines' (quotes and $ variables ignored)."""
+    if not raw_text or "::" not in raw_text:
+        return ""
+    return raw_text.strip().strip('"').split("::", 1)[0].strip()
+
+
+class _XRefBuilder:
+    def __init__(self, ctx):
+        self.ctx = ctx
+        self.scripts = ctx.collection("script")
+        self.steps = ctx.collection("scriptStep")
+        self.layouts = ctx.layouts
+        self.objects = ctx.collection("layoutObject")
+        self.fields = ctx.collection("field")
+        self.tos = ctx.collection("to")
+        self.relationships = ctx.collection("relationship")
+        self.cfs = ctx.collection("customFunction")
+        self.value_lists = ctx.collection("valueList")
+        self.menus = ctx.collection("customMenu")
+        # (layout docId, target, role) a layout object already gives: fm-saxml rolls an
+        # object's references up to its layout too, and a placement must count once.
+        self.object_refs = set()
+        for r in ctx.references:
+            obj = self.objects.get(r.source_doc_id) if r.source_entity_type == "layoutObject" else None
+            if obj is not None:
+                self.object_refs.add((obj.layout_doc_id, r.target_doc_id, r.role))
+
+    def source(self, ref):
+        """(SourceType, SourceName, SourceLocation, TO the field was reached through), or None to skip."""
+        kind, sid, role = ref.source_entity_type, ref.source_doc_id, ref.role
+        location = (f"trigger: {role}" if ref.relationship_type == TRIGGER_RELATIONSHIP and role
+                    and role not in LOCATION_FOR_ROLE else LOCATION_FOR_ROLE.get(role or "", role or ""))
+
+        if kind == "scriptStep":
+            step = self.steps.get(sid)
+            script = self.scripts.get(step.script_doc_id) if step else None
+            if step is None:
+                return "script", _doc_name(sid), "", ""
+            return ("script", _with_id(script, _doc_name(step.script_doc_id)),
+                    f"line {step.index + 1}: {step.name}", _to_name_from_raw(ref.raw_text))
+
+        if kind == "field":
+            if ref.relationship_type == "summarizes":
+                location = "summary"
+            source_type = "field_auto" if role in FIELD_AUTO_ROLES else "field_calc"
+            return source_type, _doc_name(sid), location or "calc", _to_name_from_raw(ref.raw_text)
+
+        if kind in ("layout", "layoutObject"):
+            if kind == "layoutObject":
+                obj = self.objects.get(sid)
+                layout_id = obj.layout_doc_id if obj else ""
+                to_doc = getattr(obj, "table_occurrence_doc_id", None) if obj else None
+                to_name = _doc_name(to_doc) if to_doc else _to_name_from_raw(ref.raw_text)
+            else:
+                layout_id = sid
+                if (sid, ref.target_doc_id, role) in self.object_refs:
+                    return None   # rolled up from one of its objects
+                to_name = _to_name_from_raw(ref.raw_text)
+            layout = self.layouts.get(layout_id)
+            return "layout", _with_id(layout, _doc_name(layout_id)), location, to_name
+
+        if kind == "relationship":
+            rel = self.relationships.get(sid)
+            left = _doc_name(rel.left_table_occurrence_doc_id) if rel else ""
+            right = _doc_name(rel.right_table_occurrence_doc_id) if rel else ""
+            sort = (role or "").endswith("Sort")
+            return ("relationship", f"{left}→{right}", "sort field" if sort else "join field",
+                    left if (role or "").startswith("left") else right)
+
+        if kind == "customFunction":
+            return "custom_func", _with_id(self.cfs.get(sid), _doc_name(sid)), "calc body", \
+                _to_name_from_raw(ref.raw_text)
+
+        if kind == "valueList":
+            return "value_list", _with_id(self.value_lists.get(sid), _doc_name(sid)), location, \
+                _to_name_from_raw(ref.raw_text)
+
+        if kind == "fileOptions":
+            return "file", "File", location, ""
+
+        if kind == "customMenu":
+            return "custom_menu", _with_id(self.menus.get(sid), _doc_name(sid)), location, \
+                _to_name_from_raw(ref.raw_text)
+
+        return None
+
+    def xref(self, ref):
+        ref_type = REF_TYPE_FOR_TARGET.get(ref.target_entity_type)
+        if ref_type is None or ref.relationship_type in STRUCTURAL:
+            return None
+        src = self.source(ref)
+        if src is None:
+            return None
+        source_type, source_name, location, to_name = src
+
+        notes = []
+        ext = ref.external_target
+        if ext is not None:
+            name = ext.name or _doc_name(ext.target_doc_id)
+            if ref_type == "field" and ext.base_table and "::" not in name:
+                name = f"{ext.base_table}::{name}"
+            notes.append(f'external file "{ext.data_source}"')
+        else:
+            target = self.ctx.get(ref.target_doc_id)
+            if ref_type == "field":
+                name = getattr(target, "qualified_name", None) or _doc_name(ref.target_doc_id)
+            else:
+                name = _named(target, _doc_name(ref.target_doc_id))
+            if ref_type == "field":
+                context = _field_context(ref, source_type, to_name)
+                if source_type == "relationship":
+                    context = "left side" if (ref.role or "").startswith("left") else "right side"
+                if context:
+                    notes.append(context)
+            if ref.confidence == "unresolved":
+                notes.append("unresolved")
+        if ref.via == "byName":
+            notes.append("by name")
+        return XRef(source_type, source_name, location, ref_type, name, ", ".join(notes))
+
+
+# Build progress lines: (label, the SourceTypes it counts), in the order they print
+BUILD_GROUPS = [
+    ("field calculations", {"field_calc", "field_auto"}),
+    ("relationships", {"relationship"}),
+    ("scripts", {"script"}),
+    ("layouts", {"layout"}),
+    ("file-level triggers", {"file"}),
+    ("custom functions", {"custom_func"}),
+    ("value lists", {"value_list"}),
+    ("custom menus", {"custom_menu"}),
+]
+
+
+def build_xrefs(ctx):
+    """XRef rows for every reference in the solution, in build-group order."""
+    builder = _XRefBuilder(ctx)
+    rows = [x for x in (builder.xref(r) for r in ctx.references) if x is not None]
+    order = {t: i for i, (_, types) in enumerate(BUILD_GROUPS) for t in types}
+    return sorted(rows, key=lambda x: order.get(x.source_type, len(order)))   # stable: keeps model order
+
+
+def _context_name(args, ctx):
+    """Folder under agent/context/ for this solution's xref.index (query and dead read it there).
+
+    --context names it; else -s, or the FileMaker file name when -s is a docs folder or
+    --file picks one file of a multi-file build.
+    """
+    if args.context:
+        return args.context
+    if args.file or not args.solution or os.sep in args.solution or "/" in args.solution:
+        return ctx.name
+    return args.solution
+
+
+def _default_solution(docs_root):
+    """The only solution under the docs root, for `build` without -s."""
+    root = docs_root or os.environ.get(solution_context.DOCS_ROOT_ENV)
+    if root and Path(root).is_dir():
+        found = [d.name for d in Path(root).iterdir() if d.is_dir()
+                 and ((d / "docs.json").is_file() or (d / "entities.json").is_file())]
+        if len(found) == 1:
+            return found[0]
+        if found:
+            print("Multiple solutions found. Specify one with -s:", file=sys.stderr)
+            for s in sorted(found):
+                print(f"  {s}", file=sys.stderr)
+            sys.exit(1)
+    return None
+
+
+def cmd_build(args):
+    """Build xref.index for the solution from its fm-saxml docs."""
+    if not args.solution:
+        args.solution = _default_solution(args.docs_root)
+        if not args.solution:
+            print("ERROR: no solution given: pass -s <solution> (and --docs-root or "
+                  f"${solution_context.DOCS_ROOT_ENV})", file=sys.stderr)
+            sys.exit(1)
     try:
-        root = ET.parse(meta_path).getroot()
-    except (ET.ParseError, OSError):
-        return refs
-
-    for trig in root.iter("ScriptTrigger"):
-        script_ref = trig.find("ScriptReference")
-        if script_ref is None:
-            continue
-        name = script_ref.get("name", "")
-        if not name:
-            continue
-        event = trig.get("action", "")
-        refs.append(XRef(
-            "file", "File", f"trigger: {event}",
-            "script", name, "",
-        ))
-    return refs
-
-
-def parse_relationships(relationships_index, to_map):
-    """Parse relationship join fields as references."""
-    refs = []
-
-    for row in relationships_index:
-        left_to = row["left_to"]
-        right_to = row["right_to"]
-        join_fields = row["join_fields"]
-        source_name = f"{left_to}\u2192{right_to}"
-
-        if not join_fields:
-            continue
-
-        # Handle multi-predicate joins (joined with +)
-        predicates = join_fields.split("+")
-        for pred in predicates:
-            parts = pred.split("=", 1)
-            if len(parts) != 2:
-                continue
-            left_field = parts[0].strip()
-            right_field = parts[1].strip()
-
-            # Left field
-            left_base = to_map.get(left_to, left_to)
-            refs.append(XRef(
-                "relationship", source_name, "join field",
-                "field", f"{left_base}::{left_field}", "left side",
-            ))
-
-            # Right field
-            right_base = to_map.get(right_to, right_to)
-            refs.append(XRef(
-                "relationship", source_name, "join field",
-                "field", f"{right_base}::{right_field}", "right side",
-            ))
-
-    return refs
-
-
-def parse_value_lists(solution_name, to_map):
-    """Parse value list XML files for field-based VL references."""
-    refs = []
-    vl_dir = XML_PARSED_DIR / "value_lists" / solution_name
-
-    if not vl_dir.exists():
-        return refs
-
-    for xml_path in sorted(vl_dir.glob("*.xml")):
-        try:
-            tree = ET.parse(xml_path)
-            root = tree.getroot()
-        except (ET.ParseError, OSError):
-            continue
-
-        # Get VL name and ID
-        vl_ref = root.find(".//ValueListReference")
-        if vl_ref is None:
-            continue
-        vl_name = vl_ref.get("name", "")
-        vl_id = vl_ref.get("id", "?")
-        source_name = f"{vl_name} (ID {vl_id})"
-
-        # Check source type
-        source_el = root.find(".//Source")
-        if source_el is None or source_el.get("value") != "FromField":
-            continue
-
-        # Primary field
-        pf = root.find(".//PrimaryField/FieldReference")
-        if pf is not None:
-            fname = pf.get("name", "")
-            to_el = pf.find("TableOccurrenceReference")
-            to_name = to_el.get("name", "") if to_el is not None else ""
-            if to_name and fname:
-                canonical, context = resolve_to_field(to_name, fname, to_map)
-                refs.append(XRef(
-                    "value_list", source_name, "primary field",
-                    "field", canonical, context,
-                ))
-
-        # Secondary field
-        sf = root.find(".//SecondaryField/FieldReference")
-        if sf is not None:
-            fname = sf.get("name", "")
-            to_el = sf.find("TableOccurrenceReference")
-            to_name = to_el.get("name", "") if to_el is not None else ""
-            if to_name and fname:
-                canonical, context = resolve_to_field(to_name, fname, to_map)
-                refs.append(XRef(
-                    "value_list", source_name, "secondary field",
-                    "field", canonical, context,
-                ))
-
-    return refs
-
-
-# ---------------------------------------------------------------------------
-# Build command
-# ---------------------------------------------------------------------------
-
-def cmd_build(solution_name):
-    """Build xref.index for the given solution."""
-    solution_dir = CONTEXT_DIR / solution_name
-
-    if not solution_dir.exists():
-        print(f"ERROR: No context directory for '{solution_name}'", file=sys.stderr)
-        print(f"  Expected: {solution_dir}", file=sys.stderr)
+        ctx = solution_context.from_args(args)
+        all_refs = build_xrefs(ctx)
+    except solution_context.SolutionContextError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Load index files
-    fields_index = load_fields_index(solution_dir)
-    relationships_index = load_relationships_index(solution_dir)
-    to_index = load_table_occurrences_index(solution_dir)
-    scripts_index = load_scripts_index(solution_dir)
-
-    # Build helpers
-    to_map = build_to_map(to_index)
-    fields_by_table = build_fields_by_table(fields_index)
-    cf_names = build_cf_names(solution_name)
+    solution_name = _context_name(args, ctx)
+    solution_dir = CONTEXT_DIR / solution_name
+    solution_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"==> Building xref.index for: {solution_name}")
-    print(f"  Fields: {len(fields_index)}, TOs: {len(to_index)}, "
-          f"Scripts: {len(scripts_index)}, CFs: {len(cf_names)}")
-
-    all_refs = []
-
-    # 1. Field calculations
-    print("  Parsing field calculations...")
-    field_refs = parse_field_calcs(fields_index, to_map, fields_by_table, cf_names)
-    all_refs.extend(field_refs)
-    print(f"    {len(field_refs)} references found")
-
-    # 2. Relationships
-    print("  Parsing relationships...")
-    rel_refs = parse_relationships(relationships_index, to_map)
-    all_refs.extend(rel_refs)
-    print(f"    {len(rel_refs)} references found")
-
-    # 3. Scripts
-    print("  Parsing scripts...")
-    script_refs = parse_scripts(solution_name, scripts_index, to_map, cf_names)
-    all_refs.extend(script_refs)
-    print(f"    {len(script_refs)} references found")
-
-    # 4. Layouts
-    print("  Parsing layout summaries...")
-    layouts_dir = solution_dir / "layouts"
-    layout_summaries_missing = not layouts_dir.exists() or not any(layouts_dir.glob("*.json"))
-    layout_refs = parse_layouts(solution_dir, solution_name, to_map)
-    all_refs.extend(layout_refs)
-    print(f"    {len(layout_refs)} references found")
-    if layout_summaries_missing:
-        print(
-            "  ⚠️  WARNING: no layout summaries found at "
-            f"context/{solution_name}/layouts/.\n"
-            "      Layout placements, button scripts and script TRIGGERS are "
-            "therefore MISSING from the xref index.\n"
-            "      Dead-object results will contain false positives "
-            "(trigger-only / layout-only objects look orphaned).\n"
-            "      Generate them first:\n"
-            f"        python3 agent/scripts/layout_to_summary.py --solution \"{solution_name}\"\n"
-            "      then rebuild the xref index.",
-            file=sys.stderr,
-        )
-
-    # 4b. File-level script triggers (metadata.xml)
-    print("  Parsing file-level triggers...")
-    file_trig_refs = parse_file_triggers(solution_name)
-    all_refs.extend(file_trig_refs)
-    print(f"    {len(file_trig_refs)} references found")
-
-    # 5. Custom functions
-    print("  Parsing custom functions...")
-    cf_refs = parse_custom_functions(solution_name, to_map, cf_names)
-    all_refs.extend(cf_refs)
-    print(f"    {len(cf_refs)} references found")
-
-    # 6. Value lists
-    print("  Parsing value lists...")
-    vl_refs = parse_value_lists(solution_name, to_map)
-    all_refs.extend(vl_refs)
-    print(f"    {len(vl_refs)} references found")
+    print(f"  Docs: {ctx.path} (fm-saxml contract {ctx.schema_version})")
+    print(f"  Fields: {len(ctx.collection('field'))}, TOs: {len(ctx.collection('to'))}, "
+          f"Scripts: {len(ctx.scripts)}, CFs: {len(ctx.collection('customFunction'))}")
+    for label, types in BUILD_GROUPS:
+        print(f"  Parsing {label}...")
+        print(f"    {sum(1 for x in all_refs if x.source_type in types)} references found")
 
     # Write xref.index
     xref_path = solution_dir / "xref.index"
-    with open(xref_path, "w", encoding="utf-8") as f:
+    with open(xref_path, "w", encoding="utf-8", newline="\n") as f:
         f.write("# SourceType|SourceName|SourceLocation|RefType|RefName|RefContext\n")
         for ref in all_refs:
             # Escape pipes in fields
@@ -765,6 +458,7 @@ def cmd_build(solution_name):
 
     print(f"\n==> Done! {len(all_refs)} total references")
     print(f"  Output: {xref_path}")
+
 
 
 def _escape_pipe(s):
@@ -1167,8 +861,14 @@ def main():
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # build
-    build_parser = subparsers.add_parser("build", help="Build xref.index")
-    build_parser.add_argument("-s", "--solution", help="Solution name")
+    build_parser = subparsers.add_parser(
+        "build", help="Build xref.index from the solution's fm-saxml docs")
+    solution_context.add_arguments(build_parser, solution_required=False)
+    build_parser.add_argument(
+        "--context", default=None,
+        help="folder under agent/context/ to write xref.index to, the name query and dead "
+             "take with -s (default: -s, or the FileMaker file name when -s is a docs folder "
+             "or --file is given)")
 
     # query
     query_parser = subparsers.add_parser("query", help="Query references")
@@ -1199,11 +899,12 @@ def main():
                              help="Show low-confidence results")
 
     args = parser.parse_args()
+    if args.command == "build":
+        cmd_build(args)
+        return
     solution = resolve_solution(args.solution)
 
-    if args.command == "build":
-        cmd_build(solution)
-    elif args.command == "query":
+    if args.command == "query":
         cmd_query(solution, args.type, args.name, args.direction)
     elif args.command == "dead":
         cmd_dead(solution, args.type, args.verbose)

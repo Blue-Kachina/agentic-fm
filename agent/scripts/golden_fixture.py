@@ -56,6 +56,11 @@ DEAD_TYPES = ["fields", "scripts", "custom_functions", "layouts", "value_lists"]
 # Golden files whose line order carries no meaning (compared sorted).
 UNORDERED = {"trace/xref.index"}
 
+# Golden files of tools already ported off the exploder: their exploder version is gone, so
+# run_tools() no longer makes them and --update keeps them as they are. Each port's own test
+# compares its output with them (trace build: test_trace_build.py).
+FROZEN = {"trace/build.txt", "trace/xref.index"}
+
 
 def _shadow_root(tmp: Path) -> Path:
     """A copy of the repo layout the tools expect, holding the fixture's inputs."""
@@ -117,8 +122,8 @@ def run_tools() -> dict[str, str]:
         for p in sorted((ctx / "layouts").glob("*.json")):
             out[f"layout_to_summary/{p.name}"] = p.read_text(encoding="utf-8")
 
-        out["trace/build.txt"] = _run(root, scripts + "trace.py", "build", "-s", SOLUTION)
-        out["trace/xref.index"] = (ctx / "xref.index").read_text(encoding="utf-8")
+        # trace.py build is ported (P2-06): query, dead and analyze.py read the golden xref.index
+        shutil.copy2(GOLDEN / "trace" / "xref.index", ctx / "xref.index")
         for name, kind, obj, direction in QUERIES:
             out[f"trace/query_{name}.txt"] = _run(root, scripts + "trace.py", "query", "-s", SOLUTION,
                                                   "-t", kind, "-n", obj, "--direction", direction)
@@ -173,17 +178,17 @@ def main() -> int:
     ap.add_argument("--update", action="store_true", help="rewrite golden/ from today's tools")
     a = ap.parse_args()
     outputs = run_tools()
+    on_disk = {p.relative_to(GOLDEN).as_posix() for p in GOLDEN.rglob("*") if p.is_file()} if GOLDEN.exists() else set()
+    stale = sorted(on_disk - set(outputs) - FROZEN)
     if a.update:
-        if GOLDEN.exists():
-            shutil.rmtree(GOLDEN)
+        for name in stale:
+            (GOLDEN / name).unlink()
         for name, text in outputs.items():
             path = GOLDEN / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text, encoding="utf-8", newline="\n")
-        print(f"Wrote {len(outputs)} golden files to {GOLDEN}")
+        print(f"Wrote {len(outputs)} golden files to {GOLDEN} (kept {len(FROZEN & on_disk)} frozen)")
         return 0
-    stale = sorted(p.relative_to(GOLDEN).as_posix() for p in GOLDEN.rglob("*") if p.is_file()
-                   and p.relative_to(GOLDEN).as_posix() not in outputs)
     diffs = [d for name, text in outputs.items() if (d := compare(name, text))]
     diffs += [f"golden/{name} is no longer produced\n" for name in stale]
     for d in diffs:

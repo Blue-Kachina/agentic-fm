@@ -11,10 +11,10 @@ This skill traces references to FileMaker objects (fields, scripts, custom funct
 
 ### Layer 1: Deterministic engine (`trace.py`)
 
-Scans all solution data sources and builds `agent/context/{solution}/xref.index` — a compact cross-reference index. Supports three commands:
+Reads the solution's fm-saxml docs and builds `agent/context/{solution}/xref.index` — a compact cross-reference index. Supports three commands:
 
 ```bash
-python3 agent/scripts/trace.py build  -s "Solution Name"     # build xref.index
+python3 agent/scripts/trace.py build  -s "Solution Name" --docs-root <folder>   # build xref.index
 python3 agent/scripts/trace.py query  -s "Solution Name" -t TYPE -n "Name"  # query refs
 python3 agent/scripts/trace.py dead   -s "Solution Name" -t TYPE  # find unused objects
 ```
@@ -28,18 +28,21 @@ The `query` and `dead` commands read from the pre-built `xref.index` file — th
 
 Adds judgment for things static analysis cannot handle: ExecuteSQL strings, dynamic references, ambiguity resolution, severity classification, and false positive filtering.
 
-## Data sources scanned by trace.py
+## What trace.py build reads
 
-| Source | What it finds |
+`build` reads the references fm-saxml resolved (`references.json`, through `agent/scripts/solution_context.py`): pass the solution's name with `--docs-root <folder>` (or set `FM_SAXML_DOCS_ROOT`), or its docs folder as `-s`. For a multi-file build add `--file <FileMaker file>`. `--context <name>` names the folder under `agent/context/` it writes to, which is the name `query` and `dead` take with `-s`.
+
+| Source in the docs | xref rows |
 |--------|---------------|
-| `fields.index` — auto-enter and calc columns | Field-to-field references, custom function calls in calcs |
-| `scripts_sanitized/*.txt` | Field refs (Set Field, Set Variable, If, etc.), layout refs (Go to Layout), script refs (Perform Script), CF calls |
-| `custom_functions_sanitized/*.txt` | TO::Field refs, CF-to-CF calls |
-| `context/{solution}/layouts/*.json` | Field placements and button scripts on layouts |
-| `relationships.index` | Join field references |
-| `value_lists/*.xml` | Field-based value list sources |
+| Script steps | Field, layout, script, value list, custom function and TO refs; `line N` is the Script Workspace line |
+| Field calculations, auto-enter, lookups, validation, summary fields | Field and custom function refs (`field_calc` / `field_auto`) |
+| Custom function bodies | Field refs, CF-to-CF calls |
+| Layouts and layout objects | Field placements, button scripts, script triggers, value lists, every object calc (hide, tooltip, conditional formatting...) |
+| Relationships | Join and sort fields |
+| Value lists | Source fields and TOs |
+| File options, custom menus | File-level script triggers, menu item scripts |
 
-All field references are normalized to **canonical form** (`BaseTable::FieldName`) using `table_occurrences.index` for TO resolution. The original TO is preserved in the reference context.
+All field references are in **canonical form** (`BaseTable::FieldName`); the TO used is kept in the reference context (`via TO "..."`). References into another file, by name (indirection) or unresolved say so in the context.
 
 ---
 
@@ -56,8 +59,8 @@ ls agent/context/
 # 1b. Check xref.index existence and age
 stat agent/context/{solution}/xref.index
 
-# 1c. Check layout summaries exist
-ls agent/context/{solution}/layouts/ 2>/dev/null | head -1
+# 1c. Check where the solution's fm-saxml docs are (for build)
+python3 agent/scripts/solution_context.py -s "{solution}" --docs-root <folder>
 
 # 1d. Check webviewer status (for later visualization offer)
 curl -s http://localhost:8765/webviewer/status
@@ -70,16 +73,10 @@ curl -s http://localhost:8765/webviewer/status
 
 **xref.index caching — avoid unnecessary rebuilds:**
 - If `xref.index` **exists** and the developer has not mentioned schema changes (new fields, renamed tables, new scripts, etc.), **use it directly** — skip the build. This is the single biggest time saver.
-- If `xref.index` is **missing**, build it: `python3 agent/scripts/trace.py build -s "{solution}"`
-- If the developer explicitly says the schema changed, or if trace results look wrong, **rebuild**: `python3 agent/scripts/trace.py build -s "{solution}"`
+- If `xref.index` is **missing**, build it: `python3 agent/scripts/trace.py build -s "{solution}" --docs-root <folder>`
+- If the developer explicitly says the schema changed (after converting a new export with fm-saxml), or if trace results look wrong, **rebuild** with the same command.
 
-**Layout summary dependency**: If `agent/context/{solution}/layouts/` is empty or missing, warn and suggest:
-
-```bash
-python3 agent/scripts/layout_to_summary.py --solution "{solution}"
-```
-
-Then rebuild xref.index.
+`build` takes layout references from the fm-saxml docs, so it no longer needs layout summaries.
 
 Save the webviewer status result for Step 5b — do not check again later.
 

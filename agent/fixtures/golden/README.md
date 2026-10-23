@@ -83,5 +83,12 @@ python3 agent/scripts/golden_fixture.py --update   # rewrite golden/ (review the
 
 In a port's test: `golden_fixture.compare("trace/xref.index", new_output)` returns None or a
 unified diff; `sort_lines=True` ignores line order. `test_golden_fixture.py` checks that today's
-tools still reproduce `golden/`; once a tool is ported and its exploder version is deleted
-(roadmap P3-09), its part of that test goes, and the golden files stay as the reference.
+tools still reproduce `golden/`. Once a tool is ported, its golden files are listed in
+`golden_fixture.FROZEN`: they stay as the reference, `--update` leaves them alone, and the port's
+own test compares with them.
+
+| Ported | Frozen golden files | Compared by |
+|---|---|---|
+| `trace.py build` (P2-06) | `trace/build.txt`, `trace/xref.index` | `test_trace_build.py` (differences listed with reasons in `GOLDEN_DIFFERENCES`) |
+
+`trace.py query` and `dead` and `analyze.py` still run here, on the golden `xref.index`.

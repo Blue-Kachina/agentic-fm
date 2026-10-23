@@ -87,6 +87,9 @@ def locate(solution: str, docs_root: str | os.PathLike | None = None) -> Path:
     try:
         return fm_saxml.find_docs(solution, root)
     except fm_saxml.DocsNotFoundError as e:
+        if "matches several" in str(e):
+            raise SolutionContextError(f"{e}\nPass the docs folder itself as the solution, or move the "
+                                       "other folder out of the docs root.") from None
         raise SolutionContextError(f"No fm-saxml docs for {solution!r} under {root}: {e}\n"
                                    + _convert_hint(solution)) from None
 

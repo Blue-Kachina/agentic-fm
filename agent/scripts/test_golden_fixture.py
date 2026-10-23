@@ -2,6 +2,7 @@
 
 - Today's exploder-path tools still produce golden/ on the fixture's inputs, so the golden
   files are reproducible and every port is compared with output these tools really give.
+  Golden files of tools already ported (golden_fixture.FROZEN) are kept as they are.
 - compare() reports differences as a unified diff, and ignores order where asked.
 - The fixture's export converts with the installed fm-saxml and holds the same scripts and
   layouts as the exploded tree, so ported tools read the same solution the golden came from.
@@ -21,7 +22,8 @@ def test_tools_reproduce_golden():
     outputs = gf.run_tools()
     produced = set(outputs)
     on_disk = {p.relative_to(gf.GOLDEN).as_posix() for p in gf.GOLDEN.rglob("*") if p.is_file()}
-    assert produced == on_disk, f"missing: {sorted(on_disk - produced)}, new: {sorted(produced - on_disk)}"
+    assert gf.FROZEN <= on_disk and not produced & gf.FROZEN   # ported tools: kept, compared by their own tests
+    assert produced == on_disk - gf.FROZEN, f"missing: {sorted(on_disk - gf.FROZEN - produced)}, new: {sorted(produced - on_disk)}"
     diffs = [d for name, text in outputs.items() if (d := gf.compare(name, text))]
     assert not diffs, "\n".join(diffs) + "\nIf intended: python3 agent/scripts/golden_fixture.py --update"
 
