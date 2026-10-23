@@ -88,15 +88,14 @@ def test_preview_matches_golden(unscrubbed, path):
 
 
 # fm-saxml scrubs raw/ by default. In the fixture that changes two lines of OneOfEverything:
-# the AI account name is a credential (redacted on purpose), and the RAG step's parameter
-# *type* "RAGAccountName" is redacted with its value, so the step can't be decoded (an
-# fm-saxml bug: structure is not a credential). When fm-saxml fixes the second, this fails:
-# drop that pair.
+# the AI and RAG account names are credentials, redacted on purpose. Only the values change;
+# since fm-saxml 0.6.6 the redaction leaves the XML's structure alone (before, the RAG step's
+# parameter type was redacted too and the step couldn't be decoded).
 SCRUBBED_LINES = [
     ('21\tConfigure AI Account [ Account Name: "accountNameGoesHere" ; Model Provider: OpenAI ]',
      '21\tConfigure AI Account [ Account Name: "[REDACTED:api_key#1]" ; Model Provider: OpenAI ]'),
     ('26\tConfigure RAG Account [ RAG Account Name: "RAGAccountName" ]',
-     '26\tConfigure RAG Account  [ … unsupported SaXML shape … ]'),
+     '26\tConfigure RAG Account [ RAG Account Name: "[REDACTED:api_key#2]" ]'),
 ]
 
 

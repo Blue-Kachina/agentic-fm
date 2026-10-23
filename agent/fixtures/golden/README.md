@@ -16,7 +16,7 @@ each difference.
 
 The fm-saxml side is not stored: tests convert `saxml/EverythingBagel.xml` with the installed
 fm-saxml (`golden_fixture.build_docs()`), so it always matches the version under test. The
-fork's CI pins fm-saxml-converter 0.6.5.
+fork's CI pins fm-saxml-converter 0.6.6.
 
 ### The Mac run (inputs)
 
@@ -91,7 +91,7 @@ own test compares with them.
 | `trace.py build` (P2-06) | `trace/build.txt`, `trace/xref.index` | `test_trace_build.py` (differences listed with reasons in `GOLDEN_DIFFERENCES`) |
 | `trace.py query` and `dead` (P2-07) | `trace/query_*.txt`, `trace/dead_*.txt` | `test_trace_query_dead.py` (changed outputs and reasons in `GOLDEN_CHANGES`) |
 | `layout_to_summary.py` (P2-09) | `layout_to_summary/*.json` | `test_layout_to_summary.py` (byte-identical, no differences) |
-| `saxmlpreview.py` input (P2-12) | `saxmlpreview/*.txt` | `test_script_input.py` (identical from unscrubbed docs; from scrubbed docs, two lines of OneOfEverything differ, listed in `SCRUBBED_LINES`) |
+| `saxmlpreview.py` input (P2-12) | `saxmlpreview/*.txt` | `test_script_input.py` (identical from unscrubbed docs; from scrubbed docs, two lines of OneOfEverything differ (redacted credentials), listed in `SCRUBBED_LINES`) |
 | `extract_theme.py` (P2-10) | `extract_theme/*.sha256` | `test_extract_theme.py` (same four files; the manifest's color palette is in swatch order, so its sum is taken key-sorted) |
 
 `analyze.py` was deleted, not ported (P2-14), and its golden profile with it: fm-saxml's
