@@ -84,12 +84,14 @@ def _render_control(step, step_id, pfx):
         if pfx:  # disabled
             return pfx + ('# ' + text if text else '# '), (False, False)
         return (('# ' + text) if text else ''), (False, False)
+    # If / Else If / Exit Loop If: outside the f-strings, which can't hold a backslash before Python 3.12
+    cond = get_cdata(step.find('.//Parameter[@type="Calculation"]')) if step_id in (68, 125, 72) else ''
     if step_id == 68:  # If
-        return f'{pfx}If [ {get_cdata(step.find(".//Parameter[@type=\"Calculation\"]"))} ]', (False, True)
+        return f'{pfx}If [ {cond} ]', (False, True)
     if step_id == 69:  # Else
         return f'{pfx}Else', (True, True)
     if step_id == 125:  # Else If
-        return f'{pfx}Else If [ {get_cdata(step.find(".//Parameter[@type=\"Calculation\"]"))} ]', (True, True)
+        return f'{pfx}Else If [ {cond} ]', (True, True)
     if step_id == 70:  # End If
         return f'{pfx}End If', (True, False)
     if step_id == 71:  # Loop
@@ -101,7 +103,7 @@ def _render_control(step, step_id, pfx):
                 flush = ' [ Flush: Always ]'
         return f'{pfx}Loop{flush}', (False, True)
     if step_id == 72:  # Exit Loop If
-        return f'{pfx}Exit Loop If [ {get_cdata(step.find(".//Parameter[@type=\"Calculation\"]"))} ]', (False, False)
+        return f'{pfx}Exit Loop If [ {cond} ]', (False, False)
     if step_id == 73:  # End Loop
         return f'{pfx}End Loop', (True, False)
     if step_id == 103:  # Exit Script
