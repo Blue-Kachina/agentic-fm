@@ -25,7 +25,7 @@ jobs:
       # fm-saxml: the solution context module (solution_context.py) reads its docs.
       # Keep the version in step with the DIS harness's requirements.txt.
       - name: Install pytest and fm-saxml
-        run: python -m pip install pytest fm-saxml-converter==0.6.3
+        run: python -m pip install pytest fm-saxml-converter==0.6.4
 
       # test_deploy.py needs a running companion server, so it is not run here.
       - name: Run tests

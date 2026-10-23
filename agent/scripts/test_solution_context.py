@@ -28,11 +28,8 @@ needs_fm_saxml = pytest.mark.skipif(importlib.util.find_spec("fm_saxml") is None
 
 
 def _build(input_path: str, root: str, solution: str) -> None:
-    # RAGAccountName is a dummy value in a Configure RAG Account step. fm-saxml 0.6.3 redacts it
-    # in the step text but its scrubbing guard then finds it in the step's label and parameter,
-    # and exits 2 (an fm-saxml bug). Allowing the dummy value keeps the build clean.
     r = subprocess.run([sys.executable, "-m", "fm_saxml", "build", input_path, "--docs-root", root,
-                        "--solution", solution, "--scrub-allow", "^RAGAccountName$"],
+                        "--solution", solution],
                        capture_output=True, text=True, encoding="utf-8",
                        env={**os.environ, "PYTHONUTF8": "1"})   # Windows consoles default to cp1252
     assert r.returncode == 0, r.stdout + r.stderr
