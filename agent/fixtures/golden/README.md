@@ -16,7 +16,7 @@ each difference.
 
 The fm-saxml side is not stored: tests convert `saxml/EverythingBagel.xml` with the installed
 fm-saxml (`golden_fixture.build_docs()`), so it always matches the version under test. The
-fork's CI pins fm-saxml-converter 0.6.4.
+fork's CI pins fm-saxml-converter 0.6.5.
 
 ### The Mac run (inputs)
 
@@ -46,7 +46,6 @@ that holds the inputs above:
 |---|---|
 | `layout_to_summary/` | `layout_to_summary.py --solution EverythingBagel` |
 | `trace/` | `trace.py build`; `trace.py query` for each type (list in `QUERIES`); `trace.py dead` for each type; the built `xref.index` (compared ignoring line order) |
-| `analyze/` | `analyze.py --format all`: the profile `.json` and `.md` (stdout is timings; `.html` is the same data in a template) |
 | `saxmlpreview/` | `saxmlpreview.py` on each `xml_parsed/scripts/` file: the line map |
 
 Differences from the Mac run's own default path, on purpose:
@@ -54,10 +53,8 @@ Differences from the Mac run's own default path, on purpose:
 - Layout summaries are built first. The default path skips them, and then `trace.py` warns
   that layout references are missing and its dead scans are unreliable (every field and both
   layouts came out "unused").
-- `analyze.py` runs with its optional packages (networkx, pandas, matplotlib, jinja2) blocked,
-  so the profile is its baseline and the same on every machine.
-- Output is normalised: LF line endings, the temporary root as `<root>`, `/` in paths after it,
-  and analyze.py's timestamp as `<generated_at>`.
+- Output is normalised: LF line endings, the temporary root as `<root>`, and `/` in paths after
+  it.
 
 Checked on 2026-10-23: run the default way (no layout summaries), this fork's tools on Windows
 gave the Mac run's outputs exactly (trace build, the five dead scans, `xref.index`, and the
@@ -92,4 +89,5 @@ own test compares with them.
 | `trace.py build` (P2-06) | `trace/build.txt`, `trace/xref.index` | `test_trace_build.py` (differences listed with reasons in `GOLDEN_DIFFERENCES`) |
 | `trace.py query` and `dead` (P2-07) | `trace/query_*.txt`, `trace/dead_*.txt` | `test_trace_query_dead.py` (changed outputs and reasons in `GOLDEN_CHANGES`) |
 
-`analyze.py` still runs here, on the golden `xref.index`.
+`analyze.py` was deleted, not ported (P2-14), and its golden profile with it: fm-saxml's
+`Reports/profile.md` replaces it. The comparison is in the Phase 2 roadmap, unit P2-08.

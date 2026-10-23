@@ -1,200 +1,86 @@
 ---
 name: solution-analysis
-description: Analyze a FileMaker solution and produce a structured profile covering data model, business logic, UI layer, integrations, and health metrics. Uses on-disk pre-processing to handle solutions of any size without sending raw XML through the agent. Use when the developer says "analyze solution", "solution overview", "solution analysis", "solution profile", "solution spec", "what does this solution do", "solution summary", or wants a high-level understanding of an entire FileMaker solution.
-compatibility: Requires Python 3. Optionally networkx, pandas, matplotlib, jinja2 (via venv) for extended analysis.
+description: Analyze a FileMaker solution and produce a structured profile covering data model, business logic, UI layer, integrations, and health metrics. Reads the reports fm-saxml writes with the solution's docs, so solutions of any size are handled without sending raw XML through the agent. Use when the developer says "analyze solution", "solution overview", "solution analysis", "solution profile", "solution spec", "what does this solution do", "solution summary", or wants a high-level understanding of an entire FileMaker solution.
+compatibility: Needs the solution's fm-saxml docs (fm-saxml-converter 0.6.5 or later). No scripts to run.
 ---
 
 # Solution Analysis
 
-This skill produces a comprehensive profile of a FileMaker solution by running `agent/scripts/analyze.py` — a Python script that reads pre-indexed data (index files, xref, layout summaries, sanitized scripts) and synthesizes a structured overview. The agent never touches raw XML; all heavy processing happens on disk.
+This skill gives a developer (or someone new to a solution) a complete understanding of what the solution does: its data model, scripted business logic, UI coverage, integration points, and health.
 
-**Purpose**: Give a developer (or someone new to a solution) a complete understanding of what the solution does — its data model, scripted business logic, UI coverage, integration points, and health.
+The numbers come from fm-saxml, which writes them with the solution's docs on every conversion; nothing needs building. The agent reads those reports and turns them into a narrative. It never reads raw XML.
 
-**Output**: `agent/sandbox/{solution} - solution-profile.json` and optionally a markdown specification document.
+**Output**: a narrative overview, in chat or as a markdown document when the developer wants one to share.
 
-## Architecture
+## Where the reports are
 
-### Layer 1: Deterministic engine (`analyze.py`)
+Every fm-saxml docs folder has a `Reports/` folder:
 
-Pure Python analysis that reads pre-indexed data and produces structured output:
+| File | What it contains |
+| --- | --- |
+| `Reports/profile.md` | The solution profile: tables with data and field types, relationship measures (join operators, multi-predicate, self-joins, cascades on each side, sorted sides), relationship graph (TO degrees, hub TOs, isolated TOs, disconnected tables), scripts (steps, largest scripts, folders, Perform Script links, entry points), layouts by base TO, layout folders, portals, layouts nothing navigates to, value lists by type, external calls by step type, unused candidates |
+| `Reports/summary.md` | Entity counts, reference counts (exact, parsed, unresolved, other files), names written in text, warning counts, scrubbing |
+| `Reports/warnings.md` | Every warning (empty scripts, unused field candidates, unresolved references...) |
+| `Reports/indirection.md` | Places that name an object in text (GetField, Perform Script by name, ExecuteSQL), which a rename breaks |
+| `Reports/unresolved-references.md` | References fm-saxml could not resolve |
+| `index.md` | File options, external data sources, and links to each kind's list (scripts, layouts, custom functions...) |
 
-```bash
-python3 agent/scripts/analyze.py -s "SolutionApp"                          # JSON profile
-python3 agent/scripts/analyze.py -s "SolutionApp" --format markdown        # Markdown spec
-python3 agent/scripts/analyze.py -s "SolutionApp" --deep                   # Full script analysis
-python3 agent/scripts/analyze.py -s "SolutionApp" --ensure-prerequisites   # Build xref + layout summaries first
-python3 agent/scripts/analyze.py --list-extensions                           # Show optional deps
-```
-
-The script automatically builds missing prerequisites (`xref.index`, layout summaries) when `--ensure-prerequisites` is passed.
-
-### Layer 2: Agentic interpretation (this skill)
-
-Reads the compact JSON profile and produces narrative insight — what the solution appears to do, how its parts connect, what patterns it follows, and what health issues deserve attention.
+A **multi-file build** (several exports converted together) has one folder per file, each with its own `Reports/`, plus a top-level `Reports/batch-summary.md`: files converted, cross-file references, and how each file's external data sources were paired with the other files.
 
 ## Workflow
 
-### Step 1: Identify the solution
+### Step 1: Find the docs
 
 Determine which solution to analyze:
 
-1. If the developer named a specific solution, use that name
-2. If `agent/CONTEXT.json` exists, read the `solution` field
-3. If only one solution exists in `agent/context/`, auto-detect it
-4. Otherwise, list available solutions and ask
+1. If the developer named a solution or a docs folder, use that.
+2. Otherwise look under the docs root (`--docs-root` or `$FM_SAXML_DOCS_ROOT`); if there is only one solution, use it; if there are several, list them and ask.
 
-### Step 2: Run the analysis
+To check a docs folder and see whether it is a multi-file build:
 
 ```bash
-python3 agent/scripts/analyze.py -s "{solution}" --ensure-prerequisites
+python3 agent/scripts/solution_context.py -s "{solution or docs folder}" --docs-root <folder>
 ```
 
-This:
+If no docs are found, the developer converts the Save a Copy as XML export with fm-saxml (`solution_context.py` prints the command). After a schema change, they export and convert again; the reports are rebuilt with the docs.
 
-- Builds `xref.index` (via `trace.py build`) if missing
-- Builds layout summaries (via `layout_to_summary.py`) if missing
-- Analyzes all six index files, sanitized scripts, custom functions, and layout summaries
-- Writes `agent/sandbox/{solution} - solution-profile.json`
+### Step 2: Read the reports
 
-For deep analysis (when the developer requests it or the solution is small enough):
+Read `Reports/profile.md` and `Reports/summary.md` in parallel. For a multi-file build, read `Reports/batch-summary.md` first, then each file's `profile.md` and `summary.md`.
 
-```bash
-python3 agent/scripts/analyze.py -s "{solution}" --ensure-prerequisites --deep
-```
+Read the rest only when the narrative needs it: `warnings.md` for health details, `indirection.md` before saying anything about renames, `index.md` for data sources and file options, and the list it links for the names of one kind of object (custom functions, say). For large solutions, read the sections you need rather than whole files.
 
-### Step 3: Read the profile
+### Step 3: Produce the narrative
 
-Read `agent/sandbox/{solution} - solution-profile.json`. The profile contains these sections:
+Using the reports, produce a narrative covering:
 
-| Section          | Key                  | What it contains                                                                 |
-| ---------------- | -------------------- | -------------------------------------------------------------------------------- |
-| Summary          | `summary`            | Top-level counts (tables, fields, scripts, layouts, etc.)                        |
-| Data Model       | `data_model`         | Tables with field breakdowns, TO groups, relationship summary, topology analysis |
-| Naming           | `naming_conventions` | Detected prefix patterns and case styles                                         |
-| Business Logic   | `business_logic`     | Script folders, call graph, entry points, utility scripts, clusters, line counts |
-| Custom Functions | `custom_functions`   | Function inventory, categories, dependency chains                                |
-| UI Layer         | `ui_layer`           | Layout inventory, classifications, portal usage, orphaned layouts                |
-| Integrations     | `integrations`       | External data sources, value lists, external script calls                        |
-| Multi-file       | `multi_file`         | Cross-file references and correlated solutions                                   |
-| Health           | `health`             | Dead objects, disconnected tables, empty scripts                                 |
+1. **Executive Summary**: what this solution appears to be (CRM, ERP, inventory system, etc.), judged from table names, script folders and integrations. Mention its scale (tables, fields, scripts, layouts).
 
-### Step 4: Produce the narrative
+2. **Data Architecture**: the core entity tables and how they relate. Judge the relationship graph topology (anchor-buoy, star, tiered hub, spider-web, flat) from the graph measures and the TO names, using `references/relationship-graph-topologies.md`; say it is a judgment and what it rests on. Note cascades (a parent-child cascade is usually on the right side) and self-joins.
 
-Using the profile data, produce a narrative specification that covers:
+3. **Business Logic Domains**: walk through the script folders. For each major folder, describe what that functional area does, judged from script names and entry points. Highlight the largest scripts, and scripts many others call, which serve as shared infrastructure.
 
-1. **Executive Summary** — What this solution appears to be (CRM, ERP, inventory system, etc.) based on table names, script domains, and integration patterns. Mention the solution's scale (table count, script count, field count).
+4. **UI Coverage**: which tables have layouts and which don't. Use the layout and folder names to judge what layouts are for (`references/layout-classifications.md`); say it is a judgment. Call out layouts nothing navigates to and portals that reveal parent-child UI patterns.
 
-2. **Data Architecture** — Describe the topology pattern (anchor-buoy, spider-web, hybrid). Identify the core entity tables and how they relate. Note the naming convention and what it tells us about the development approach.
+5. **Integration Points**: external data sources (`index.md`) and external calls by step type (Insert from URL, Send Mail, Execute SQL, Perform Script on Server, import and export...).
 
-3. **Business Logic Domains** — Walk through the script folder hierarchy. For each major folder, describe what that functional area does based on script names and entry points. Highlight the largest scripts and utility scripts that serve as shared infrastructure.
+6. **Health Observations**: unused candidates, disconnected tables, empty scripts, unresolved references, names written in text. Frame these as observations, not criticisms: solutions grow organically and some "unused" objects are intentional placeholders. Unused results are candidates only: calls by calculated name, server schedules and `fmp://` URLs don't show up in the docs.
 
-4. **UI Coverage** — Which tables have layouts and which don't. Note the layout classification distribution. Call out orphaned layouts and any portals that reveal parent-child UI patterns.
+### Step 4: Optionally write a document
 
-5. **Integration Points** — External data sources, API calls (Insert from URL), email integration, import/export capabilities.
-
-6. **Health Observations** — Dead object counts, disconnected tables, empty scripts. Frame these as observations, not criticisms — solutions grow organically and some "dead" objects may be intentional placeholders.
-
-### Step 5: Optionally generate markdown
-
-If the developer wants a shareable document:
-
-```bash
-python3 agent/scripts/analyze.py -s "{solution}" --format markdown --ensure-prerequisites
-```
-
-This produces `agent/sandbox/{solution} - solution-profile.md` — a structured markdown document with tables, the Mermaid ERD, and all metrics.
-
-## Optional extensions
-
-The analysis script supports optional Python libraries that enable deeper analysis. Check availability:
-
-```bash
-python3 agent/scripts/analyze.py --list-extensions
-```
-
-Extended features include:
-
-- **networkx**: Anchor-buoy topology detection with confidence scores, script community detection, cycle detection, bridge relationship identification
-- **pandas**: Statistical profiling, outlier detection, table health scorecards
-- **matplotlib**: Embedded visualizations in the markdown report
-- **jinja2**: Customizable report templates
-
-If any are missing and the developer wants extended analysis, guide them through setup:
-
-> **Extended analysis requires additional Python dependencies.**
->
-> Core analysis works without them — install only if you want topology detection, statistical profiling, visualizations, or templated reports.
->
-> **Option A: venv in the project folder (recommended)**
-> ```bash
-> python3 -m venv agent/.venv
-> source agent/.venv/bin/activate
-> pip install -r .cursor/skills/solution-analysis/assets/requirements-analyze.txt
-> ```
->
-> Once set up, run the analysis with the venv active, or prefix with `agent/.venv/bin/python3`:
-> ```bash
-> agent/.venv/bin/python3 agent/scripts/analyze.py -s "{solution}" --ensure-prerequisites
-> ```
-
-If the developer declines, proceed with the core analysis — all six profile sections are still generated, just without the extended metrics.
-
-## Performance contract
-
-- **Never read raw xml_parsed XML** — the analysis script reads only pre-indexed data
-- **Run analyze.py once** — don't re-run unless the developer changes parameters
-- **Read the JSON profile selectively** — for very large solutions, read specific sections rather than the entire file
-- **Parallel tool calls** — when reading the profile and checking for prerequisites, batch independent reads
+If the developer wants a shareable document, write the narrative as markdown, with the report tables it relies on. Save it where the developer's project keeps deliverables about the solution, named `{solution} - solution-profile.md`.
 
 ## Multi-file solutions
 
-When a FileMaker solution uses a data separation model (UI file + data file) or references other FM files, the analysis automatically detects and incorporates cross-file relationships into a single unified profile.
+In a data separation model (UI file + data file) or any multi-file solution:
 
-### How it works
+- Lead with the architecture: which file is the UI file and which holds the data, from `batch-summary.md` (data source pairings) and each file's table and TO counts.
+- Note which tables are local UI or utility tables and which are core domain tables in the data file.
+- Most TOs in the UI file usually point at the data file; the true entity relationships live in the data file's graph.
+- Uses from other files count: a script another file calls is an entry point ("another file" in profile.md), not unused.
 
-1. `detect_multi_file()` parses `external_data_sources/` XML to find referenced files
-2. If correlated solutions exist in `agent/context/` (both files have been exploded and indexed via `fmcontext.sh`), the analysis loads both solutions' index data
-3. Table occurrences are classified as Local or External using the enriched `table_occurrences.index` (columns: `TOName|TOID|BaseTableName|BaseTableID|Type|DataSource`)
-4. External TOs are mapped to correlated solutions via base table overlap matching
-5. The unified profile shows all tables with their `source_file` attribution
+## Performance contract
 
-### Workflow
-
-```bash
-# Standard analysis — auto-detects correlated files
-python3 agent/scripts/analyze.py -s "SolutionApp" --ensure-prerequisites
-
-# Explicitly name correlated solutions
-python3 agent/scripts/analyze.py -s "SolutionApp" --correlated SolutionData
-```
-
-### Profile enrichments for multi-file
-
-The JSON profile includes these additional fields when multi-file is detected:
-
-- `multi_file.file_architecture`: `"data_separation"`, `"multi_file"`, or `"single"`
-- `multi_file.data_source_map`: Maps external data source names to correlated SolutionApps (e.g., `{"Data": "SolutionData"}`)
-- `multi_file.files`: Array with per-file summary (name, role, local table count, TO counts)
-- `data_model.tables[*].source_file`: Which FM file owns each base table
-- `data_model.tables[*].is_external`: `true` for tables from correlated solutions
-- `data_model.base_table_edges[*].cross_file`: Whether a relationship crosses file boundaries
-- `data_model.local_tables` / `data_model.external_tables`: Tables grouped by ownership
-- `data_model.to_classification`: Breakdown of Local vs External TOs by data source
-
-### Output format differences
-
-**HTML**: The relationship graph colors nodes by source file (blue = local, orange = data file). Cross-file edges use dashed orange lines. A legend shows the file-to-color mapping. The tables DataTable includes a "Source" column.
-
-**Markdown**: The ERD uses a Mermaid `flowchart` with `subgraph` blocks per file (instead of `erDiagram`). Cross-file edges are dashed. A "Multi-File Architecture" section shows the pattern, per-file summary table, and table ownership.
-
-**JSON**: All enrichments above are machine-readable for agent consumption.
-
-### Narrative guidance
-
-When describing a data separation model solution:
-
-- Lead with the architecture pattern: "This is a data separation model with X as the UI file and Y as the data file"
-- Note which tables are local UI/utility tables vs core domain tables stored in the data file
-- Highlight that most table occurrences in the UI file are external references
-- The true ERD (entity relationships between domain tables) lives in the data file
-- The UI file's relationship graph primarily connects external TOs for layout/portal purposes
+- **Never read raw XML**: the reports hold what this skill needs.
+- **Read reports selectively**: for very large solutions, read the sections you need.
+- **Parallel tool calls**: batch independent reads.

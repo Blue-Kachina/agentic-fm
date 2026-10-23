@@ -152,7 +152,7 @@ A multi-file solution should be classified at both the **per-file** and **soluti
 
 ## Classification Heuristics (for automated detection)
 
-The following signals are used by `analyze.py` to classify topology. They are listed in priority order — higher-priority signals can override lower ones.
+Use these signals to judge the topology from `Reports/profile.md` (graph measures, join operators, layouts by base TO) and the TO names. They are listed in priority order — higher-priority signals can override lower ones.
 
 ### Signal: Hub-to-Base-Table Ratio
 

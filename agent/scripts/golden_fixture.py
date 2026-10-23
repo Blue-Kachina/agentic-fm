@@ -13,7 +13,7 @@ against known-good output.
 The tools find their inputs from their own location (<root>/agent/context, agent/xml_parsed),
 so they run from a temporary copy of the repo layout holding the fixture's inputs, never on
 this checkout's agent/context or xml_parsed. Output is normalised before it is compared or
-written: line endings, that temporary root, and analyze.py's timestamp.
+written: line endings and that temporary root.
 
 Tests and ports use:
     run_tools()                      -> {golden name: text}
@@ -75,8 +75,6 @@ def _shadow_root(tmp: Path) -> Path:
     (agent / "config").mkdir()
     for example in (REPO_ROOT / "agent" / "config").glob("*.example"):   # module defaults etc.
         shutil.copy2(example, agent / "config" / example.name)
-    assets = Path(".cursor") / "skills" / "solution-analysis" / "assets"  # analyze.py's HTML template
-    shutil.copytree(REPO_ROOT / assets, root / assets)
     shutil.copytree(FIXTURE / "xml_parsed", agent / "xml_parsed")
     shutil.copytree(FIXTURE / "context", agent / "context" / SOLUTION)
     return root
@@ -87,22 +85,10 @@ def _normalise(text: str, root: Path) -> str:
     for form in {str(root), root.as_posix()}:
         text = text.replace(form, "<root>")
     # paths printed after the root: one separator style on every OS
-    text = re.sub(r"<root>[^\n\"']*", lambda m: m.group(0).replace("\\", "/"), text)
-    return re.sub(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d+\+00:00", "<generated_at>", text)
-
-
-# analyze.py does more (networkx topology, clustering...) when optional packages are installed.
-# The golden profile is its baseline: those imports are blocked, whatever this Python has.
-ANALYZE_OPTIONAL = ("networkx", "pandas", "matplotlib", "jinja2")
-_RUN_WITHOUT_OPTIONAL = ("import runpy, sys\n"
-                         f"for m in {ANALYZE_OPTIONAL!r}: sys.modules[m] = None\n"
-                         "sys.argv = sys.argv[1:]\n"
-                         "runpy.run_path(sys.argv[0], run_name='__main__')\n")
+    return re.sub(r"<root>[^\n\"']*", lambda m: m.group(0).replace("\\", "/"), text)
 
 
 def _run(root: Path, *args: str) -> str:
-    if args[0].endswith("analyze.py"):
-        args = ("-c", _RUN_WITHOUT_OPTIONAL, *args)
     r = subprocess.run([sys.executable, *args], cwd=root, capture_output=True, text=True,
                        encoding="utf-8", env={**os.environ, "PYTHONUTF8": "1"})
     if r.returncode != 0:
@@ -119,20 +105,9 @@ def run_tools() -> dict[str, str]:
         ctx = root / "agent" / "context" / SOLUTION
         scripts = "agent/scripts/"
 
-        # Layout summaries first: trace.py and analyze.py read them, and without them every
-        # layout-only reference is missing (the tools warn and the dead scans are unreliable).
         _run(root, scripts + "layout_to_summary.py", "--solution", SOLUTION)
         for p in sorted((ctx / "layouts").glob("*.json")):
             out[f"layout_to_summary/{p.name}"] = p.read_text(encoding="utf-8")
-
-        # trace.py is ported (P2-06, P2-07): analyze.py reads the golden xref.index
-        shutil.copy2(GOLDEN / "trace" / "xref.index", ctx / "xref.index")
-
-        # analyze.py's stdout is progress and timings: only its profile files are golden.
-        _run(root, scripts + "analyze.py", "-s", SOLUTION, "--format", "all")
-        for ext in ("json", "md"):
-            p = root / "agent" / "sandbox" / f"{SOLUTION} - solution-profile.{ext}"
-            out[f"analyze/solution-profile.{ext}"] = p.read_text(encoding="utf-8")
 
         for p in sorted((root / "agent" / "xml_parsed" / "scripts" / SOLUTION).glob("*.xml")):
             out[f"saxmlpreview/{p.stem}.txt"] = _run(root, scripts + "saxmlpreview.py", str(p))
