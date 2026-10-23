@@ -1,0 +1,7 @@
+=== Potentially unused layouts (EverythingBagel) ===
+
+HIGH CONFIDENCE — no references found anywhere (2):
+  CustomMenuSetLayout
+  EverythingBagel
+
+Summary: 2 high, 0 medium unused out of 2 total layouts

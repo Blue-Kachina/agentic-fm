@@ -1,0 +1,87 @@
+# Golden fixture: exploder-path output on EverythingBagel
+
+What the exploder path (Explode XML → `fmparse.sh` → fm-xml-export-exploder → `fmcontext.sh`)
+reads and what today's tools make of it, on the EverythingBagel test file. Each port off the
+exploder (roadmap Phase 2) compares its output with `EverythingBagel/golden/`, or explains
+each difference.
+
+## EverythingBagel/
+
+| Folder | What | Made by |
+|---|---|---|
+| `saxml/EverythingBagel.xml` | Save a Copy as XML of the file | FileMaker Pro, on the Mac run below |
+| `xml_parsed/` | the exploded tree (78 files) | fm-xml-export-exploder, on the Mac run |
+| `context/` | `fields`, `layouts`, `relationships`, `scripts`, `table_occurrences`, `value_lists`, `custom_functions` `.index` | `fmcontext.sh`, on the Mac run |
+| `golden/` | tool output on those inputs (below) | `agent/scripts/golden_fixture.py --update` |
+
+The fm-saxml side is not stored: tests convert `saxml/EverythingBagel.xml` with the installed
+fm-saxml (`golden_fixture.build_docs()`), so it always matches the version under test. The
+fork's CI pins fm-saxml-converter 0.6.4.
+
+### The Mac run (inputs)
+
+Copied unchanged from `samples/EverythingBagel_mac_run/` in fm-saxml-converter
+(<https://github.com/Blue-Kachina/fm-doc-saxml>, commit 3c3c4a8, MIT licence, copyright (c) 2026
+Matthew Leering), whose `NOTES.md` has the full record. Run on 2026-10-21:
+
+| Item | Version |
+|---|---|
+| FileMaker Pro | 26.0.3; SaXML `FMSaveAsXML version="2.3.0.0"` |
+| fm-xml-export-exploder | 0.6.1 (sha256 `03efac61602973b63a19452dec3bc0f110895f908c83aa6e5b8b1447d6beef03`) |
+| agentic-fm | upstream petrowsky/agentic-fm `b2669b6` (version.txt 1.0.0), clean tree |
+| macOS, Python | 26.5.2 arm64, Python 3.14.7 |
+
+How it was run: a copy of EverythingBagel.fmp12 (same file name) got two scripts pasted from
+`filemaker/agentic-fm.xml`, "Get agentic-fm path" and "Explode XML" (so the export has them as
+script IDs 3 and 4); with `companion_server.py` running, Explode XML did Save a Copy as XML and
+POSTed to `/explode`, and `fmparse.sh` ran with its defaults (`--output_tree domain`, no
+`--all-lines`, no `--lossless`, no `agent/config/*.json`).
+
+### golden/ (outputs)
+
+Made by this fork's tools, run by `golden_fixture.py` from a temporary copy of the repo layout
+that holds the inputs above:
+
+| Folder | Commands |
+|---|---|
+| `layout_to_summary/` | `layout_to_summary.py --solution EverythingBagel` |
+| `trace/` | `trace.py build`; `trace.py query` for each type (list in `QUERIES`); `trace.py dead` for each type; the built `xref.index` (compared ignoring line order) |
+| `analyze/` | `analyze.py --format all`: the profile `.json` and `.md` (stdout is timings; `.html` is the same data in a template) |
+| `saxmlpreview/` | `saxmlpreview.py` on each `xml_parsed/scripts/` file: the line map |
+
+Differences from the Mac run's own default path, on purpose:
+
+- Layout summaries are built first. The default path skips them, and then `trace.py` warns
+  that layout references are missing and its dead scans are unreliable (every field and both
+  layouts came out "unused").
+- `analyze.py` runs with its optional packages (networkx, pandas, matplotlib, jinja2) blocked,
+  so the profile is its baseline and the same on every machine.
+- Output is normalised: LF line endings, the temporary root as `<root>`, `/` in paths after it,
+  and analyze.py's timestamp as `<generated_at>`.
+
+Checked on 2026-10-23: run the default way (no layout summaries), this fork's tools on Windows
+gave the Mac run's outputs exactly (trace build, the five dead scans, `xref.index`, and the
+analyze profile in all three formats), apart from timestamps and absolute paths.
+
+### Known exploder-path bugs kept in the golden
+
+Ports are expected to differ here; say so when comparing.
+
+1. `context/custom_functions.index` is empty: exploder 0.6.1 writes no `custom_function_stubs/`,
+   which `fmcontext.sh` reads. `trace.py` still counts 1 custom function.
+2. `context/value_lists.index` has empty names and IDs: `fmcontext.sh` reads
+   `/ValueList/ValueListReference/@name`, but the exploded files have `/ValueList/@name`. So
+   `trace/query_value_list_HardcodedValueList.txt` finds nothing and `dead_value_lists.txt`
+   lists a blank name.
+
+## Use
+
+```bash
+python3 agent/scripts/golden_fixture.py            # check today's tools against golden/
+python3 agent/scripts/golden_fixture.py --update   # rewrite golden/ (review the diff)
+```
+
+In a port's test: `golden_fixture.compare("trace/xref.index", new_output)` returns None or a
+unified diff; `sort_lines=True` ignores line order. `test_golden_fixture.py` checks that today's
+tools still reproduce `golden/`; once a tool is ported and its exploder version is deleted
+(roadmap P3-09), its part of that test goes, and the golden files stay as the reference.

@@ -1,0 +1,101 @@
+<FieldCatalog>
+	<SortOrder>1</SortOrder>
+	<CustomOrderList>
+		<key>6</key>
+		<key>7</key>
+		<key>8</key>
+		<key>9</key>
+		<key>10</key>
+		<key>11</key>
+		<key>12</key>
+		<key>13</key>
+	</CustomOrderList>
+	<UUID modifications="9" userName="Admin" accountName="Admin" timestamp="2026-03-12T11:32:11">BDA3E18A-8BE3-1E4C-A68B-E8A394483CED</UUID>
+	<BaseTableReference id="129" name="EverythingBagel"></BaseTableReference>
+	<ObjectList membercount="8">
+		<Field id="6" name="textField" fieldtype="Normal" datatype="Text" comment="">
+			<UUID modifications="1" userName="Admin" accountName="Admin" timestamp="2026-03-12T11:32:11">F0065580-4FBD-C84F-BEDB-B4AC58598BAE</UUID>
+			<AutoEnter type="" prohibitModification="False"></AutoEnter>
+			<Validation alwaysValidate="False" type="OnlyDuringDataEntry" allowOverride="True" notEmpty="False" unique="False" existing="False"></Validation>
+			<Storage autoIndex="True" global="False" maxRepetitions="1">
+				<LanguageReference name="English" id="21"></LanguageReference>
+			</Storage>
+			<Annotation></Annotation>
+			<DisplayNames enable="False"></DisplayNames>
+		</Field>
+		<Field id="7" name="numberField" fieldtype="Normal" datatype="Number" comment="">
+			<UUID modifications="1" userName="Admin" accountName="Admin" timestamp="2026-03-12T11:32:11">DB873002-F451-CE4D-8E5A-CFCF767DEDA7</UUID>
+			<AutoEnter type="" prohibitModification="False"></AutoEnter>
+			<Validation alwaysValidate="False" type="OnlyDuringDataEntry" allowOverride="True" notEmpty="False" unique="False" existing="False"></Validation>
+			<Storage autoIndex="True" global="False" maxRepetitions="1">
+				<LanguageReference name="English" id="21"></LanguageReference>
+			</Storage>
+			<Annotation></Annotation>
+			<DisplayNames enable="False"></DisplayNames>
+		</Field>
+		<Field id="8" name="dateField" fieldtype="Normal" datatype="Date" comment="">
+			<UUID modifications="1" userName="Admin" accountName="Admin" timestamp="2026-03-12T11:32:11">6F0AB3E7-BE36-344E-89AA-DEECD6638A44</UUID>
+			<AutoEnter type="" prohibitModification="False"></AutoEnter>
+			<Validation alwaysValidate="False" type="OnlyDuringDataEntry" allowOverride="True" notEmpty="False" unique="False" existing="False"></Validation>
+			<Storage autoIndex="True" global="False" maxRepetitions="1">
+				<LanguageReference name="English" id="21"></LanguageReference>
+			</Storage>
+			<Annotation></Annotation>
+			<DisplayNames enable="False"></DisplayNames>
+		</Field>
+		<Field id="9" name="timeField" fieldtype="Normal" datatype="Time" comment="">
+			<UUID modifications="1" userName="Admin" accountName="Admin" timestamp="2026-03-12T11:32:11">7F483143-B868-2E47-A7BE-3C9211977C24</UUID>
+			<AutoEnter type="" prohibitModification="False"></AutoEnter>
+			<Validation alwaysValidate="False" type="OnlyDuringDataEntry" allowOverride="True" notEmpty="False" unique="False" existing="False"></Validation>
+			<Storage autoIndex="True" global="False" maxRepetitions="1">
+				<LanguageReference name="English" id="21"></LanguageReference>
+			</Storage>
+			<Annotation></Annotation>
+			<DisplayNames enable="False"></DisplayNames>
+		</Field>
+		<Field id="10" name="timestampField" fieldtype="Normal" datatype="Timestamp" comment="">
+			<UUID modifications="1" userName="Admin" accountName="Admin" timestamp="2026-03-12T11:32:11">BF25DDF1-2BC6-8248-84A8-43CDA43B80B8</UUID>
+			<AutoEnter type="" prohibitModification="False"></AutoEnter>
+			<Validation alwaysValidate="False" type="OnlyDuringDataEntry" allowOverride="True" notEmpty="False" unique="False" existing="False"></Validation>
+			<Storage autoIndex="True" global="False" maxRepetitions="1">
+				<LanguageReference name="English" id="21"></LanguageReference>
+			</Storage>
+			<Annotation></Annotation>
+			<DisplayNames enable="False"></DisplayNames>
+		</Field>
+		<Field id="11" name="containerField" fieldtype="Normal" datatype="Binary" comment="">
+			<UUID modifications="0" userName="Admin" accountName="Admin" timestamp="2026-03-12T11:31:02">9B66D604-BAC5-3945-A6C4-D455D954F7DB</UUID>
+			<AutoEnter type="" prohibitModification="False"></AutoEnter>
+			<Validation alwaysValidate="False" type="OnlyDuringDataEntry" allowOverride="True" notEmpty="False" unique="False" existing="False"></Validation>
+			<Storage global="False" maxRepetitions="1"></Storage>
+			<Annotation></Annotation>
+			<DisplayNames enable="False"></DisplayNames>
+		</Field>
+		<Field id="12" name="calculationField" fieldtype="Calculated" datatype="Number" comment="">
+			<UUID modifications="1" userName="Admin" accountName="Admin" timestamp="2026-03-12T11:32:11">A8A9B668-2FAC-6843-8626-C9B3C8FA14C0</UUID>
+			<AutoEnter alwaysEvaluate="False"></AutoEnter>
+			<Storage storeCalculationResults="True" autoIndex="True" global="False" maxRepetitions="1">
+				<LanguageReference name="English" id="21"></LanguageReference>
+			</Storage>
+			<Calculation>
+				<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+				<Text><![CDATA[""]]></Text>
+			</Calculation>
+			<Annotation></Annotation>
+			<DisplayNames enable="False"></DisplayNames>
+		</Field>
+		<Field id="13" name="summaryField" fieldtype="Summary" datatype="Number" comment="">
+			<UUID modifications="1" userName="Admin" accountName="Admin" timestamp="2026-03-12T11:32:11">5C850F3D-7CE4-4E44-804E-398EA16D9D6A</UUID>
+			<AutoEnter type="" prohibitModification="False"></AutoEnter>
+			<SummaryInfo restartEachGroup="False" summarizeRepetition="Together" operation="Total">
+				<SummaryField>
+					<FieldReference id="7" name="numberField">
+						<BaseTableReference id="129" name="EverythingBagel"></BaseTableReference>
+					</FieldReference>
+				</SummaryField>
+			</SummaryInfo>
+			<Annotation></Annotation>
+			<DisplayNames enable="False"></DisplayNames>
+		</Field>
+	</ObjectList>
+</FieldCatalog>

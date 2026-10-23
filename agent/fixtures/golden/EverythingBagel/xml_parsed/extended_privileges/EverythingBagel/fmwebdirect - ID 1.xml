@@ -1,0 +1,4 @@
+<ExtendedPrivilege id="1" name="fmwebdirect">
+	<Description>Access via FileMaker WebDirect</Description>
+	<UUID modifications="0" userName="Admin" accountName="" timestamp="2026-03-12T11:30:06">822D6791-190E-3743-BD29-B15C4E61AB5D</UUID>
+</ExtendedPrivilege>

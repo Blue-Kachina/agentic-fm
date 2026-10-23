@@ -1,0 +1,8 @@
+<TableOccurrence View="Full" height="0" id="1065089" name="EverythingBagel" type="Local">
+	<UUID modifications="2" userName="Admin" accountName="Admin" timestamp="2026-03-12T11:31:40">B17A7B1A-16D3-834D-A4F1-02119A3BD0DC</UUID>
+	<BaseTableSourceReference type="BaseTableReference">
+		<BaseTableReference id="129" name="EverythingBagel"></BaseTableReference>
+	</BaseTableSourceReference>
+	<CoordRect top="20" left="20" bottom="131" right="151"></CoordRect>
+	<Color red="120" green="120" blue="120" alpha="1.00"></Color>
+</TableOccurrence>

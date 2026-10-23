@@ -1,0 +1,14 @@
+<CustomMenu name="[Align Text]" id="8">
+	<UUID modifications="0" userName="Admin" accountName="Admin" timestamp="2026-03-12T11:30:06">D906D521-7796-1440-863C-0542F10687C8</UUID>
+	<MenuItemList membercount="0"></MenuItemList>
+	<Conditions>
+		<Install>
+			<Calculation>
+				<Text><![CDATA[1]]></Text>
+			</Calculation>
+		</Install>
+	</Conditions>
+	<Comment></Comment>
+	<Base name="Align Text" value="22"></Base>
+	<Options browseMode="True" findMode="True" previewMode="True"></Options>
+</CustomMenu>

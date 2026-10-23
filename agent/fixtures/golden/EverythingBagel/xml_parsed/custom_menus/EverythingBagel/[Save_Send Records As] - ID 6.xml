@@ -1,0 +1,14 @@
+<CustomMenu name="[Save/Send Records As]" id="6">
+	<UUID modifications="0" userName="Admin" accountName="Admin" timestamp="2026-03-12T11:30:06">1A9EE465-4098-7546-A8F6-2DD914AB9613</UUID>
+	<MenuItemList membercount="0"></MenuItemList>
+	<Conditions>
+		<Install>
+			<Calculation>
+				<Text><![CDATA[1]]></Text>
+			</Calculation>
+		</Install>
+	</Conditions>
+	<Comment></Comment>
+	<Base name="Save/Send Records As" value="168"></Base>
+	<Options browseMode="True" findMode="True" previewMode="True"></Options>
+</CustomMenu>

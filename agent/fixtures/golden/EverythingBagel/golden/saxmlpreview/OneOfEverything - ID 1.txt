@@ -1,0 +1,209 @@
+Script: OneOfEverything
+
+1	# Comment
+2	Add Account [ Authenticate via: FileMaker ; Expire password: Off ]
+3	Adjust Window [ Resize to Fit ]
+4	Allow Formatting Bar [ Off ]
+5	Allow User Abort [ Off ]
+6	Arrange All Windows [ Tile Horizontally ]
+7	AVPlayer Play [ Presentation: Start Full Screen ; Hide Controls: Off ; Disable Interaction: Off ]
+8	AVPlayer Set Options [ Presentation: Start Full Screen ; Disable Interaction: Off ; Hide Controls: Off ; Disable External Controls: Off ; Pause in Background: Off ; Zoom: Fit ; Sequence: None ]
+9	AVPlayer Set Playback State [ Stopped ]
+10	Beep
+11	Change Password [ With dialog: On ]
+12	Check Found Set
+13	Check Record
+14	Check Selection [ Select: On ]
+15	Clear [ Select: On ]
+16	Close Data File
+17	Close File
+18	Close Popover
+19	Close Window [ Current Window ]
+20	Commit Records/Requests [ With dialog: Off ]
+21	Configure AI Account [ Account Name: "accountNameGoesHere" ; Model Provider: OpenAI ]
+22	Configure Local Notification
+23	Configure Machine Learning Model [ Operation: uninstall ; Name: "nameGoesHere" ]
+24	Configure NFC Reading
+25	Configure Prompt Template [ Model Provider: OpenAI ; Template Type: SQL Query ]
+26	Configure RAG Account [ RAG Account Name: "RAGAccountName" ]
+27	Configure Region Monitor Script
+28	Configure Regression Model [ Action: Train Model ; Algorithm: Random Forest ; Model Name: "modelName" ]
+29	Constrain Found Set
+30	Convert File [ … unsupported SaXML shape … ]
+31	Copy [ Select: On ]
+32	Copy All Records/Requests
+33	Copy Record/Request
+34	Correct Word
+35	Create Data File [ Create folders: On ]
+36	Cut [ Select: On ]
+37	Delete Account
+38	Delete All Records [ With dialog: On ]
+39	Delete File
+40	Delete Portal Row [ With dialog: On ]
+41	Delete Record/Request [ With dialog: On ]
+42	Dial Phone [ With dialog: Off ]
+43	Duplicate Record/Request
+44	Edit User Dictionary
+45	
+46	If [ True ]
+47	Else If [ True ]
+48	Else
+49	End If
+50	
+51	Loop [ Flush: Always ]
+52	    Exit Loop If [ True ]
+53	End Loop
+54	
+55	Enter Browse Mode [ Pause: Off ]
+56	Enter Find Mode [ Pause: On ]
+57	Enter Preview Mode [ Pause: Off ]
+58	Execute FileMaker Data API [ Select: On ]
+59	Execute SQL [ … unsupported SaXML shape … ]
+60	Exit Application
+61	Exit Script [ Text Result: True ]
+62	Export Field Contents [ Create folders: On ]
+63	Export Records [ With dialog: Off ; Create folders: On ]
+64	Extend Found Set
+65	Find Matching Records [ Replace ]
+66	Fine-Tune Model [ Account Name: "accountName" ; Training Data: Table ]
+67	Flush Cache to Disk
+68	Freeze Window
+69	Generate Response from Model [ Account Name: "accountName" ; Model: "modelGoesHere" ; User Prompt: "promptGoesHere" ; Agentic mode ]
+70	Get Data File Position
+71	Get File Exists
+72	Get File Size
+73	Get Folder Path [ Allow Folder Creation: Off ]
+74	Go to Field
+75	Go to Layout [ original layout ]
+76	Go to List of Records [ List of record IDs: "recordIdsGoHere" ; Using layout: original layout ; New window: Off ]
+77	Go to Next Field
+78	Go to Object
+79	Go to Portal Row [ Select: Off ; First ; Exit after last: On ; With dialog: On ]
+80	Go to Previous Field
+81	Go to Record/Request/Page [ First ; Exit after last: On ; With dialog: Off ]
+82	Go to Related Record [ Show only related records ; Window style: Style=Document, Close=Yes, Minimize=Yes, Maximize=Yes, Resize=Yes, Styles=3606018 ; Using layout: original layout ]
+83	Halt Script
+84	Import Records [ With dialog: Off ; File ]
+85	Insert Audio/Video
+86	Insert Calculated Result [ Select ]
+87	Insert Current Date [ Select ]
+88	Insert Current Time [ Select ]
+89	Insert Current User Name [ Select ]
+90	Insert Embedding
+91	Insert Embedding in Found Set
+92	Insert File [ Dialog: asFile=True, enable=True ]
+93	Insert from Device [ Type: Camera ; Camera: Back; Resolution: Full; Flash: Auto ]
+94	Insert from Index [ Select ]
+95	Insert from Last Visited [ Select ]
+96	Insert from URL [ Select ; With dialog: Off ]
+97	Insert PDF
+98	Insert Picture
+99	Insert Text [ Select ]
+100	Install Menu Set [ Use as file default: Off ]
+101	Install OnTimer Script
+102	Install Plug-In File
+103	Modify Last Find
+104	Move/Resize Window [ Current Window ]
+105	New File
+106	New Record/Request
+107	New Window [ Style: Document ; Controls: Toolbars, Menu Bar, Close, Minimize, Maximize, Resize ; Layout: <unknown> ]
+108	Omit Multiple Records [ With dialog: Off ]
+109	Omit Record
+110	Open Data File
+111	Open Edit Saved Finds
+112	Open Favorites
+113	Open File [ Open hidden: Off ]
+114	Open File Options
+115	Open Find/Replace
+116	Open Help
+117	Open Hosts
+118	Open Manage Containers
+119	Open Manage Data Sources
+120	Open Manage Database
+121	Open Manage Layouts
+122	Open Manage Themes
+123	Open Manage Value Lists
+124	Open Record/Request
+125	Open Script Workspace
+126	Open Settings
+127	Open Sharing
+128	Open Transaction
+129	Commit Transaction
+130	Open Upload to Host
+131	Open URL [ With dialog: Off ]
+132	Paste [ Select: On ; No style: On ; Link if available: Off ]
+133	Pause/Resume Script
+134	Perform AppleScript
+135	Perform Find [ Restore ]
+136	Perform Find by Natural Language [ Get: Found Set ]
+137	Perform Find/Replace [ … unsupported SaXML shape … ]
+138	Perform JavaScript in Web Viewer
+139	Perform Quick Find
+140	Perform RAG Action [ Action: Add Data ; RAG Data: From Text ]
+141	Perform Script
+142	Perform Script on Server [ Wait for completion: On ]
+143	Perform Script on Server with Callback [ State: Continue ]
+144	Perform Semantic Find [ Query by: Natural language ; Record set: All records ]
+145	Perform SQL Query by Natural Language [ Options specified: From list ; Action: Query ; Data Tables: From list ]
+146	Print [ With dialog: Off ; Restore ]
+147	Print Setup [ With dialog: Off ; Restore ; Page format: PageOrientation=Portrait, ScaleFactor=1, PrintableHeight=734, PrintableWidth=576, PaperTop=-18, PaperLeft=-18, PaperBottom=774, PaperRight=594 ]
+148	Re-Login [ With dialog: Off ]
+149	Read from Data File [ Read as: Bytes ]
+150	Recover File [ With dialog: Off ]
+151	Refresh Object
+152	Refresh Portal
+153	Refresh Window
+154	Relookup Field Contents [ With dialog: Off ]
+155	Rename File
+156	Replace Field Contents [ With dialog: Off ; Current contents ]
+157	Reset Account Password [ Expire password: Off ]
+158	Revert Record/Request [ With dialog: Off ]
+159	Revert Transaction [ … unsupported SaXML shape … ]
+160	Save a Copy as [ copy of current file ; Create folders: On ]
+161	Save a Copy as Add-on Package [ Replace UUIDs: Off ]
+162	Save a Copy as XML [ Window name: JSONSetElement ( "{}" ; [ "catalogs_included" ; JSONMakeArray ( "PersistentStoreCatalog BaseDirectoryCatalog FileAccessCatalog ExternalDataSourceCatalog BaseTableCatalog TableOccurrenceCatalog CustomFunctionsCatalog ValueListCatalog FieldCatalog RelationshipCatalog CustomMenuCatalog CustomMenuSetCatalog ScriptCatalog ThemeCatalog LayoutCatalog LibraryCatalog PrivilegeSetsCatalog ExtendedPrivilegesCatalog AccountsCatalog Metadata" ; " " ; JSONString ) ; JSONArray ] ; [ "include_details" ; False ; JSONBoolean ] ; [ "split_catalogs" ; False ; JSONBoolean ] ; [ "standalone_binarydata" ; False ; JSONBoolean ] ) ]
+163	Save Records as Excel [ With dialog: Off ; ; Records being browsed ; Create folders: On ; Profile: DataType=XLXE, FieldDelimiter=" ", FieldNameRow=-1, IsPredefined=-1 ; Use field names: Off ]
+164	Save Records as JSONL [ Format for fine-tuning: Off ; Create folders: Off ]
+165	Save Records as PDF [ Save to: File ; Create folders: On ; With dialog: Off ; Records being browsed ]
+166	Save Records as Snapshot Link [ Records being browsed ; Create folders: On ]
+167	Scroll Window [ Home ]
+168	Select All
+169	Select Dictionaries
+170	Select Window [ Current Window ]
+171	Send DDE Execute [ File ]
+172	Send Event [ … unsupported SaXML shape … ]
+173	Send Mail [ With dialog: On ; Send via: Off ; Send via: Off ; SMTPEncryptionTLS ; SMTPAuthenticationPlain ; OAuthProviderGoogle ]
+174	Set AI Call Logging [ … unsupported SaXML shape … ]
+175	Set Data File Position
+176	Set Dictionary [ Spelling Language: US English ]
+177	Set Error Capture [ On ]
+178	Set Error Logging [ Logging: Off ]
+179	Set Field
+180	Set Field By Name
+181	Set Layout Object Animation [ Animation: On ]
+182	Set Multi-User [ On ]
+183	Set Next Serial Value
+184	Set Revert Transaction on Error [ Revert on error: Off ]
+185	Set Selection
+186	Set Session Identifier
+187	Set Use System Formats [ Use system formats: On ]
+188	Set Variable [  ; Value:  ]
+189	Set Web Viewer [ Action: 0 ]
+190	Set Window Title
+191	Set Zoom Level [ Lock: Off ; 100% ]
+192	Show All Records
+193	Show Custom Dialog
+194	Show Omitted Only
+195	Show/Hide Menubar [ Lock: Off ; Hide ]
+196	Show/Hide Text Ruler [ Show ]
+197	Show/Hide Toolbars [ Include Edit Record Toolbar: On ; Lock: Off ; Hide ]
+198	Sort Records [ With dialog: Off ]
+199	Sort Records by Field [ Ascending ]
+200	Speak [ … unsupported SaXML shape … ]
+201	Spelling Options
+202	Trigger Claris Connect Flow [ … unsupported SaXML shape … ]
+203	Truncate Table [ With dialog: On ]
+204	Undo/Redo [ Undo ]
+205	Unsort Records
+206	View As [ Cycle ]
+207	Write to Data File [ Write as: UTF-8 ; Append line feed ]

@@ -1,0 +1,7 @@
+<ValueList id="1" name="HardcodedValueList">
+	<Source value="Custom"></Source>
+	<CustomValues>
+		<Text><![CDATA[ABC]]></Text>
+	</CustomValues>
+	<UUID modifications="0" userName="Admin" accountName="Admin" timestamp="2026-03-12T11:32:32">6DE8851C-124F-EA4D-8D23-E0EB1A50A28F</UUID>
+</ValueList>

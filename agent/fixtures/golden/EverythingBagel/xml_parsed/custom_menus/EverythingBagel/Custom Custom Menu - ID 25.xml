@@ -1,0 +1,42 @@
+<CustomMenu name="Custom Custom Menu" id="25">
+	<UUID modifications="0" userName="Admin" accountName="Admin" timestamp="2026-10-21T13:51:47">4B4D221B-C372-2D48-A740-DBC9A2913258</UUID>
+	<MenuItemList membercount="1">
+		<CustomMenuItem hash="B685C265612D592DDEC98882F2A07283" isSubMenuItem="False" isSeparatorItem="False">
+			<action>
+				<Step hash="77794ADA436BFF1095839DF6E8F1423B" id="93" name="Beep" enable="True">
+				</Step>
+			</action>
+			<Conditions>
+				<Install>
+					<Calculation>
+						<Text><![CDATA[1]]></Text>
+					</Calculation>
+				</Install>
+			</Conditions>
+			<Name>
+				<Calculation>
+					<Text><![CDATA["Custom Custom Menu Item"]]></Text>
+				</Calculation>
+			</Name>
+			<Command id="0"></Command>
+			<Override name="True" action="True" Shortcut="False"></Override>
+		</CustomMenuItem>
+	</MenuItemList>
+	<Conditions>
+		<Install>
+			<Calculation>
+				<Text><![CDATA[1]]></Text>
+			</Calculation>
+		</Install>
+	</Conditions>
+	<Comment>Custom Custom Menu</Comment>
+	<Options browseMode="True" findMode="True" previewMode="True">
+		<Override>
+			<Title>
+				<Calculation>
+					<Text><![CDATA["Untitled"]]></Text>
+				</Calculation>
+			</Title>
+		</Override>
+	</Options>
+</CustomMenu>

@@ -1,0 +1,7 @@
+<ExternalDataSource name="odbc_test" type="ODBC" id="2">
+	<ODBC name="TestDatabase">
+		<Authentication type="Prompt"></Authentication>
+		<Filter catalogName="" schemaName="" tableName="" typeBasedFilter="True" tables="True" views="False" systemTable="False"></Filter>
+	</ODBC>
+	<UUID modifications="0" userName="Admin" accountName="Admin" timestamp="2026-10-21T14:41:45">BC91A6FB-42D0-CC46-B3C3-E2C044FED050</UUID>
+</ExternalDataSource>

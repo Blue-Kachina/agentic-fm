@@ -1,0 +1,23 @@
+<Relationship id="1">
+	<UUID modifications="0" userName="Admin" accountName="Admin" timestamp="2026-03-12T11:31:40">25279EA9-BB75-1046-866E-A22940D84D12</UUID>
+	<LeftTable cascadeCreate="False" cascadeDelete="False" type="Local">
+		<TableOccurrenceReference id="1065090" name="EverythingBagel__EVERYTHINGBAGEL__selfJoin"></TableOccurrenceReference>
+	</LeftTable>
+	<RightTable cascadeCreate="False" cascadeDelete="False" type="Local">
+		<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+	</RightTable>
+	<JoinPredicateList membercount="1">
+		<JoinPredicate type="Equal">
+			<LeftField>
+				<FieldReference id="6" name="textField">
+					<TableOccurrenceReference id="1065090" name="EverythingBagel__EVERYTHINGBAGEL__selfJoin"></TableOccurrenceReference>
+				</FieldReference>
+			</LeftField>
+			<RightField>
+				<FieldReference id="6" name="textField">
+					<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+				</FieldReference>
+			</RightField>
+		</JoinPredicate>
+	</JoinPredicateList>
+</Relationship>

@@ -1,0 +1,6 @@
+<ExternalDataSource name="Empty" type="FileMaker" id="1">
+	<File>
+		<UniversalPathList>file:Empty&#13;fmnet:/127.0.0.1/Empty</UniversalPathList>
+	</File>
+	<UUID modifications="1" userName="Admin" accountName="Admin" timestamp="2026-10-21T14:41:09">E005F7A7-19A4-AA43-B012-BC4B36E44FEF</UUID>
+</ExternalDataSource>

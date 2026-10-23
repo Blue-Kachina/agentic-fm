@@ -1,0 +1,8 @@
+<TableOccurrence View="Full" height="80" id="1065091" name="Empty" type="External">
+	<UUID modifications="2" userName="Admin" accountName="Admin" timestamp="2026-10-21T13:57:33">85EA8F26-622C-A24E-BDB2-790FA46A2720</UUID>
+	<BaseTableSourceReference type="ExternalDataSourceReference">
+		<DataSourceReference id="1" name="Empty"></DataSourceReference>
+	</BaseTableSourceReference>
+	<CoordRect top="24" left="619" bottom="135" right="750"></CoordRect>
+	<Color red="120" green="120" blue="120" alpha="1.00"></Color>
+</TableOccurrence>

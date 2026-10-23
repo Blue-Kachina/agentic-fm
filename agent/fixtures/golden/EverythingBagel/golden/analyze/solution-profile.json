@@ -1,0 +1,362 @@
+{
+  "solution": "EverythingBagel",
+  "generated_at": "<generated_at>",
+  "generator": "analyze.py",
+  "deep_mode": false,
+  "extensions": {
+    "used": [],
+    "skipped": [
+      "networkx",
+      "pandas",
+      "matplotlib",
+      "jinja2"
+    ]
+  },
+  "summary": {
+    "tables": 1,
+    "fields": 8,
+    "table_occurrences": 3,
+    "relationships": 1,
+    "scripts": 4,
+    "layouts": 2,
+    "custom_functions": 0,
+    "value_lists": 2
+  },
+  "data_model": {
+    "tables": {
+      "EverythingBagel": {
+        "id": "129",
+        "field_count": 8,
+        "by_datatype": {
+          "Text": 1,
+          "Number": 3,
+          "Date": 1,
+          "Time": 1,
+          "Timestamp": 1,
+          "Binary": 1
+        },
+        "by_fieldtype": {
+          "Normal": 6,
+          "Calculated": 1,
+          "Summary": 1
+        },
+        "auto_enter_patterns": {
+          "calc:\"\"": 1
+        },
+        "has_primary_key": false,
+        "foreign_key_count": 0,
+        "unstored_count": 0,
+        "global_count": 0,
+        "summary_count": 1,
+        "source_file": "EverythingBagel"
+      }
+    },
+    "table_count": 1,
+    "total_table_count": 1,
+    "total_fields": 8,
+    "table_occurrences": {
+      "(external/unknown)": {
+        "count": 1,
+        "names": [
+          "Empty"
+        ]
+      },
+      "EverythingBagel": {
+        "count": 2,
+        "names": [
+          "EverythingBagel",
+          "EverythingBagel__EVERYTHINGBAGEL__selfJoin"
+        ]
+      }
+    },
+    "to_count": 3,
+    "relationships": {
+      "total": 1,
+      "by_join_type": {
+        "Equal": 1
+      },
+      "cascades": {
+        "create": 0,
+        "delete": 0
+      },
+      "multi_predicate": 0,
+      "self_joins": 1
+    },
+    "topology": {
+      "pattern": "flat",
+      "confidence": 0.8,
+      "avg_degree": 1.0,
+      "max_degree": 1,
+      "low_degree_pct": 1.0,
+      "hub_count": 0,
+      "has_cartesian": false,
+      "layout_concentration": {
+        "total_ui": 1,
+        "distinct_ui_tos": 1,
+        "top_to_pct": 1.0,
+        "cover_50": 1,
+        "spread_ratio": 1.0
+      }
+    },
+    "base_table_edges": [],
+    "performance": {
+      "total_unstored": 0,
+      "total_summary": 1,
+      "total_global": 0,
+      "total_calculated": 1,
+      "unstored_pct": 0.0,
+      "summary_pct": 12.5,
+      "hotspot_tables": [
+        {
+          "table": "EverythingBagel",
+          "unstored": 0,
+          "summary": 1,
+          "calculated": 1,
+          "total_fields": 8
+        }
+      ]
+    },
+    "to_classification": {
+      "local": 2,
+      "external": 1,
+      "by_data_source": {
+        "Empty": 1
+      }
+    },
+    "local_tables": [
+      "EverythingBagel"
+    ],
+    "external_tables": {}
+  },
+  "naming_conventions": {
+    "prefix_conventions": {},
+    "case_styles": {
+      "camelCase": 8
+    },
+    "dominant_case": "camelCase"
+  },
+  "business_logic": {
+    "total_scripts": 4,
+    "total_files_analyzed": 4,
+    "folders": {
+      "(root)": {
+        "scripts": [
+          "Explode XML",
+          "Get agentic-fm path",
+          "Just Beep",
+          "OneOfEverything"
+        ],
+        "count": 4
+      }
+    },
+    "call_graph_edges": 2,
+    "call_graph": [
+      [
+        "Explode XML",
+        "Get agentic-fm path"
+      ]
+    ],
+    "entry_points": [
+      "Explode XML",
+      "OneOfEverything"
+    ],
+    "utility_scripts": [],
+    "leaf_scripts": [
+      "Get agentic-fm path"
+    ],
+    "clusters": [
+      {
+        "name": "(root)",
+        "script_count": 4,
+        "entry_points": [
+          "Explode XML",
+          "OneOfEverything"
+        ],
+        "method": "folder_grouping"
+      }
+    ],
+    "line_counts": {
+      "total": 329,
+      "avg": 82.2,
+      "max": 207,
+      "largest_scripts": [
+        [
+          "OneOfEverything",
+          207
+        ],
+        [
+          "Explode XML",
+          94
+        ],
+        [
+          "Get agentic-fm path",
+          27
+        ],
+        [
+          "Just Beep",
+          1
+        ]
+      ]
+    }
+  },
+  "custom_functions": {
+    "total": 0,
+    "functions": {},
+    "categories": {
+      "constant": 0,
+      "functional": 0,
+      "solution_specific": 0,
+      "utility": 0
+    },
+    "dependency_chains": []
+  },
+  "ui_layer": {
+    "total": 2,
+    "by_base_to": {
+      "EverythingBagel": 2
+    },
+    "by_folder": {
+      "(root)": 2
+    },
+    "classifications": {
+      "navigation": 1,
+      "other": 1
+    },
+    "portals": [
+      {
+        "layout": "EverythingBagel",
+        "table": "unknown"
+      }
+    ],
+    "button_wiring_count": 0,
+    "orphaned_layouts": [
+      "CustomMenuSetLayout",
+      "EverythingBagel"
+    ],
+    "has_layout_summaries": true,
+    "layout_purpose": {
+      "by_purpose": {
+        "utility": 1,
+        "ui": 1
+      },
+      "layouts": [
+        {
+          "name": "CustomMenuSetLayout",
+          "purpose": "utility",
+          "button_count": 0,
+          "base_to": "EverythingBagel"
+        },
+        {
+          "name": "EverythingBagel",
+          "purpose": "ui",
+          "button_count": 4,
+          "base_to": "EverythingBagel"
+        }
+      ],
+      "ui_concentration": {
+        "total_ui": 1,
+        "distinct_ui_tos": 1,
+        "top_to_pct": 1.0,
+        "cover_50": 1,
+        "spread_ratio": 1.0
+      }
+    }
+  },
+  "integrations": {
+    "external_data_sources": [
+      "Empty - ID 1",
+      "odbc_test - ID 2"
+    ],
+    "value_lists": {
+      "total": 2,
+      "by_source": {
+        "Custom": 1,
+        "FromField": 1
+      }
+    },
+    "external_calls": {
+      "Insert from URL": {
+        "count": 2,
+        "scripts": [
+          "Explode XML",
+          "OneOfEverything"
+        ]
+      },
+      "Send Mail": {
+        "count": 1,
+        "scripts": [
+          "OneOfEverything"
+        ]
+      },
+      "Export Records": {
+        "count": 1,
+        "scripts": [
+          "OneOfEverything"
+        ]
+      },
+      "Import Records": {
+        "count": 1,
+        "scripts": [
+          "OneOfEverything"
+        ]
+      }
+    }
+  },
+  "multi_file": {
+    "is_multi_file": true,
+    "file_architecture": "multi_file",
+    "referenced_files": [
+      "Empty",
+      "odbc_test"
+    ],
+    "correlated_solutions": [],
+    "data_source_map": {},
+    "data_sources": [
+      {
+        "name": "Empty",
+        "id": "1",
+        "type": "FileMaker",
+        "path": "file:Empty\rfmnet:/127.0.0.1/Empty",
+        "filenames": [
+          "Empty"
+        ],
+        "has_variable": false
+      },
+      {
+        "name": "odbc_test",
+        "id": "2",
+        "type": "ODBC",
+        "path": "",
+        "filenames": [],
+        "has_variable": false
+      }
+    ],
+    "files": [
+      {
+        "name": "EverythingBagel",
+        "role": "primary",
+        "local_table_count": 1,
+        "local_to_count": 2,
+        "external_to_count": 1
+      }
+    ]
+  },
+  "per_file_graphs": {},
+  "health": {
+    "xref_available": true,
+    "dead_fields": {
+      "count": 0,
+      "sample": []
+    },
+    "dead_scripts": {
+      "count": 2,
+      "sample": [
+        "Explode XML",
+        "OneOfEverything"
+      ]
+    },
+    "disconnected_tables": [],
+    "empty_scripts": [],
+    "total_xref_entries": 17
+  }
+}

@@ -1,0 +1,13 @@
+<PrivilegeSet id="2" name="[Data Entry Only]">
+	<UUID modifications="0" userName="Admin" accountName="" timestamp="2026-03-12T11:30:06">3E3B2A7C-BD54-7843-B8A0-C62F5EEE1B69</UUID>
+	<Description>write access to all records, no design access</Description>
+	<access default="True">
+		<Records Create="True" Edit="True" Delete="True"></Records>
+		<Layouts View="ReadOnly"></Layouts>
+		<ValueLists View="ReadOnly"></ValueLists>
+		<Scripts View="ReadOnly"></Scripts>
+		<Other value="25348" Print="True" Export="True" manageDatabase="False" manageCustomMenus="False" manageAccounts="False" manageExtPrivs="False" allowOverride="False" allowOpenQuickly="False" disconnectIdle="True" commands="All">
+			<Password prohibitModification="False"></Password>
+		</Other>
+	</access>
+</PrivilegeSet>

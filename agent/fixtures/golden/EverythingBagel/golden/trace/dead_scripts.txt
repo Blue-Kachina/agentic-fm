@@ -1,0 +1,9 @@
+=== Potentially unused scripts (EverythingBagel) ===
+
+HIGH CONFIDENCE — no references found anywhere (1):
+  OneOfEverything
+
+MODULE — installed tool objects, invoked externally — NOT dead (1):
+  Explode XML — agentic-fm
+
+Summary: 1 high, 0 medium unused + 1 module (live) out of 4 total scripts

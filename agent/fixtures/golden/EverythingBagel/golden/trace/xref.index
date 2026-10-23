@@ -1,0 +1,18 @@
+# SourceType|SourceName|SourceLocation|RefType|RefName|RefContext
+relationship|EverythingBagel__EVERYTHINGBAGEL__selfJoin→EverythingBagel|join field|field|EverythingBagel::textField|left side
+relationship|EverythingBagel__EVERYTHINGBAGEL__selfJoin→EverythingBagel|join field|field|EverythingBagel::textField|right side
+script|Explode XML (ID 4)|line 59: Perform Script|script|Get agentic-fm path|
+layout|EverythingBagel (ID 1)|field placement|field|EverythingBagel::textField|
+layout|EverythingBagel (ID 1)|field placement|field|EverythingBagel::numberField|
+layout|EverythingBagel (ID 1)|field placement|field|EverythingBagel::dateField|
+layout|EverythingBagel (ID 1)|field placement|field|EverythingBagel::timeField|
+layout|EverythingBagel (ID 1)|field placement|field|EverythingBagel::timestampField|
+layout|EverythingBagel (ID 1)|field placement|field|EverythingBagel::containerField|
+layout|EverythingBagel (ID 1)|field placement|field|EverythingBagel::calculationField|
+layout|EverythingBagel (ID 1)|field placement|field|EverythingBagel::summaryField|
+layout|EverythingBagel (ID 1)|field placement|field|EverythingBagel::numberField|via TO "EverythingBagel__EVERYTHINGBAGEL__selfJoin"
+layout|EverythingBagel (ID 1)|field placement|field|EverythingBagel::textField|via TO "EverythingBagel__EVERYTHINGBAGEL__selfJoin"
+layout|EverythingBagel (ID 1)|button script|script|Just Beep|
+layout|EverythingBagel (ID 1)|field placement|field|EverythingBagel::textField|
+layout|EverythingBagel (ID 1)|field placement|field|EverythingBagel::textField|
+layout|EverythingBagel (ID 1)|field placement|field|EverythingBagel::textField|

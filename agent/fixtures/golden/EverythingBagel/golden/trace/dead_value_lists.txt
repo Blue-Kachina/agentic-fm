@@ -1,0 +1,6 @@
+=== Potentially unused value_lists (EverythingBagel) ===
+
+HIGH CONFIDENCE — no references found anywhere (1):
+  
+
+Summary: 1 high, 0 medium unused out of 1 total value_lists

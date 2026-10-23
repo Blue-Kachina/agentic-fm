@@ -1,0 +1,208 @@
+# Comment
+Add Account [ ⚠️ PARAMETER "AccountType" NOT PARSED ⚠️ ; ⚠️ PARAMETER "PrivilegeSetReference" NOT PARSED ⚠️ ; Expire password: OFF ]
+Adjust Window [ Resize to Fit ]
+Allow Formatting Bar [ OFF ]
+Allow User Abort [ OFF ]
+Arrange All Windows [ Tile Horizontally ]
+AVPlayer Play [ ⚠️ PARAMETER "Source" NOT PARSED ⚠️ ]
+AVPlayer Set Options
+AVPlayer Set Playback State [ Stopped ]
+Beep
+Change Password [ With dialog: ON ]
+Check Found Set
+Check Record
+Check Selection [ Select: ON ]
+Clear [ Select: ON ]
+Close Data File
+Close File [ Current File ]
+Close Popover
+Close Window
+Commit Records/Requests [ With dialog: OFF ]
+Configure AI Account [ Verify SSL Certificates: OFF ; OpenAI ; ⚠️ PARAMETER "LLMAccountName" NOT PARSED ⚠️ ]
+Configure Local Notification [ ⚠️ PARAMETER "action" NOT PARSED ⚠️ ]
+Configure Machine Learning Model [ ⚠️ PARAMETER "operation" NOT PARSED ⚠️ ; ⚠️ PARAMETER "name" NOT PARSED ⚠️ ]
+Configure NFC Reading [ ⚠️ PARAMETER "action" NOT PARSED ⚠️ ]
+Configure Prompt Template [ ⚠️ PARAMETER "TemplateType" NOT PARSED ⚠️ ; ⚠️ PARAMETER "ModelProvider" NOT PARSED ⚠️ ; ]
+Configure RAG Account  [ Verify SSL Certificates: OFF ; ⚠️ PARAMETER "RAGAccountName" NOT PARSED ⚠️ ]
+Configure Region Monitor Script [ ⚠️ PARAMETER "Monitor" NOT PARSED ⚠️ ]
+Configure Regression Model [ Skip empty or invalid records: OFF ; ⚠️ PARAMETER "LLMTrainModelName" NOT PARSED ⚠️ ; ⚠️ PARAMETER "LLMTrainAlgorithm" NOT PARSED ⚠️ ; ⚠️ PARAMETER "LLMTrainActions" NOT PARSED ⚠️ ]
+Constrain Found Set [ ⚠️ RESTORE ⚠️ ]
+Convert File [ Verify SSL Certificates: OFF ; Open File: ON ; Skip Indexes: OFF ; With dialog: ON ]
+Copy [ Select: ON ]
+Copy All Records/Requests
+Copy Record/Request
+Correct Word
+Create Data File [ Create folders: ON ]
+Cut [ Select: ON ]
+Delete Account
+Delete All Records [ With dialog: ON ]
+Delete File
+Delete Portal Row [ With dialog: ON ]
+Delete Record/Request [ With dialog: ON ]
+Dial Phone [ With dialog: OFF ]
+Duplicate Record/Request
+Edit User Dictionary
+
+If [ Collapsed: OFF ; True ]
+Else If [ Collapsed: OFF ; True ]
+Else [ Collapsed: OFF ; Collapsed: OFF ]
+End If
+
+Loop [ Collapsed: OFF ; Flush: Always ]
+	Exit Loop If [ True ]
+End Loop
+
+Enter Browse Mode [ Pause: OFF ]
+Enter Find Mode [ Pause: ON ]
+Enter Preview Mode [ Pause: OFF ]
+Execute FileMaker Data API [ Select: ON ]
+Execute SQL [ With dialog: OFF ; Create folders: OFF ]
+Exit Application
+Exit Script [ True ]
+Export Field Contents [ Create folders: ON ]
+Export Records [ With dialog: OFF ; Create folders: ON ]
+Extend Found Set
+Find Matching Records [ Replace ]
+Fine-Tune Model [ ⚠️ PARAMETER "FineTuneDataSource" NOT PARSED ⚠️ ; ⚠️ PARAMETER "FineTuneAccountName" NOT PARSED ⚠️ ]
+Flush Cache to Disk
+Freeze Window
+Generate Response from Model [ Agentic mode: ON ; Stream: OFF ; ⚠️ PARAMETER "LLMAction" NOT PARSED ⚠️ ; ⚠️ PARAMETER "LLMUserPrompt" NOT PARSED ⚠️ ; ⚠️ PARAMETER "LLMModel" NOT PARSED ⚠️ ; ⚠️ PARAMETER "LLMAccountName" NOT PARSED ⚠️ ]
+Get Data File Position
+Get File Exists
+Get File Size
+Get Folder Path [ Allow Folder Creation: OFF ; ⚠️ PARAMETER "Variable" NOT PARSED ⚠️ ]
+Go to Field []
+Go to Layout [ Layout: <original layout> ; Animation: None ]
+Go to List of Records [ "recordIdsGoHere" ; Layout: <original layout> ; Animation: None ]
+Go to Next Field
+Go to Object []
+Go to Portal Row [ Select: OFF ; First ]
+Go to Previous Field
+Go to Record/Request/Page [ First ]
+Go to Related Record [ Layout: <original layout> ]
+Halt Script
+Import Records [ Verify SSL Certificates: OFF ; With dialog: OFF ]
+Insert Audio/Video [ Store only a reference: OFF ]
+Insert Calculated Result [ Select: ON ]
+Insert Current Date [ Select: ON ]
+Insert Current Time [ Select: ON ]
+Insert Current User Name [ Select: ON ]
+Insert Embedding
+Insert Embedding in Found Set [ Show summary: OFF ; Continue on error: OFF ; Replace target contents: OFF ]
+Insert File
+Insert from Device [ Full ]
+Insert from Index [ Select: ON ]
+Insert from Last Visited [ Select: ON ]
+Insert from URL [ Verify SSL Certificates: OFF ; Select: ON ; With dialog: OFF ; ⚠️ PARAMETER "URL" NOT PARSED ⚠️ ]
+Insert PDF [ Store only a reference: OFF ]
+Insert Picture [ Store only a reference: OFF ]
+Insert Text [ Select ]
+Install Menu Set [ ⚠️ PARAMETER "CustomMenuSet" NOT PARSED ⚠️ ]
+Install OnTimer Script
+Install Plug-In File
+Modify Last Find
+Move/Resize Window
+New File
+New Record/Request
+New Window [ Style: Document ; Layout: <original layout> ]
+Omit Multiple Records [ With dialog: OFF ]
+Omit Record
+Open Data File
+Open Edit Saved Finds
+Open Favorites
+Open File [ Open hidden: OFF ; <unknown> ]
+Open File Options
+Open Find/Replace
+Open Help
+Open Hosts
+Open Manage Containers
+Open Manage Data Sources
+Open Manage Database
+Open Manage Layouts
+Open Manage Themes
+Open Manage Value Lists
+Open Record/Request
+Open Script Workspace
+Open Settings
+Open Sharing
+Open Transaction [ Collapsed: OFF ; Skip auto-enter options: OFF ; Skip data entry validation: OFF ; Override ESS locking conflicts: OFF ]
+Commit Transaction
+Open Upload to Host
+Open URL [ In external browser: OFF ; With dialog: OFF ; ⚠️ PARAMETER "URL" NOT PARSED ⚠️ ]
+Paste [ Select: ON ; No style: ON ]
+Pause/Resume Script [ ⚠️ PARAMETER "Options" NOT PARSED ⚠️ ]
+Perform AppleScript [ ⚠️ PARAMETER "Options" NOT PARSED ⚠️ ]
+Perform Find
+Perform Find by Natural Language [ ⚠️ PARAMETER "LLMAction" NOT PARSED ⚠️ ]
+Perform Find/Replace [ With dialog: ON ; ⚠️ PARAMETER "perform" NOT PARSED ⚠️ ; ⚠️ PARAMETER "find" NOT PARSED ⚠️ ; ⚠️ PARAMETER "replace" NOT PARSED ⚠️ ; ⚠️ PARAMETER "direction" NOT PARSED ⚠️ ; ⚠️ PARAMETER "case" NOT PARSED ⚠️ ; ⚠️ PARAMETER "whole" NOT PARSED ⚠️ ; ⚠️ PARAMETER "across" NOT PARSED ⚠️ ; ⚠️ PARAMETER "within" NOT PARSED ⚠️ ]
+Perform JavaScript in Web Viewer
+Perform Quick Find
+Perform RAG Action [ ⚠️ PARAMETER "RAGDataSource" NOT PARSED ⚠️ ; ⚠️ PARAMETER "RAGAction" NOT PARSED ⚠️ ]
+Perform Script [ From list ; "" ]
+Perform Script on Server [ From list ; ⚠️ PARAMETER "Parameter" NOT PARSED ⚠️ ; Wait for completion: ON ]
+Perform Script on Server with Callback [ ⚠️ PARAMETER "CallbackScriptState" NOT PARSED ⚠️ ; ⚠️ PARAMETER "CallbackScriptParameter" NOT PARSED ⚠️ ; From list ; ⚠️ PARAMETER "Parameter" NOT PARSED ⚠️ ]
+Perform Semantic Find [ ⚠️ PARAMETER "Query" NOT PARSED ⚠️ ; ⚠️ PARAMETER "Records" NOT PARSED ⚠️ ; Return count: OFF ]
+Perform SQL Query by Natural Language [ Stream: OFF ; ⚠️ PARAMETER "TableOccurrences" NOT PARSED ⚠️ ; ⚠️ PARAMETER "LLMTablesSelection" NOT PARSED ⚠️ ; ⚠️ PARAMETER "LLMAction" NOT PARSED ⚠️ ; ⚠️ PARAMETER "LLMOptionsSelection" NOT PARSED ⚠️ ]
+Print [ With dialog: OFF ; ⚠️ PARAMETER "Restore" NOT PARSED ⚠️ ; ⚠️ PARAMETER "Print" NOT PARSED ⚠️ ; ⚠️ PARAMETER "PageSetup" NOT PARSED ⚠️ ]
+Print Setup [ ⚠️ PARAMETER "Restore" NOT PARSED ⚠️ ; With dialog: OFF ; ⚠️ PARAMETER "PageSetup" NOT PARSED ⚠️ ]
+Re-Login [ Current File ; With dialog: OFF ]
+Read from Data File
+Recover File [ With dialog: OFF ]
+Refresh Object []
+Refresh Portal [ ⚠️ PARAMETER "Object" NOT PARSED ⚠️ ]
+Refresh Window
+Relookup Field Contents [ With dialog: OFF ]
+Rename File
+Replace Field Contents [ Current contents ]
+Reset Account Password [ Password: OFF ]
+Revert Record/Request [ With dialog: OFF ]
+Revert Transaction
+Save a Copy as [ copy of current file ; Create folders: ON ]
+Save a Copy as Add-on Package [ Replace UUIDs: OFF ]
+Save a Copy as XML [ Include details for analysis tools: OFF ; Save each layout object&apos;s binary data under its node: OFF ; Specify options as JSON: OFF ; ⚠️ PARAMETER "JSONOutput" NOT PARSED ⚠️ ]
+Save Records as Excel [ ⚠️ PARAMETER "Restore" NOT PARSED ⚠️ ; With dialog: OFF ; ⚠️ PARAMETER "Options" NOT PARSED ⚠️ ; Create folders: ON ]
+Save Records as JSONL [ Format for fine-tuning: OFF ; Create folders: OFF ]
+Save Records as PDF [ ⚠️ PARAMETER "Restore" NOT PARSED ⚠️ ; ⚠️ PARAMETER "Options" NOT PARSED ⚠️ ; With dialog: OFF ; Append to existing PDF: OFF ; Create folders: ON ; ⚠️ PARAMETER "SaveResult" NOT PARSED ⚠️ ]
+Save Records as Snapshot Link [ Records being browsed ; Create folders: ON ]
+Scroll Window [ Home ]
+Select All
+Select Dictionaries
+Select Window
+Send DDE Execute
+Send Event
+Send Mail [ ⚠️ PARAMETER "Email" NOT PARSED ⚠️ ]
+Set AI Call Logging [ enabled: OFF ; Verbose: OFF ; Truncate Messages: OFF ]
+Set Data File Position
+Set Dictionary [ US English ]
+Set Error Capture [ ON ]
+Set Error Logging [ OFF ]
+Set Field [  ;  ]
+Set Field By Name [ Specify target field: OFF ]
+Set Layout Object Animation [ ON ]
+Set Multi-User [ On ]
+Set Next Serial Value
+Set Revert Transaction on Error [ OFF ]
+Set Selection [ ⚠️ PARAMETER "Select" NOT PARSED ⚠️ ]
+Set Session Identifier
+Set Use System Formats [ ON ]
+Set Variable [  ;  ]
+Set Web Viewer [ ⚠️ PARAMETER "action" NOT PARSED ⚠️ ]
+Set Window Title
+Set Zoom Level [ Lock: OFF ; 100% ]
+Show All Records
+Show Custom Dialog
+Show Omitted Only
+Show/Hide Menubar [ Hide ; Lock: OFF ]
+Show/Hide Text Ruler [ Show ]
+Show/Hide Toolbars [ Lock: OFF ; Include Edit Record Toolbar: ON ; Hide ]
+Sort Records [ With dialog: OFF ; ⚠️ PARAMETER "Restore" NOT PARSED ⚠️ ]
+Sort Records by Field [ Ascending ]
+Speak [ ⚠️ PARAMETER "Voice" NOT PARSED ⚠️ ; ⚠️ PARAMETER "Wait" NOT PARSED ⚠️ ]
+Spelling Options
+Trigger Claris Connect Flow [ Verify SSL Certificates: OFF ; Select: ON ; With dialog: OFF ; ⚠️ PARAMETER "URL" NOT PARSED ⚠️ ; "--request POST --header \"Content-Type: application/json\" --data " ; ⚠️ PARAMETER "Flow" NOT PARSED ⚠️ ]
+Truncate Table [ With dialog: ON ; <Current Table> ]
+Undo/Redo [ Collapsed: OFF ; Undo ]
+Unsort Records
+View As [ Cycle ]
+Write to Data File [ Append line feed: ON ]
+

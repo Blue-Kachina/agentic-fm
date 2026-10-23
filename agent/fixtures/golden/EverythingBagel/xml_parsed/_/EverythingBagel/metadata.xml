@@ -1,0 +1,19 @@
+<Metadata membercount="1">
+	<AddAction membercount="9">
+		<PageSetup>
+			<Orientation name="Portrait" value="0"></Orientation>
+			<size height="1100" width="850"></size>
+			<scale value="100"></scale>
+		</PageSetup>
+		<HideWebDirectSharing enable="False"></HideWebDirectSharing>
+		<HideClientSharing enable="False"></HideClientSharing>
+		<Encryption type="0"></Encryption>
+		<Minimum version="12.0" value="1208"></Minimum>
+		<Login type="1">
+			<AccountName>Admin</AccountName>
+		</Login>
+		<SavePassword keychain="True" requireMobile="False"></SavePassword>
+		<ShowSignInFields enable="True"></ShowSignInFields>
+		<UseDefaultFields enable="False"></UseDefaultFields>
+	</AddAction>
+</Metadata>

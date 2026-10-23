@@ -1,0 +1,13 @@
+<PrivilegeSet id="1" name="[Full Access]">
+	<UUID modifications="0" userName="Admin" accountName="" timestamp="2026-03-12T11:30:06">45918007-5357-DF46-B588-7930F97D33A4</UUID>
+	<Description>access to everything</Description>
+	<access default="True">
+		<Records Create="True" Edit="True" Delete="True"></Records>
+		<Layouts Create="True" Edit="True" Delete="True"></Layouts>
+		<ValueLists Create="True" Edit="True" Delete="True"></ValueLists>
+		<Scripts Create="True" Edit="True" Delete="True"></Scripts>
+		<Other value="65535" Print="True" Export="True" manageDatabase="True" manageCustomMenus="True" manageAccounts="True" manageExtPrivs="True" allowOverride="True" allowOpenQuickly="True" disconnectIdle="False" commands="All">
+			<Password prohibitModification="False"></Password>
+		</Other>
+	</access>
+</PrivilegeSet>

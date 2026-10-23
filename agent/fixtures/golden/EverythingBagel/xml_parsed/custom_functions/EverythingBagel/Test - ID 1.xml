@@ -1,0 +1,10 @@
+<CustomFunction id="1" name="Test" access="All">
+	<UUID modifications="1" userName="Admin" accountName="Admin" timestamp="2026-03-12T12:14:18">7D53E59D-2B29-CC42-9F15-86D36B0C0DF9</UUID>
+	<Calculation>
+		<Text><![CDATA["We received the parameter: " & parameter1]]></Text>
+	</Calculation>
+	<Display>Test ( parameter1 )</Display>
+	<ObjectList membercount="1">
+		<Parameter name="parameter1"></Parameter>
+	</ObjectList>
+</CustomFunction>

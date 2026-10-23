@@ -1,0 +1,12 @@
+<ValueList id="2" name="ValuesFromField">
+	<Source value="FromField"></Source>
+	<Field>
+		<PrimaryField show="True" sort="True">
+			<FieldReference id="6" name="textField">
+				<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+			</FieldReference>
+		</PrimaryField>
+		<ShowRelated value="False"></ShowRelated>
+	</Field>
+	<UUID modifications="0" userName="Admin" accountName="Admin" timestamp="2026-03-12T11:32:50">26DDA15C-2B02-7A41-A451-CB021ED7E94F</UUID>
+</ValueList>

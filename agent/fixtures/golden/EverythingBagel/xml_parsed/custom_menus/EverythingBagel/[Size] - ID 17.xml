@@ -1,0 +1,14 @@
+<CustomMenu name="[Size]" id="17">
+	<UUID modifications="0" userName="Admin" accountName="Admin" timestamp="2026-03-12T11:30:06">5B253A61-C4F6-374B-969F-024922E8EC36</UUID>
+	<MenuItemList membercount="0"></MenuItemList>
+	<Conditions>
+		<Install>
+			<Calculation>
+				<Text><![CDATA[1]]></Text>
+			</Calculation>
+		</Install>
+	</Conditions>
+	<Comment></Comment>
+	<Base name="Size" value="20"></Base>
+	<Options browseMode="True" findMode="True" previewMode="True"></Options>
+</CustomMenu>

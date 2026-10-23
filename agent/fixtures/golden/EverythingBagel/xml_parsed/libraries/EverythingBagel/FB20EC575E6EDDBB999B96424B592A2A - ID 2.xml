@@ -1,0 +1,9 @@
+<BinaryData>
+	<LibraryReference id="2" key="FB20EC575E6EDDBB999B96424B592A2A"></LibraryReference>
+	<StreamList>
+		<Stream name="MAIN" type="id">SVG </Stream>
+		<Stream name="SVG " type="Base64" size="340">PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjxzdmcgdmVyc2lvbj0iMS4yIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIg0KCSB4PSIwcHgiIHk9IjBweCIgd2lkdGg9IjI0cHgiIGhlaWdodD0iMjRweCIgdmlld0JveD0iMCAwIDI0IDI0Ij4NCjxnIGNsYXNzPSJmbV9maWxsIj4NCjxwb2x5Z29uIHBvaW50cz0iMjQsMTAgMTQsMTAgMTQsMCAxMCwwIDEwLDEwIC0wLjAwMSwxMCAtMC4wMDEsMTQgMTAsMTQgMTAsMjQgMTQsMjQgMTQsMTQgMjQsMTQgIi8+DQo8L2c+DQo8L3N2Zz4NCg==</Stream>
+		<Stream name="GLPH" type="Hex" size="1">01</Stream>
+		<Stream name="FNAM" type="Hex" size="23">000000010533373B3D3F000B3B6B69053B3E3E74292C3D</Stream>
+	</StreamList>
+</BinaryData>

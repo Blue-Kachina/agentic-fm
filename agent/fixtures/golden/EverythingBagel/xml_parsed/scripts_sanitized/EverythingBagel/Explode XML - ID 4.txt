@@ -1,0 +1,96 @@
+# PURPOSE: Push out solution XML to be parsed for AI use.
+// Insert Text [ Target: $README ; "INTERACTIVE MODE (FM Pro):
+				  Run with no parameter. Saves XML to desktop, POSTs to localhost:8765/explode.
+				  Requires companion server running and $$AGENTIC.FM configured.
+				
+				SERVER MODE (OData via AGFMScriptBridge):
+				  Pass JSON parameter with keys:
+				    repo_path     — absolute POSIX path to the agentic-fm project root on the companion server host
+				    export_path   — absolute POSIX path where FMS will write the XML export (must be host-accessible)
+				    companion_url — base URL of the companion server (e.g. http://host.docker.internal:8765)
+				    solution_name — (optional) override solution name; defaults to Get(FileName)
+				
+				  NOTE: export_path must be a path FMS can write to AND the companion server host can read.
+				  On a Linux FMS container with a host-mounted Data dir, use that mount path.
+				  The FM path is constructed as "filelinux:" & export_path — adjust prefix for other OS.
+				
+				RETURNS (server mode): companion server response JSON { success, exit_code, stdout, stderr }" ]
+
+// # MARK: Server mode
+Set Variable [ $input ; Get ( ScriptParameter ) ]
+If [ Collapsed: OFF ; JSONGetElementType ( $input ; "repo_path" ) = JSONString ]
+	Set Variable [ $repoPath ; JSONGetElement ( $input ; "repo_path" ) ]
+	Set Variable [ $exportPath ; JSONGetElement ( $input ; "export_path" ) ]
+	Set Variable [ $companionUrl ; JSONGetElement ( $input ; "companion_url" ) ]
+	Set Variable [ $solutionName ; Let (
+						~override = JSONGetElement ( $input ; "solution_name" ) ;
+						If ( IsEmpty ( ~override ) ; Get ( FileName ) ; ~override )
+					) ]
+	# Build FM path: filelinux: prefix for FMS on Linux. Adjust for other OS.
+	Set Variable [ $xmlFmPath ; "filelinux:" & $exportPath ]
+	Save a Copy as XML [ Get ( WindowName ) ; ⚠️ PARAMETER "UniversalPathList" NOT PARSED ⚠️ ; Include details for analysis tools: OFF ; Save each layout object&apos;s binary data under its node: OFF ; Specify options as JSON: OFF ; ⚠️ PARAMETER "JSONOutput" NOT PARSED ⚠️ ]
+	Set Variable [ $saveError ; Get ( LastError ) ]
+	If [ Collapsed: OFF ; $saveError ≠ 0 ]
+		Exit Script [ JSONSetElement ( "{}" ;
+							[ "success" ; False ; JSONBoolean ] ;
+							[ "error" ; "Save as XML failed (error " & $saveError & ")" ; JSONString ]
+						) ]
+	End If
+	
+	Set Variable [ $payload ; JSONSetElement ( "{}" ;
+						[ "solution_name" ; $solutionName ; JSONString ] ;
+						[ "export_file_path" ; $exportPath ; JSONString ] ;
+						[ "repo_path" ; $repoPath ; JSONString ]
+					) ]
+	Insert from URL [ Verify SSL Certificates: OFF ; Select: ON ; With dialog: OFF ; Target: $response ; ⚠️ PARAMETER "URL" NOT PARSED ⚠️ ; "-X POST -H \"Content-Type: application/json\" -d " & Quote ( $payload ) ]
+	Set Variable [ $httpError ; Get ( LastError ) ]
+	If [ Collapsed: OFF ; $httpError ≠ 0 ]
+		Exit Script [ JSONSetElement ( "{}" ;
+							[ "success" ; False ; JSONBoolean ] ;
+							[ "error" ; "Companion server unreachable (error " & $httpError & ")" ; JSONString ]
+						) ]
+	End If
+	Exit Script [ $response ]
+End If
+
+// # MARK: Interactive mode
+# DEPENDENCY: The companion server must be running (agent/scripts/companion_server.py)
+
+Perform Script [ From list ; "Get agentic-fm path" ]
+If [ Collapsed: OFF ; not Get ( ScriptResult ) ]
+	Show Custom Dialog [ Title: "Bad install" ; Message: "The agentic-fm install was not found. Please check the $$AGENTIC.FM global variable" ; Default Button: "OK" ]
+	Exit Script []
+End If
+
+Set Variable [ $output[1] ; Get ( DesktopPath ) & Get ( FileName ) & ".xml" ]
+Save a Copy as XML [ Get ( WindowName ) ; ⚠️ PARAMETER "UniversalPathList" NOT PARSED ⚠️ ; Include details for analysis tools: OFF ; Save each layout object&apos;s binary data under its node: OFF ; Specify options as JSON: OFF ; ⚠️ PARAMETER "JSONOutput" NOT PARSED ⚠️ ]
+
+Set Variable [ $payload[1] ; JSONSetElement ( "{}" ;
+					[ "solution_name" ; Get ( FileName ) ; JSONString ] ;
+					[ "export_file_path" ; ConvertFromFileMakerPath ( $output ; 1 ) ; JSONString ] ;
+					[ "repo_path" ; ConvertFromFileMakerPath ( JSONGetElement ( $$AGENTIC.FM ; "path" ) ; 1 ) ; JSONString ] ;
+					[ "exploder_bin_path" ; "~/bin/fm-xml-export-exploder" ; JSONString ]
+				) ]
+
+Insert from URL [ Verify SSL Certificates: OFF ; Select: ON ; With dialog: OFF ; Target: $response ; ⚠️ PARAMETER "URL" NOT PARSED ⚠️ ; "-X POST -H \"Content-Type: application/json\" -d " & Quote ( $payload ) ]
+Set Variable [ $httpError[1] ; Get ( LastError ) ]
+
+If [ Collapsed: OFF ; $httpError ≠ 0 ]
+	Show Custom Dialog [ Title: "Companion server not running" ; Message: "Start the companion server first:¶¶python3 agent/scripts/companion_server.py¶¶Then run Explode XML again." ; Default Button: "OK" ]
+	Exit Script []
+End If
+
+Set Variable [ $success[1] ; JSONGetElement ( $response ; "success" ) ]
+Set Variable [ $stdout[1] ; JSONGetElement ( $response ; "stdout" ) ]
+Set Variable [ $stderr[1] ; JSONGetElement ( $response ; "stderr" ) ]
+Set Variable [ $exitCode[1] ; JSONGetElement ( $response ; "exit_code" ) ]
+
+If [ Collapsed: OFF ; not $success or $exitCode ≠ 0 ]
+	Show Custom Dialog [ Title: "Error" ; Message: $stderr & If ( not IsEmpty ( $stdout ) ; ¶ & $stdout ; "" ) ; Default Button: "OK" ]
+Else [ Collapsed: OFF ; Collapsed: OFF ]
+	Show Custom Dialog [ Title: "Finished" ; Message: "The XML has been placed into agentic-fm's xml_parsed folder." & If ( not IsEmpty ( $stdout ) ; "¶¶" & $stdout ; "" ) ; Default Button: "OK" ]
+End If
+
+Exit Script []
+
+

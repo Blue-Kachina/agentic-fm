@@ -1,0 +1,14 @@
+<CustomMenu name="[Show Window]" id="16">
+	<UUID modifications="0" userName="Admin" accountName="Admin" timestamp="2026-03-12T11:30:06">B497D784-EFEB-4545-9B50-CD0EA33749A3</UUID>
+	<MenuItemList membercount="0"></MenuItemList>
+	<Conditions>
+		<Install>
+			<Calculation>
+				<Text><![CDATA[1]]></Text>
+			</Calculation>
+		</Install>
+	</Conditions>
+	<Comment></Comment>
+	<Base name="Show Window" value="38"></Base>
+	<Options browseMode="True" findMode="True" previewMode="True"></Options>
+</CustomMenu>

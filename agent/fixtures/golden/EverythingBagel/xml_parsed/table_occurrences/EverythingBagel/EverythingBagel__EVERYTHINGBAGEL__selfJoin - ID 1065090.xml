@@ -1,0 +1,8 @@
+<TableOccurrence View="Full" height="67" id="1065090" name="EverythingBagel__EVERYTHINGBAGEL__selfJoin" type="Local">
+	<UUID modifications="6" userName="Admin" accountName="Admin" timestamp="2026-03-12T11:32:08">7844680B-43C1-6C49-AC4C-90C390CE343A</UUID>
+	<BaseTableSourceReference type="BaseTableReference">
+		<BaseTableReference id="129" name="EverythingBagel"></BaseTableReference>
+	</BaseTableSourceReference>
+	<CoordRect top="21" left="191" bottom="134" right="465"></CoordRect>
+	<Color red="119" green="119" blue="119" alpha="1.00"></Color>
+</TableOccurrence>

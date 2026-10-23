@@ -1,0 +1,4 @@
+<ExtendedPrivilege id="7" name="fmextscriptaccess">
+	<Description>Allow Apple events and ActiveX to perform FileMaker operations</Description>
+	<UUID modifications="0" userName="Admin" accountName="" timestamp="2026-03-12T11:30:06">FF820922-02BF-1740-8509-9382033EF5FE</UUID>
+</ExtendedPrivilege>

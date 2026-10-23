@@ -1,0 +1,12 @@
+<Account id="1" kind="0" type="FileMaker" enable="False">
+	<UUID modifications="0" userName="Admin" accountName="" timestamp="2026-03-12T11:30:06">28F8E89D-B321-B24A-8702-0DFF9A702A53</UUID>
+	<Description></Description>
+	<Authentication>
+		<AccountName>[Guest]</AccountName>
+		<PasswordEncrypted>
+			<Context>Bw0yub4QLJXANA==</Context>
+			<Data>hwVBgPoI0EoJSSLgyE4kUEskuDU=</Data>
+		</PasswordEncrypted>
+	</Authentication>
+	<PrivilegeSetReference id="3" name="[Read-Only Access]"></PrivilegeSetReference>
+</Account>

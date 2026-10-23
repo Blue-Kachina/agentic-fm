@@ -1,0 +1,378 @@
+{
+  "layout": "EverythingBagel",
+  "id": 1,
+  "width": 1024,
+  "table": "EverythingBagel",
+  "theme": "com.filemaker.theme.custom.E1351EFD_0067_4E44_A8BC_3E7A959006D9",
+  "parts": [
+    {
+      "type": "Top Navigation",
+      "height": 110
+    },
+    {
+      "type": "Body",
+      "height": 658,
+      "objects": [
+        {
+          "type": "Text",
+          "bounds": [
+            120,
+            63,
+            142,
+            127
+          ],
+          "text": "textField"
+        },
+        {
+          "type": "Edit Box",
+          "bounds": [
+            114,
+            138,
+            146,
+            391
+          ],
+          "style": "FM-B9C26F7D-8330-5346-B911-0FEBE1685606",
+          "styleName": "centered_text",
+          "field": "EverythingBagel::textField",
+          "fieldId": 6
+        },
+        {
+          "type": "Text",
+          "bounds": [
+            156,
+            35,
+            178,
+            127
+          ],
+          "text": "numberField"
+        },
+        {
+          "type": "Edit Box",
+          "bounds": [
+            150,
+            138,
+            182,
+            239
+          ],
+          "field": "EverythingBagel::numberField",
+          "fieldId": 7
+        },
+        {
+          "type": "Text",
+          "bounds": [
+            192,
+            56,
+            214,
+            127
+          ],
+          "text": "dateField"
+        },
+        {
+          "type": "Drop-down Calendar",
+          "bounds": [
+            186,
+            138,
+            218,
+            259
+          ],
+          "field": "EverythingBagel::dateField",
+          "fieldId": 8,
+          "displayStyle": "calendar"
+        },
+        {
+          "type": "Text",
+          "bounds": [
+            228,
+            57,
+            250,
+            127
+          ],
+          "text": "timeField"
+        },
+        {
+          "type": "Edit Box",
+          "bounds": [
+            222,
+            138,
+            254,
+            259
+          ],
+          "field": "EverythingBagel::timeField",
+          "fieldId": 9
+        },
+        {
+          "type": "Text",
+          "bounds": [
+            264,
+            14,
+            286,
+            127
+          ],
+          "text": "timestampField"
+        },
+        {
+          "type": "Edit Box",
+          "bounds": [
+            258,
+            138,
+            290,
+            379
+          ],
+          "field": "EverythingBagel::timestampField",
+          "fieldId": 10
+        },
+        {
+          "type": "Text",
+          "bounds": [
+            300,
+            23,
+            322,
+            127
+          ],
+          "text": "containerField"
+        },
+        {
+          "type": "Container",
+          "bounds": [
+            294,
+            138,
+            419,
+            391
+          ],
+          "field": "EverythingBagel::containerField",
+          "fieldId": 11
+        },
+        {
+          "type": "Text",
+          "bounds": [
+            429,
+            14,
+            451,
+            127
+          ],
+          "text": "calculationField"
+        },
+        {
+          "type": "Edit Box",
+          "bounds": [
+            423,
+            138,
+            455,
+            239
+          ],
+          "field": "EverythingBagel::calculationField",
+          "fieldId": 12
+        },
+        {
+          "type": "Text",
+          "bounds": [
+            465,
+            24,
+            487,
+            127
+          ],
+          "text": "summaryField"
+        },
+        {
+          "type": "Edit Box",
+          "bounds": [
+            459,
+            138,
+            491,
+            239
+          ],
+          "field": "EverythingBagel::summaryField",
+          "fieldId": 13
+        },
+        {
+          "type": "Portal",
+          "bounds": [
+            152,
+            465,
+            298,
+            920
+          ],
+          "relatedTO": "EverythingBagel__EVERYTHINGBAGEL__selfJoin",
+          "visibleRows": 6,
+          "objects": [
+            {
+              "type": "Edit Box",
+              "bounds": [
+                2,
+                2,
+                22,
+                226
+              ],
+              "style": "minimal_edit_box",
+              "styleName": "Minimal Edit Box",
+              "field": "EverythingBagel__EVERYTHINGBAGEL__selfJoin::numberField",
+              "fieldId": 7
+            },
+            {
+              "type": "Edit Box",
+              "bounds": [
+                2,
+                228,
+                22,
+                451
+              ],
+              "style": "minimal_edit_box",
+              "styleName": "Minimal Edit Box",
+              "field": "EverythingBagel__EVERYTHINGBAGEL__selfJoin::textField",
+              "fieldId": 6
+            }
+          ]
+        },
+        {
+          "type": "Button Bar",
+          "bounds": [
+            329,
+            456,
+            458,
+            607
+          ],
+          "buttons": [
+            {
+              "type": "Button",
+              "bounds": [
+                0,
+                0,
+                43,
+                152
+              ],
+              "label": "\"Sample 1\"",
+              "hasIcon": true
+            },
+            {
+              "type": "Button",
+              "bounds": [
+                43,
+                0,
+                86,
+                152
+              ],
+              "label": "\"Sample 2\"",
+              "hasIcon": true
+            },
+            {
+              "type": "Button",
+              "bounds": [
+                86,
+                0,
+                129,
+                152
+              ],
+              "label": "\"Sample 3\"",
+              "hasIcon": true,
+              "script": "Just Beep",
+              "scriptId": 2,
+              "param": "True"
+            }
+          ]
+        },
+        {
+          "type": "Popover Button",
+          "bounds": [
+            328,
+            642,
+            370,
+            757
+          ],
+          "objects": [
+            {
+              "type": "PopoverPanel",
+              "bounds": [
+                149,
+                768,
+                549,
+                1058
+              ]
+            }
+          ]
+        },
+        {
+          "type": "Drop-down List",
+          "bounds": [
+            517,
+            405,
+            549,
+            658
+          ],
+          "style": "FM-B9C26F7D-8330-5346-B911-0FEBE1685606",
+          "styleName": "centered_text",
+          "field": "EverythingBagel::textField",
+          "fieldId": 6,
+          "displayStyle": "dropDown",
+          "valueList": "HardcodedValueList"
+        },
+        {
+          "type": "Text",
+          "bounds": [
+            520,
+            337,
+            536,
+            394
+          ],
+          "text": "textField"
+        },
+        {
+          "type": "Pop-up Menu",
+          "bounds": [
+            556,
+            405,
+            588,
+            658
+          ],
+          "field": "EverythingBagel::textField",
+          "fieldId": 6,
+          "displayStyle": "popUp",
+          "valueList": "HardcodedValueList"
+        },
+        {
+          "type": "Text",
+          "bounds": [
+            559,
+            337,
+            575,
+            394
+          ],
+          "text": "textField"
+        },
+        {
+          "type": "Edit Box",
+          "bounds": [
+            595,
+            405,
+            627,
+            658
+          ],
+          "field": "EverythingBagel::textField",
+          "fieldId": 6,
+          "conditions": {
+            "hideWhen": "Exact ( Get ( WindowMode ) ; 1 )\n// Hide when in find mode"
+          }
+        },
+        {
+          "type": "Text",
+          "bounds": [
+            598,
+            337,
+            614,
+            394
+          ],
+          "text": "textField"
+        },
+        {
+          "type": "Button",
+          "bounds": [
+            600,
+            780,
+            675,
+            895
+          ],
+          "hasIcon": true
+        }
+      ]
+    }
+  ]
+}

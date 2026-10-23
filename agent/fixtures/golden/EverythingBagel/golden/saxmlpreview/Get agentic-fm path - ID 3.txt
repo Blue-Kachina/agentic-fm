@@ -1,0 +1,25 @@
+Script: Get agentic-fm path
+
+1	# PURPOSE: Set a global variable used by other scripts to key/value pairs used by agentic-fm.
+2	
+3	Set Variable [ $config_example ; Value: JSONSetElement ( "{}" ; [ "path" ; "" ; JSONString ] ) ]
+4	
+5	If [ IsEmpty ( $$AGENTIC.FM ) or JSONGetElementType ( $$AGENTIC.FM ; "" ) ≠ JSONObject ]
+6	    Set Variable [ $path ; Value:  ]
+7	    Get Folder Path [ Allow Folder Creation: Off ; Repetition: 1 ; Dialog title: "Select the agentic-fm folder" ; Default location: Get ( DesktopPath ) ; $path ]
+8	Else
+9	    Set Variable [ $path ; Value: JSONGetElement ( $$AGENTIC.FM ; "path" ) ]
+10	End If
+11	
+12	# Validate path
+13	Set Variable [ $fmparse ; Value: $path & "fmparse.sh" ]
+14	Get File Exists [ “$fmparse” ; Target: $exists ]
+15	
+16	If [ not $exists ]
+17	    Show Custom Dialog [ "Invalid folder path" ; "Please clear the $$AGENTIC.FM global variable and run the script again to select the agentic-fm folder." ; Buttons: commit=True, label="OK" | commit=False | commit=False ]
+18	    Exit Script [ Text Result: False ]
+19	End If
+20	
+21	Set Variable [ $$AGENTIC.FM ; Value: JSONSetElement ( If ( IsEmpty ( $$AGENTIC.FM ) ; "{}" ; $$AGENTIC.FM ) ; [ "path" ; $path ; JSONString ] ) ]
+22	
+23	Exit Script [ Text Result: True ]

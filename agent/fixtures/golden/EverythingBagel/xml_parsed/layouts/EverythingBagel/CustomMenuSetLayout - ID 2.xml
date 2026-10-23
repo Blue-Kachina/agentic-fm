@@ -1,0 +1,19 @@
+<Layout id="2" name="CustomMenuSetLayout" width="1024">
+	<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+	<LayoutThemeReference id="4" name="com.filemaker.theme.custom.EF7F68C5_98F7_804C_8702_75FCEBC9E1E5" Display="Apex Blue Copy" Base="com.filemaker.theme.apex_blue"></LayoutThemeReference>
+	<PartsList membercount="1">
+		<Part type="Body" kind="4">
+			<Definition type="Body" kind="4" size="658" absolute="0" Options="0"></Definition>
+		</Part>
+	</PartsList>
+	<UUID modifications="1" userName="Admin" accountName="Admin" timestamp="2026-10-21T14:52:12">8B17327E-1A97-DE44-BFEB-2C9C829C2123</UUID>
+	<GridStyle>
+		<Color red="0.500000" green="0.500000" blue="0.500000" alpha="1.000000"></Color>
+		<Style>5</Style>
+	</GridStyle>
+	<ClientType>3</ClientType>
+	<Options hidden="False">64708872205</Options>
+	<MenuSet>
+		<CustomMenuSetReference id="2" name="Custom Menu Set"></CustomMenuSetReference>
+	</MenuSet>
+</Layout>

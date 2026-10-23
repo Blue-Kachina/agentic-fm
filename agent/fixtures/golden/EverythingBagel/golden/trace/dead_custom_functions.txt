@@ -1,0 +1,6 @@
+=== Potentially unused custom_functions (EverythingBagel) ===
+
+HIGH CONFIDENCE — no references found anywhere (1):
+  Test
+
+Summary: 1 high, 0 medium unused out of 1 total custom_functions

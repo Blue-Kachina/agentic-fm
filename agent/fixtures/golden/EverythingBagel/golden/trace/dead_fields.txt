@@ -1,0 +1,3 @@
+=== Potentially unused fields (EverythingBagel) ===
+
+Summary: 0 high, 0 medium unused out of 8 total fields

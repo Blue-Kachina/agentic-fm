@@ -1,0 +1,14 @@
+<CustomMenu name="[Go to Request]" id="14">
+	<UUID modifications="0" userName="Admin" accountName="Admin" timestamp="2026-03-12T11:30:06">FE9E35EB-0BAF-9749-B5C8-83EFFFFCF1F1</UUID>
+	<MenuItemList membercount="0"></MenuItemList>
+	<Conditions>
+		<Install>
+			<Calculation>
+				<Text><![CDATA[1]]></Text>
+			</Calculation>
+		</Install>
+	</Conditions>
+	<Comment></Comment>
+	<Base name="Go to Request" value="172"></Base>
+	<Options browseMode="False" findMode="True" previewMode="False"></Options>
+</CustomMenu>

@@ -1,0 +1,6 @@
+=== References to script: Just Beep ===
+
+LAYOUTS (1):
+  EverythingBagel (ID 1), button script
+
+Summary: 1 references across 1 source type(s)

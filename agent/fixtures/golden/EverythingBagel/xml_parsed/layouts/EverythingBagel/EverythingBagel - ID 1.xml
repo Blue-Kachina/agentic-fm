@@ -1,0 +1,823 @@
+<Layout id="1" name="EverythingBagel" width="1024">
+	<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+	<LayoutThemeReference id="3" name="com.filemaker.theme.custom.E1351EFD_0067_4E44_A8BC_3E7A959006D9" Display="Vibrant Custom" Base="com.filemaker.theme.vibrant"></LayoutThemeReference>
+	<PartsList membercount="2">
+		<Part type="Top Navigation" kind="12">
+			<Definition type="Top Navigation" kind="12" size="110" absolute="0" Options="0"></Definition>
+		</Part>
+		<Part type="Body" kind="4">
+			<Definition type="Body" kind="4" size="658" absolute="110" Options="0"></Definition>
+			<ObjectList membercount="26">
+				<LayoutObject hash="F8FB9896486456E13A7739D628905C74" id="1" type="Text" name="" kind="2">
+					<Bounds top="120" left="63" bottom="142" right="127"></Bounds>
+					<Options>805306368</Options>
+					<Text>
+						<StyledText>
+							<Data><![CDATA[textField]]></Data>
+						</StyledText>
+					</Text>
+					<LocalCSS type="ObjectCustomStyle" name="" displayName=""><![CDATA[self:normal .self
+{
+	text-align: right;
+}
+]]></LocalCSS>
+				</LayoutObject>
+				<LayoutObject hash="3F982B403908FB907F68B3F1E9D781F0" id="2" type="Edit Box" name="" kind="1">
+					<Bounds top="114" left="138" bottom="146" right="391"></Bounds>
+					<Options>805306368</Options>
+					<Field>
+						<FieldReference id="6" name="textField" repetition="1">
+							<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+						</FieldReference>
+						<Options>32</Options>
+						<Display Style="0" show="1"></Display>
+						<Usage inputMode="0" type="1"></Usage>
+					</Field>
+					<LocalCSS type="ThemeCustomStyle" name="FM-B9C26F7D-8330-5346-B911-0FEBE1685606" displayName="centered_text"><![CDATA[self.FM-B9C26F7D-8330-5346-B911-0FEBE1685606
+{
+}
+]]></LocalCSS>
+					<ExtendedAttributes>
+						<Formatting>
+							<Graphic>
+								<Options>5</Options>
+							</Graphic>
+							<Time>
+								<Options>143</Options>
+							</Time>
+							<Numeric>
+								<Options>2304</Options>
+								<Style>
+									<Negative>
+										<Color red="221" green="0" blue="0" alpha="1.00"></Color>
+									</Negative>
+								</Style>
+								<DecimalDigits>2</DecimalDigits>
+							</Numeric>
+						</Formatting>
+					</ExtendedAttributes>
+					<Accessibility>
+						<Label>1</Label>
+					</Accessibility>
+				</LayoutObject>
+				<LayoutObject hash="BECBB72CFE5F5BD70D6F5C4A2819036F" id="3" type="Text" name="" kind="2">
+					<Bounds top="156" left="35" bottom="178" right="127"></Bounds>
+					<Options>805306368</Options>
+					<Text>
+						<StyledText>
+							<Data><![CDATA[numberField]]></Data>
+						</StyledText>
+					</Text>
+					<LocalCSS type="ObjectCustomStyle" name="" displayName=""><![CDATA[self:normal .self
+{
+	text-align: right;
+}
+]]></LocalCSS>
+				</LayoutObject>
+				<LayoutObject hash="9333132FC402102E806E7EED11468B60" id="4" type="Edit Box" name="" kind="1">
+					<Bounds top="150" left="138" bottom="182" right="239"></Bounds>
+					<Options>805306368</Options>
+					<Field>
+						<FieldReference id="7" name="numberField" repetition="1">
+							<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+						</FieldReference>
+						<Options>32</Options>
+						<Display Style="0" show="1"></Display>
+						<Usage inputMode="0" type="1"></Usage>
+					</Field>
+					<LocalCSS type="ObjectCustomStyle" name="" displayName=""><![CDATA[self:normal .self
+{
+	text-align: right;
+}
+]]></LocalCSS>
+					<ExtendedAttributes>
+						<Formatting>
+							<Graphic>
+								<Options>5</Options>
+							</Graphic>
+							<Time>
+								<Options>143</Options>
+							</Time>
+							<Numeric>
+								<Options>2304</Options>
+								<Style>
+									<Negative>
+										<Color red="221" green="0" blue="0" alpha="1.00"></Color>
+									</Negative>
+								</Style>
+								<DecimalDigits>2</DecimalDigits>
+							</Numeric>
+						</Formatting>
+					</ExtendedAttributes>
+					<Accessibility>
+						<Label>3</Label>
+					</Accessibility>
+				</LayoutObject>
+				<LayoutObject hash="274D0B33B7F3BE9347219B70F76110BD" id="5" type="Text" name="" kind="2">
+					<Bounds top="192" left="56" bottom="214" right="127"></Bounds>
+					<Options>805306368</Options>
+					<Text>
+						<StyledText>
+							<Data><![CDATA[dateField]]></Data>
+						</StyledText>
+					</Text>
+					<LocalCSS type="ObjectCustomStyle" name="" displayName=""><![CDATA[self:normal .self
+{
+	text-align: right;
+}
+]]></LocalCSS>
+				</LayoutObject>
+				<LayoutObject hash="844C24B87F4785B90D0BE73125150E43" id="6" type="Drop-down Calendar" name="" kind="1">
+					<Bounds top="186" left="138" bottom="218" right="259"></Bounds>
+					<Options>805306368</Options>
+					<Field>
+						<FieldReference id="8" name="dateField" repetition="1">
+							<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+						</FieldReference>
+						<Options>32</Options>
+						<Display Style="6" show="1"></Display>
+						<Usage inputMode="0" type="1"></Usage>
+					</Field>
+					<ExtendedAttributes>
+						<Formatting>
+							<Graphic>
+								<Options>5</Options>
+							</Graphic>
+							<Time>
+								<Options>143</Options>
+							</Time>
+							<Numeric>
+								<Options>2304</Options>
+								<Style>
+									<Negative>
+										<Color red="221" green="0" blue="0" alpha="1.00"></Color>
+									</Negative>
+								</Style>
+								<DecimalDigits>2</DecimalDigits>
+							</Numeric>
+						</Formatting>
+					</ExtendedAttributes>
+					<Accessibility>
+						<Label>5</Label>
+					</Accessibility>
+				</LayoutObject>
+				<LayoutObject hash="F72F5059AE08C3E1BEC743DCCFCED773" id="7" type="Text" name="" kind="2">
+					<Bounds top="228" left="57" bottom="250" right="127"></Bounds>
+					<Options>805306368</Options>
+					<Text>
+						<StyledText>
+							<Data><![CDATA[timeField]]></Data>
+						</StyledText>
+					</Text>
+					<LocalCSS type="ObjectCustomStyle" name="" displayName=""><![CDATA[self:normal .self
+{
+	text-align: right;
+}
+]]></LocalCSS>
+				</LayoutObject>
+				<LayoutObject hash="7E4F6E9E9084FC9469BCC645A6354E5C" id="8" type="Edit Box" name="" kind="1">
+					<Bounds top="222" left="138" bottom="254" right="259"></Bounds>
+					<Options>805306368</Options>
+					<Field>
+						<FieldReference id="9" name="timeField" repetition="1">
+							<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+						</FieldReference>
+						<Options>32</Options>
+						<Display Style="0" show="1"></Display>
+						<Usage inputMode="0" type="1"></Usage>
+					</Field>
+					<ExtendedAttributes>
+						<Formatting>
+							<Graphic>
+								<Options>5</Options>
+							</Graphic>
+							<Time>
+								<Options>143</Options>
+							</Time>
+							<Numeric>
+								<Options>2304</Options>
+								<Style>
+									<Negative>
+										<Color red="221" green="0" blue="0" alpha="1.00"></Color>
+									</Negative>
+								</Style>
+								<DecimalDigits>2</DecimalDigits>
+							</Numeric>
+						</Formatting>
+					</ExtendedAttributes>
+					<Accessibility>
+						<Label>7</Label>
+					</Accessibility>
+				</LayoutObject>
+				<LayoutObject hash="26F49A9B9B80A22E2272486F504CCC36" id="9" type="Text" name="" kind="2">
+					<Bounds top="264" left="14" bottom="286" right="127"></Bounds>
+					<Options>805306368</Options>
+					<Text>
+						<StyledText>
+							<Data><![CDATA[timestampField]]></Data>
+						</StyledText>
+					</Text>
+					<LocalCSS type="ObjectCustomStyle" name="" displayName=""><![CDATA[self:normal .self
+{
+	text-align: right;
+}
+]]></LocalCSS>
+				</LayoutObject>
+				<LayoutObject hash="9686FF695A51EFAD990FA366D30EA91A" id="10" type="Edit Box" name="" kind="1">
+					<Bounds top="258" left="138" bottom="290" right="379"></Bounds>
+					<Options>805306368</Options>
+					<Field>
+						<FieldReference id="10" name="timestampField" repetition="1">
+							<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+						</FieldReference>
+						<Options>32</Options>
+						<Display Style="0" show="1"></Display>
+						<Usage inputMode="0" type="1"></Usage>
+					</Field>
+					<ExtendedAttributes>
+						<Formatting>
+							<Graphic>
+								<Options>5</Options>
+							</Graphic>
+							<Time>
+								<Options>143</Options>
+							</Time>
+							<Numeric>
+								<Options>2304</Options>
+								<Style>
+									<Negative>
+										<Color red="221" green="0" blue="0" alpha="1.00"></Color>
+									</Negative>
+								</Style>
+								<DecimalDigits>2</DecimalDigits>
+							</Numeric>
+						</Formatting>
+					</ExtendedAttributes>
+					<Accessibility>
+						<Label>9</Label>
+					</Accessibility>
+				</LayoutObject>
+				<LayoutObject hash="44AC583BBC55A57BD753E4CE91F34AB5" id="11" type="Text" name="" kind="2">
+					<Bounds top="300" left="23" bottom="322" right="127"></Bounds>
+					<Options>805306368</Options>
+					<Text>
+						<StyledText>
+							<Data><![CDATA[containerField]]></Data>
+						</StyledText>
+					</Text>
+					<LocalCSS type="ObjectCustomStyle" name="" displayName=""><![CDATA[self:normal .self
+{
+	text-align: right;
+}
+]]></LocalCSS>
+				</LayoutObject>
+				<LayoutObject hash="A13CD31048AEBCE45A4AC1FA35675A38" id="12" type="Container" name="" kind="1">
+					<Bounds top="294" left="138" bottom="419" right="391"></Bounds>
+					<Options>805306368</Options>
+					<Field>
+						<FieldReference id="11" name="containerField" repetition="1">
+							<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+						</FieldReference>
+						<Options>32</Options>
+						<Display Style="0" show="1"></Display>
+						<Usage inputMode="0" type="1"></Usage>
+					</Field>
+					<ExtendedAttributes>
+						<Formatting>
+							<Graphic>
+								<Options>5</Options>
+							</Graphic>
+							<Time>
+								<Options>143</Options>
+							</Time>
+							<Numeric>
+								<Options>2304</Options>
+								<Style>
+									<Negative>
+										<Color red="221" green="0" blue="0" alpha="1.00"></Color>
+									</Negative>
+								</Style>
+								<DecimalDigits>2</DecimalDigits>
+							</Numeric>
+						</Formatting>
+					</ExtendedAttributes>
+					<Accessibility>
+						<Label>11</Label>
+					</Accessibility>
+				</LayoutObject>
+				<LayoutObject hash="C2E2B379424893BEB421CD8489509AF6" id="13" type="Text" name="" kind="2">
+					<Bounds top="429" left="14" bottom="451" right="127"></Bounds>
+					<Options>805306368</Options>
+					<Text>
+						<StyledText>
+							<Data><![CDATA[calculationField]]></Data>
+						</StyledText>
+					</Text>
+					<LocalCSS type="ObjectCustomStyle" name="" displayName=""><![CDATA[self:normal .self
+{
+	text-align: right;
+}
+]]></LocalCSS>
+				</LayoutObject>
+				<LayoutObject hash="960D87011DE6E26DCC0CF90C1C3A8A7D" id="14" type="Edit Box" name="" kind="1">
+					<Bounds top="423" left="138" bottom="455" right="239"></Bounds>
+					<Options>805306368</Options>
+					<Field>
+						<FieldReference id="12" name="calculationField" repetition="1">
+							<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+						</FieldReference>
+						<Options>32</Options>
+						<Display Style="0" show="1"></Display>
+						<Usage inputMode="0" type="1"></Usage>
+					</Field>
+					<ExtendedAttributes>
+						<Formatting>
+							<Graphic>
+								<Options>5</Options>
+							</Graphic>
+							<Time>
+								<Options>143</Options>
+							</Time>
+							<Numeric>
+								<Options>2304</Options>
+								<Style>
+									<Negative>
+										<Color red="221" green="0" blue="0" alpha="1.00"></Color>
+									</Negative>
+								</Style>
+								<DecimalDigits>2</DecimalDigits>
+							</Numeric>
+						</Formatting>
+					</ExtendedAttributes>
+					<Accessibility>
+						<Label>13</Label>
+					</Accessibility>
+				</LayoutObject>
+				<LayoutObject hash="1D663FB6E2ACD1831A80EF66B51E3ADB" id="15" type="Text" name="" kind="2">
+					<Bounds top="465" left="24" bottom="487" right="127"></Bounds>
+					<Options>805306368</Options>
+					<Text>
+						<StyledText>
+							<Data><![CDATA[summaryField]]></Data>
+						</StyledText>
+					</Text>
+					<LocalCSS type="ObjectCustomStyle" name="" displayName=""><![CDATA[self:normal .self
+{
+	text-align: right;
+}
+]]></LocalCSS>
+				</LayoutObject>
+				<LayoutObject hash="11427E1A05E66EB0F4A33EE667C8038E" id="16" type="Edit Box" name="" kind="1">
+					<Bounds top="459" left="138" bottom="491" right="239"></Bounds>
+					<Options>805306368</Options>
+					<Field>
+						<FieldReference id="13" name="summaryField" repetition="1">
+							<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+						</FieldReference>
+						<Options>32</Options>
+						<Display Style="0" show="1"></Display>
+						<Usage inputMode="0" type="1"></Usage>
+					</Field>
+					<ExtendedAttributes>
+						<Formatting>
+							<Graphic>
+								<Options>5</Options>
+							</Graphic>
+							<Time>
+								<Options>143</Options>
+							</Time>
+							<Numeric>
+								<Options>2304</Options>
+								<Style>
+									<Negative>
+										<Color red="221" green="0" blue="0" alpha="1.00"></Color>
+									</Negative>
+								</Style>
+								<DecimalDigits>2</DecimalDigits>
+							</Numeric>
+						</Formatting>
+					</ExtendedAttributes>
+					<Accessibility>
+						<Label>15</Label>
+					</Accessibility>
+				</LayoutObject>
+				<LayoutObject hash="783C3473AECF05B3FE41D9F270D876F5" id="17" type="Portal" name="" kind="9">
+					<Bounds top="152" left="465" bottom="298" right="920"></Bounds>
+					<Options>805306368</Options>
+					<Portal>
+						<TableOccurrenceReference id="1065090" name="EverythingBagel__EVERYTHINGBAGEL__selfJoin"></TableOccurrenceReference>
+						<Options show="6">16</Options>
+						<ObjectList membercount="2">
+							<LayoutObject hash="CA4CBD7971E1FAB31464D5C8CDDC0AD4" id="18" type="Edit Box" name="" kind="1">
+								<Bounds top="2" left="2" bottom="22" right="226"></Bounds>
+								<Options>805306368</Options>
+								<Field>
+									<FieldReference id="7" name="numberField" repetition="1">
+										<TableOccurrenceReference id="1065090" name="EverythingBagel__EVERYTHINGBAGEL__selfJoin"></TableOccurrenceReference>
+									</FieldReference>
+									<Options>32</Options>
+									<Display Style="0" show="1"></Display>
+									<Usage inputMode="0" type="1"></Usage>
+								</Field>
+								<LocalCSS type="ThemeCustomStyle" name="minimal_edit_box" displayName="Minimal Edit Box"><![CDATA[self.minimal_edit_box
+{
+}
+]]></LocalCSS>
+								<ExtendedAttributes>
+									<Formatting>
+										<Graphic>
+											<Options>5</Options>
+										</Graphic>
+										<Time>
+											<Options>143</Options>
+										</Time>
+										<Numeric>
+											<Options>2304</Options>
+											<Style>
+												<Negative>
+													<Color red="221" green="0" blue="0" alpha="1.00"></Color>
+												</Negative>
+											</Style>
+											<DecimalDigits>2</DecimalDigits>
+										</Numeric>
+									</Formatting>
+								</ExtendedAttributes>
+							</LayoutObject>
+							<LayoutObject hash="8DF616F7FCFFF2E9D4092CD442F3CCCA" id="19" type="Edit Box" name="" kind="1">
+								<Bounds top="2" left="228" bottom="22" right="451"></Bounds>
+								<Options>805306368</Options>
+								<Field>
+									<FieldReference id="6" name="textField" repetition="1">
+										<TableOccurrenceReference id="1065090" name="EverythingBagel__EVERYTHINGBAGEL__selfJoin"></TableOccurrenceReference>
+									</FieldReference>
+									<Options>32</Options>
+									<Display Style="0" show="1"></Display>
+									<Usage inputMode="0" type="1"></Usage>
+								</Field>
+								<LocalCSS type="ThemeCustomStyle" name="minimal_edit_box" displayName="Minimal Edit Box"><![CDATA[self.minimal_edit_box
+{
+}
+]]></LocalCSS>
+								<ExtendedAttributes>
+									<Formatting>
+										<Graphic>
+											<Options>5</Options>
+										</Graphic>
+										<Time>
+											<Options>143</Options>
+										</Time>
+										<Numeric>
+											<Options>2304</Options>
+											<Style>
+												<Negative>
+													<Color red="221" green="0" blue="0" alpha="1.00"></Color>
+												</Negative>
+											</Style>
+											<DecimalDigits>2</DecimalDigits>
+										</Numeric>
+									</Formatting>
+								</ExtendedAttributes>
+							</LayoutObject>
+						</ObjectList>
+					</Portal>
+				</LayoutObject>
+				<LayoutObject hash="A76FDF12050FDE0A8687591CC24FFE6F" id="20" type="Button Bar" name="" kind="18">
+					<Bounds top="329" left="456" bottom="458" right="607"></Bounds>
+					<Options>805306368</Options>
+					<ButtonBar>
+						<Options>3</Options>
+						<Select>
+							<Calculation>
+								<Text><![CDATA[True]]></Text>
+							</Calculation>
+						</Select>
+						<ObjectList membercount="3">
+							<LayoutObject hash="26299CEC86BC07A088AACFD85A95E8B6" id="21" type="Button" name="" kind="10">
+								<Bounds top="0" left="0" bottom="43" right="152"></Bounds>
+								<Options>805306376</Options>
+								<Button>
+									<Options>2</Options>
+									<Label>
+										<Calculation>
+											<Text><![CDATA["Sample 1"]]></Text>
+										</Calculation>
+									</Label>
+									<IconData type="4" size="12">
+										<BinaryData>
+											<LibraryReference id="2" key="FB20EC575E6EDDBB999B96424B592A2A"></LibraryReference>
+										</BinaryData>
+									</IconData>
+								</Button>
+							</LayoutObject>
+							<LayoutObject hash="E124FD4ECAEDFE7A483CE1BEB5F9765E" id="22" type="Button" name="" kind="10">
+								<Bounds top="43" left="0" bottom="86" right="152"></Bounds>
+								<Options>805306376</Options>
+								<Button>
+									<Options>2</Options>
+									<Label>
+										<Calculation>
+											<Text><![CDATA["Sample 2"]]></Text>
+										</Calculation>
+									</Label>
+									<IconData type="4" size="12">
+										<BinaryData>
+											<LibraryReference id="3" key="AD0839F1A7443424E36715EE0DF4B8FD"></LibraryReference>
+										</BinaryData>
+									</IconData>
+								</Button>
+							</LayoutObject>
+							<LayoutObject hash="7C3A6901F97C2778449034C4F228418B" id="23" type="Button" name="" kind="10">
+								<Bounds top="86" left="0" bottom="129" right="152"></Bounds>
+								<Options>805371912</Options>
+								<Button>
+									<Options>2</Options>
+									<Label>
+										<Calculation>
+											<Text><![CDATA["Sample 3"]]></Text>
+										</Calculation>
+									</Label>
+									<IconData type="4" size="12">
+										<BinaryData>
+											<LibraryReference id="4" key="5E073C73805B1722F13C603388CE8966"></LibraryReference>
+										</BinaryData>
+									</IconData>
+									<action>
+										<Options>4</Options>
+										<ScriptReference id="2" name="Just Beep"></ScriptReference>
+										<Calculation>
+											<Text><![CDATA[True]]></Text>
+										</Calculation>
+									</action>
+								</Button>
+							</LayoutObject>
+						</ObjectList>
+					</ButtonBar>
+				</LayoutObject>
+				<LayoutObject hash="C4914647E14017C4E1ABB106653832EB" id="24" type="Popover Button" name="" kind="14">
+					<Bounds top="328" left="642" bottom="370" right="757"></Bounds>
+					<Options>805306376</Options>
+					<PopoverButton>
+						<Label>
+							<Text>
+								<Options>2</Options>
+								<StyledText>
+									<Data><![CDATA[Popover Button Text]]></Data>
+								</StyledText>
+							</Text>
+						</Label>
+						<IconData type="0" size="11"></IconData>
+						<LayoutObject hash="8073C29A786A1B5439214B4AD471B55A" id="25" type="PopoverPanel" name="" kind="15" position="0" Options="0">
+							<Bounds top="149" left="768" bottom="549" right="1058"></Bounds>
+							<Options>805306368</Options>
+							<Title>
+								<Text><![CDATA["Popover Title"]]></Text>
+							</Title>
+							<ObjectList membercount="0"></ObjectList>
+						</LayoutObject>
+					</PopoverButton>
+				</LayoutObject>
+				<LayoutObject hash="A1E9D9612AFC923F300E1D426657B837" id="26" type="Drop-down List" name="" kind="1">
+					<Bounds top="517" left="405" bottom="549" right="658"></Bounds>
+					<Options>805306368</Options>
+					<Field>
+						<FieldReference id="6" name="textField" repetition="1">
+							<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+						</FieldReference>
+						<Options>32</Options>
+						<Display Style="1" show="1">
+							<ValueListReference id="1" name="HardcodedValueList"></ValueListReference>
+						</Display>
+						<Usage inputMode="0" type="1"></Usage>
+					</Field>
+					<LocalCSS type="ThemeCustomStyle" name="FM-B9C26F7D-8330-5346-B911-0FEBE1685606" displayName="centered_text"><![CDATA[self.FM-B9C26F7D-8330-5346-B911-0FEBE1685606
+{
+}
+]]></LocalCSS>
+					<ExtendedAttributes>
+						<Formatting>
+							<Graphic>
+								<Options>5</Options>
+							</Graphic>
+							<Time>
+								<Options>143</Options>
+							</Time>
+							<Numeric>
+								<Options>2304</Options>
+								<Style>
+									<Negative>
+										<Color red="221" green="0" blue="0" alpha="1.00"></Color>
+									</Negative>
+								</Style>
+								<DecimalDigits>2</DecimalDigits>
+							</Numeric>
+						</Formatting>
+					</ExtendedAttributes>
+					<Accessibility>
+						<Label>27</Label>
+					</Accessibility>
+				</LayoutObject>
+				<LayoutObject hash="683AA94E350D1E1BA89B17466DDDA170" id="27" type="Text" name="" kind="2">
+					<Bounds top="520" left="337" bottom="536" right="394"></Bounds>
+					<Options>805306368</Options>
+					<Text>
+						<StyledText>
+							<Data><![CDATA[textField]]></Data>
+						</StyledText>
+					</Text>
+					<LocalCSS type="ObjectCustomStyle" name="" displayName=""><![CDATA[self:normal .self
+{
+	text-align: right;
+}
+]]></LocalCSS>
+				</LayoutObject>
+				<LayoutObject hash="5A13B78DCF7BB5790633D913067554F5" id="28" type="Pop-up Menu" name="" kind="1">
+					<Bounds top="556" left="405" bottom="588" right="658"></Bounds>
+					<Options>805306368</Options>
+					<Field>
+						<FieldReference id="6" name="textField" repetition="1">
+							<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+						</FieldReference>
+						<Options>32</Options>
+						<Display Style="2" show="1">
+							<ValueListReference id="1" name="HardcodedValueList"></ValueListReference>
+						</Display>
+						<Usage inputMode="0" type="1"></Usage>
+					</Field>
+					<ExtendedAttributes>
+						<Formatting>
+							<Graphic>
+								<Options>5</Options>
+							</Graphic>
+							<Time>
+								<Options>143</Options>
+							</Time>
+							<Numeric>
+								<Options>2304</Options>
+								<Style>
+									<Negative>
+										<Color red="221" green="0" blue="0" alpha="1.00"></Color>
+									</Negative>
+								</Style>
+								<DecimalDigits>2</DecimalDigits>
+							</Numeric>
+						</Formatting>
+					</ExtendedAttributes>
+					<Accessibility>
+						<Label>29</Label>
+					</Accessibility>
+				</LayoutObject>
+				<LayoutObject hash="A93BBDE66529FCF8CE49C5D40DE2A92D" id="29" type="Text" name="" kind="2">
+					<Bounds top="559" left="337" bottom="575" right="394"></Bounds>
+					<Options>805306368</Options>
+					<Text>
+						<StyledText>
+							<Data><![CDATA[textField]]></Data>
+						</StyledText>
+					</Text>
+					<LocalCSS type="ObjectCustomStyle" name="" displayName=""><![CDATA[self:normal .self
+{
+	text-align: right;
+}
+]]></LocalCSS>
+				</LayoutObject>
+				<LayoutObject hash="D96591DA21AE24558D1789AF18D51A5C" id="30" type="Edit Box" name="" kind="1">
+					<Bounds top="595" left="405" bottom="627" right="658"></Bounds>
+					<Options>805306372</Options>
+					<Field>
+						<FieldReference id="6" name="textField" repetition="1">
+							<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+						</FieldReference>
+						<Options>32816</Options>
+						<Display Style="0" show="1"></Display>
+						<Usage inputMode="0" type="1"></Usage>
+					</Field>
+					<ExtendedAttributes>
+						<Formatting>
+							<Graphic>
+								<Options>5</Options>
+							</Graphic>
+							<Time>
+								<Options>143</Options>
+							</Time>
+							<Numeric>
+								<Options>2304</Options>
+								<Style>
+									<Negative>
+										<Color red="221" green="0" blue="0" alpha="1.00"></Color>
+									</Negative>
+								</Style>
+								<DecimalDigits>2</DecimalDigits>
+							</Numeric>
+						</Formatting>
+					</ExtendedAttributes>
+					<Accessibility>
+						<Label>31</Label>
+					</Accessibility>
+					<Conditions>
+						<Hide findMode="False">
+							<Calculation>
+								<Text><![CDATA[Exact ( Get ( WindowMode ) ; 1 )
+// Hide when in find mode]]></Text>
+							</Calculation>
+						</Hide>
+					</Conditions>
+					<CanEntryCalc>
+						<Calculation>
+							<Text><![CDATA[False]]></Text>
+						</Calculation>
+					</CanEntryCalc>
+				</LayoutObject>
+				<LayoutObject hash="3283D4A842C0B95B0308BA7D263E3AE4" id="31" type="Text" name="" kind="2">
+					<Bounds top="598" left="337" bottom="614" right="394"></Bounds>
+					<Options>805306368</Options>
+					<Text>
+						<StyledText>
+							<Data><![CDATA[textField]]></Data>
+						</StyledText>
+					</Text>
+					<LocalCSS type="ObjectCustomStyle" name="" displayName=""><![CDATA[self:normal .self
+{
+	text-align: right;
+}
+]]></LocalCSS>
+				</LayoutObject>
+				<LayoutObject hash="4BFCA58DE92929802FEE9FBE12531ED5" id="32" type="Button" name="" kind="10">
+					<Bounds top="600" left="780" bottom="675" right="895"></Bounds>
+					<Options>805306376</Options>
+					<Button>
+						<Label></Label>
+						<IconData type="1" size="54">
+							<BinaryData>
+								<LibraryReference id="5" key="3016CAB4C485F18E6FE9DE1ACF8429EB"></LibraryReference>
+							</BinaryData>
+						</IconData>
+					</Button>
+				</LayoutObject>
+			</ObjectList>
+		</Part>
+	</PartsList>
+	<TableView>
+		<ObjectList membercount="10">
+			<TableViewLayoutObject hidden="False" id="3" name="numberField" width="75">
+				<FieldReference id="7" name="numberField" repetition="1">
+					<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+				</FieldReference>
+			</TableViewLayoutObject>
+			<TableViewLayoutObject hidden="False" id="13" name="numberField" width="75">
+				<FieldReference id="7" name="numberField" repetition="1">
+					<TableOccurrenceReference id="1065090" name="EverythingBagel__EVERYTHINGBAGEL__selfJoin"></TableOccurrenceReference>
+				</FieldReference>
+			</TableViewLayoutObject>
+			<TableViewLayoutObject hidden="False" id="14" name="textField" width="120">
+				<FieldReference id="6" name="textField" repetition="1">
+					<TableOccurrenceReference id="1065090" name="EverythingBagel__EVERYTHINGBAGEL__selfJoin"></TableOccurrenceReference>
+				</FieldReference>
+			</TableViewLayoutObject>
+			<TableViewLayoutObject hidden="False" id="4" name="dateField" width="75">
+				<FieldReference id="8" name="dateField" repetition="1">
+					<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+				</FieldReference>
+			</TableViewLayoutObject>
+			<TableViewLayoutObject hidden="False" id="5" name="timeField" width="75">
+				<FieldReference id="9" name="timeField" repetition="1">
+					<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+				</FieldReference>
+			</TableViewLayoutObject>
+			<TableViewLayoutObject hidden="False" id="6" name="timestampField" width="150">
+				<FieldReference id="10" name="timestampField" repetition="1">
+					<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+				</FieldReference>
+			</TableViewLayoutObject>
+			<TableViewLayoutObject hidden="False" id="7" name="containerField" width="75">
+				<FieldReference id="11" name="containerField" repetition="1">
+					<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+				</FieldReference>
+			</TableViewLayoutObject>
+			<TableViewLayoutObject hidden="False" id="8" name="calculationField" width="75">
+				<FieldReference id="12" name="calculationField" repetition="1">
+					<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+				</FieldReference>
+			</TableViewLayoutObject>
+			<TableViewLayoutObject hidden="False" id="2" name="textField" width="120">
+				<FieldReference id="6" name="textField" repetition="1">
+					<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+				</FieldReference>
+			</TableViewLayoutObject>
+			<TableViewLayoutObject hidden="False" id="9" name="summaryField" width="75">
+				<FieldReference id="13" name="summaryField" repetition="1">
+					<TableOccurrenceReference id="1065089" name="EverythingBagel"></TableOccurrenceReference>
+				</FieldReference>
+			</TableViewLayoutObject>
+		</ObjectList>
+	</TableView>
+	<UUID modifications="6" userName="Admin" accountName="Admin" timestamp="2026-10-21T14:37:59">9A1BD310-F375-CD49-9BEC-551EB5C8523D</UUID>
+	<GridStyle>
+		<Color red="0.500000" green="0.500000" blue="0.500000" alpha="1.000000"></Color>
+		<Style>5</Style>
+	</GridStyle>
+	<ClientType>3</ClientType>
+	<Options hidden="False">64708872193</Options>
+	<MenuSet>
+		<CustomMenuSetReference id="0" name="[File Default]"></CustomMenuSetReference>
+	</MenuSet>
+</Layout>

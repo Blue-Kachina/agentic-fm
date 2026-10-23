@@ -1,0 +1,7 @@
+<Script>
+	<ScriptReference id="2" name="Just Beep"></ScriptReference>
+	<ObjectList membercount="1">
+		<Step hash="13BD038DFFF4496128C9ECC3F777D52E" id="93" name="Beep" enable="True">
+		</Step>
+	</ObjectList>
+</Script>

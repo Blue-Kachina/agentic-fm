@@ -1,0 +1,4 @@
+<ExtendedPrivilege id="9" name="fmrest">
+	<Description>Access via FileMaker Data API</Description>
+	<UUID modifications="0" userName="Admin" accountName="" timestamp="2026-03-12T11:30:06">04D1B5EC-480B-0B45-94FD-11B3776B4C8D</UUID>
+</ExtendedPrivilege>

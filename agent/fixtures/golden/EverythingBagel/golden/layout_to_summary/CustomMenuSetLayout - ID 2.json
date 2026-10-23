@@ -1,0 +1,13 @@
+{
+  "layout": "CustomMenuSetLayout",
+  "id": 2,
+  "width": 1024,
+  "table": "EverythingBagel",
+  "theme": "com.filemaker.theme.custom.EF7F68C5_98F7_804C_8702_75FCEBC9E1E5",
+  "parts": [
+    {
+      "type": "Body",
+      "height": 658
+    }
+  ]
+}

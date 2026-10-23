@@ -1,0 +1,9 @@
+# TableName|TableID|FieldName|FieldID|DataType|FieldType|AutoEnter|Flags
+EverythingBagel|129|textField|6|Text|Normal||
+EverythingBagel|129|numberField|7|Number|Normal||
+EverythingBagel|129|dateField|8|Date|Normal||
+EverythingBagel|129|timeField|9|Time|Normal||
+EverythingBagel|129|timestampField|10|Timestamp|Normal||
+EverythingBagel|129|containerField|11|Binary|Normal||
+EverythingBagel|129|calculationField|12|Number|Calculated|calc:""|
+EverythingBagel|129|summaryField|13|Number|Summary||

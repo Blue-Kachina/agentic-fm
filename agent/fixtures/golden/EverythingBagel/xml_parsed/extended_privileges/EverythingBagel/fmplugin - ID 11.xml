@@ -1,0 +1,4 @@
+<ExtendedPrivilege id="11" name="fmplugin">
+	<Description>Validate cross-file plug-in access</Description>
+	<UUID modifications="0" userName="Admin" accountName="" timestamp="2026-03-12T11:30:06">166B372A-CBAD-4C49-B77B-9AD8E5B5D79C</UUID>
+</ExtendedPrivilege>

@@ -1,0 +1,4 @@
+<ExtendedPrivilege id="6" name="fmphp">
+	<Description>Access via PHP Web Publishing - FMS only</Description>
+	<UUID modifications="0" userName="Admin" accountName="" timestamp="2026-03-12T11:30:06">73235A3C-9A47-B54B-9BBD-168C8A5F18D5</UUID>
+</ExtendedPrivilege>

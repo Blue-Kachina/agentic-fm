@@ -1,0 +1,4 @@
+<ExtendedPrivilege id="10" name="fmodata">
+	<Description>Access via OData</Description>
+	<UUID modifications="0" userName="Admin" accountName="" timestamp="2026-03-12T11:30:06">7D36DBD9-1DFD-4E41-97FD-2797A82416FB</UUID>
+</ExtendedPrivilege>

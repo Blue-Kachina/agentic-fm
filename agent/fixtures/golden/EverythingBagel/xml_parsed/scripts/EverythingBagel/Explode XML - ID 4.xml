@@ -1,0 +1,932 @@
+<Script>
+	<ScriptReference id="4" name="Explode XML"></ScriptReference>
+	<ObjectList membercount="62">
+		<Step hash="F5B2A138B8DAA212F76560343A598FFF" id="89" name="# (comment)" enable="True">
+			<Options>4</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Comment">
+					<Comment value="PURPOSE: Push out solution XML to be parsed for AI use."></Comment>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="5960BE435543BFB24377F54D61912F1A" id="61" name="Insert Text" enable="False">
+			<Options>5</Options>
+			<ParameterValues membercount="3">
+				<Parameter type="Boolean">
+					<Boolean type="Select" id="4096" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="Target">
+					<Variable value="$README">
+						<repetition>
+							<Calculation datatype="1" position="32">
+								<Calculation>
+									<Text><![CDATA[1]]></Text>
+								</Calculation>
+							</Calculation>
+						</repetition>
+					</Variable>
+				</Parameter>
+				<Parameter type="Text">
+					<Text value="INTERACTIVE MODE (FM Pro):&#13;  Run with no parameter. Saves XML to desktop, POSTs to localhost:8765/explode.&#13;  Requires companion server running and $$AGENTIC.FM configured.&#13;&#13;SERVER MODE (OData via AGFMScriptBridge):&#13;  Pass JSON parameter with keys:&#13;    repo_path     — absolute POSIX path to the agentic-fm project root on the companion server host&#13;    export_path   — absolute POSIX path where FMS will write the XML export (must be host-accessible)&#13;    companion_url — base URL of the companion server (e.g. http://host.docker.internal:8765)&#13;    solution_name — (optional) override solution name; defaults to Get(FileName)&#13;&#13;  NOTE: export_path must be a path FMS can write to AND the companion server host can read.&#13;  On a Linux FMS container with a host-mounted Data dir, use that mount path.&#13;  The FM path is constructed as &quot;filelinux:&quot; &amp; export_path — adjust prefix for other OS.&#13;&#13;RETURNS (server mode): companion server response JSON { success, exit_code, stdout, stderr }"></Text>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="4F7FB90AE520CE97E743FCFA464D783A" id="89" name="# (comment)" enable="True">
+			<ParameterValues membercount="1">
+				<Parameter type="Comment">
+					<Comment></Comment>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="24DE899B15B47A51BFB022432178A33F" id="89" name="# (comment)" enable="False">
+			<Options>4</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Comment">
+					<Comment value="MARK: Server mode"></Comment>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="39F18BCE8E7D71FD3219707B8C5B55FE" id="141" name="Set Variable" enable="True">
+			<Options>16388</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Variable">
+					<value>
+						<Calculation datatype="1" position="1">
+							<Calculation>
+								<Text><![CDATA[Get ( ScriptParameter )]]></Text>
+							</Calculation>
+						</Calculation>
+					</value>
+					<Name value="$input"></Name>
+					<repetition></repetition>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="4E1C516A6E3DC2169123CDB856D8601C" id="68" name="If" enable="True">
+			<Options>16384</Options>
+			<ParameterValues membercount="2">
+				<Parameter type="Boolean">
+					<Boolean type="Collapsed" id="33554432" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="Calculation">
+					<Calculation datatype="7" position="0">
+						<Calculation>
+							<Text><![CDATA[JSONGetElementType ( $input ; "repo_path" ) = JSONString]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="DABA380E6E17439BF4A6AC56E549365D" id="141" name="Set Variable" enable="True">
+			<Options>16388</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Variable">
+					<value>
+						<Calculation datatype="1" position="1">
+							<Calculation>
+								<Text><![CDATA[JSONGetElement ( $input ; "repo_path" )]]></Text>
+							</Calculation>
+						</Calculation>
+					</value>
+					<Name value="$repoPath"></Name>
+					<repetition></repetition>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="488AC9771814C5196F5EAF1EEA09E555" id="141" name="Set Variable" enable="True">
+			<Options>16388</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Variable">
+					<value>
+						<Calculation datatype="1" position="1">
+							<Calculation>
+								<Text><![CDATA[JSONGetElement ( $input ; "export_path" )]]></Text>
+							</Calculation>
+						</Calculation>
+					</value>
+					<Name value="$exportPath"></Name>
+					<repetition></repetition>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="45C2D4CFA56576093C1A2B59C304477F" id="141" name="Set Variable" enable="True">
+			<Options>16388</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Variable">
+					<value>
+						<Calculation datatype="1" position="1">
+							<Calculation>
+								<Text><![CDATA[JSONGetElement ( $input ; "companion_url" )]]></Text>
+							</Calculation>
+						</Calculation>
+					</value>
+					<Name value="$companionUrl"></Name>
+					<repetition></repetition>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="EE6A8DE7ED816F0A1BD85E46D9EBB803" id="141" name="Set Variable" enable="True">
+			<Options>16388</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Variable">
+					<value>
+						<Calculation datatype="1" position="1">
+							<Calculation>
+								<Text><![CDATA[Let (	~override = JSONGetElement ( $input ; "solution_name" ) ;	If ( IsEmpty ( ~override ) ; Get ( FileName ) ; ~override ))]]></Text>
+							</Calculation>
+						</Calculation>
+					</value>
+					<Name value="$solutionName"></Name>
+					<repetition></repetition>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="B9EE898B12ADF332D2045A103E5EAC2E" id="89" name="# (comment)" enable="True">
+			<Options>4</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Comment">
+					<Comment value="Build FM path: filelinux: prefix for FMS on Linux. Adjust for other OS."></Comment>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="1EF540067FA487A22CA9511E3BF78B08" id="141" name="Set Variable" enable="True">
+			<Options>16388</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Variable">
+					<value>
+						<Calculation datatype="1" position="1">
+							<Calculation>
+								<Text><![CDATA["filelinux:" & $exportPath]]></Text>
+							</Calculation>
+						</Calculation>
+					</value>
+					<Name value="$xmlFmPath"></Name>
+					<repetition></repetition>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="74AE9A95B12C1DDF7EAD828DC7092352" id="3" name="Save a Copy as XML" enable="True">
+			<Options>16416</Options>
+			<ParameterValues membercount="6">
+				<Parameter type="Calculation">
+					<Calculation datatype="1" position="0">
+						<Calculation>
+							<Text><![CDATA[Get ( WindowName )]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+				<Parameter type="UniversalPathList">
+					<UniversalPathList membercount="1">
+						<ObjectList>
+							<Location><![CDATA[$xmlFmPath]]></Location>
+						</ObjectList>
+					</UniversalPathList>
+				</Parameter>
+				<Parameter type="Boolean">
+					<Boolean type="Include details for analysis tools" id="256" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="Boolean">
+					<Boolean type="Save each layout object&apos;s binary data under its node" id="512" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="Boolean">
+					<Boolean type="Specify options as JSON" id="32768" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="JSONOutput">
+					<Calculation datatype="1" position="1">
+						<Calculation>
+							<Text><![CDATA[JSONSetElement ( "{}" ;
+  [ "catalogs_included" ; JSONMakeArray (
+  "PersistentStoreCatalog
+  BaseDirectoryCatalog
+  FileAccessCatalog
+  ExternalDataSourceCatalog
+  BaseTableCatalog
+  TableOccurrenceCatalog
+  CustomFunctionsCatalog
+  ValueListCatalog
+  FieldCatalog
+  RelationshipCatalog
+  CustomMenuCatalog
+  CustomMenuSetCatalog
+  ScriptCatalog
+  ThemeCatalog
+  LayoutCatalog
+  LibraryCatalog
+  PrivilegeSetsCatalog
+  ExtendedPrivilegesCatalog
+  AccountsCatalog
+  Metadata"
+  ; " " ; JSONString ) ; JSONArray ] ;
+  [ "include_details" ; False ; JSONBoolean ] ;
+  [ "split_catalogs" ; False ; JSONBoolean ] ;
+  [ "standalone_binarydata" ; False ; JSONBoolean ]
+)]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="EF2A4BA547635F23A63059C6FBECF081" id="141" name="Set Variable" enable="True">
+			<Options>16388</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Variable">
+					<value>
+						<Calculation datatype="1" position="1">
+							<Calculation>
+								<Text><![CDATA[Get ( LastError )]]></Text>
+							</Calculation>
+						</Calculation>
+					</value>
+					<Name value="$saveError"></Name>
+					<repetition></repetition>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="2B0F5C0DC36ECD1055622B06A7EB610C" id="68" name="If" enable="True">
+			<Options>16384</Options>
+			<ParameterValues membercount="2">
+				<Parameter type="Boolean">
+					<Boolean type="Collapsed" id="33554432" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="Calculation">
+					<Calculation datatype="7" position="0">
+						<Calculation>
+							<Text><![CDATA[$saveError ≠ 0]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="0B83D88B152C8A28D3C1B5EBD60AB3EC" id="103" name="Exit Script" enable="True">
+			<Options>16384</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Calculation">
+					<Calculation datatype="1" position="0">
+						<Calculation>
+							<Text><![CDATA[JSONSetElement ( "{}" ;	[ "success" ; False ; JSONBoolean ] ;	[ "error" ; "Save as XML failed (error " & $saveError & ")" ; JSONString ])]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="FD04421BD1257265B3B26398BAB8002B" id="70" name="End If" enable="True">
+		</Step>
+		<Step hash="954C9C0A73783A942591EE8778FA6FF4" id="89" name="# (comment)" enable="True">
+			<ParameterValues membercount="1">
+				<Parameter type="Comment">
+					<Comment></Comment>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="35D1B497FCADE8E493EC9D0858FE8881" id="141" name="Set Variable" enable="True">
+			<Options>16388</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Variable">
+					<value>
+						<Calculation datatype="1" position="1">
+							<Calculation>
+								<Text><![CDATA[JSONSetElement ( "{}" ;	[ "solution_name" ; $solutionName ; JSONString ] ;	[ "export_file_path" ; $exportPath ; JSONString ] ;	[ "repo_path" ; $repoPath ; JSONString ])]]></Text>
+							</Calculation>
+						</Calculation>
+					</value>
+					<Name value="$payload"></Name>
+					<repetition></repetition>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="87DBAD2D074501AC190BF2ADD511F49F" id="160" name="Insert from URL" enable="True">
+			<Options>20613</Options>
+			<ParameterValues membercount="6">
+				<Parameter type="Boolean">
+					<Boolean type="Verify SSL Certificates" id="268435456" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="Boolean">
+					<Boolean type="Select" id="4096" value="True"></Boolean>
+				</Parameter>
+				<Parameter type="Boolean">
+					<Boolean type="With dialog" id="128" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="Target">
+					<Variable value="$response">
+						<repetition>
+							<Calculation datatype="1" position="32">
+								<Calculation>
+									<Text><![CDATA[1]]></Text>
+								</Calculation>
+							</Calculation>
+						</repetition>
+					</Variable>
+				</Parameter>
+				<Parameter type="URL">
+					<URL autoEncode="True">
+						<Calculation datatype="1" position="0">
+							<Calculation>
+								<Text><![CDATA[$companionUrl & "/explode"]]></Text>
+							</Calculation>
+						</Calculation>
+					</URL>
+				</Parameter>
+				<Parameter type="Calculation">
+					<Calculation datatype="1" position="1">
+						<Calculation>
+							<Text><![CDATA["-X POST -H \"Content-Type: application/json\" -d " & Quote ( $payload )]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="A3D6A987E8002D19BC36A80E9137A90F" id="141" name="Set Variable" enable="True">
+			<Options>16388</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Variable">
+					<value>
+						<Calculation datatype="1" position="1">
+							<Calculation>
+								<Text><![CDATA[Get ( LastError )]]></Text>
+							</Calculation>
+						</Calculation>
+					</value>
+					<Name value="$httpError"></Name>
+					<repetition></repetition>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="F8B67D02A456E2457AEED5F945F751DA" id="68" name="If" enable="True">
+			<Options>16384</Options>
+			<ParameterValues membercount="2">
+				<Parameter type="Boolean">
+					<Boolean type="Collapsed" id="33554432" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="Calculation">
+					<Calculation datatype="7" position="0">
+						<Calculation>
+							<Text><![CDATA[$httpError ≠ 0]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="2C9996F09B763882BF7308B04CD5A098" id="103" name="Exit Script" enable="True">
+			<Options>16384</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Calculation">
+					<Calculation datatype="1" position="0">
+						<Calculation>
+							<Text><![CDATA[JSONSetElement ( "{}" ;	[ "success" ; False ; JSONBoolean ] ;	[ "error" ; "Companion server unreachable (error " & $httpError & ")" ; JSONString ])]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="191F7564C7A39E9FD2C43F305DE92B54" id="70" name="End If" enable="True">
+		</Step>
+		<Step hash="88A524101D70B1AC47E596E2D9C301C6" id="103" name="Exit Script" enable="True">
+			<Options>16384</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Calculation">
+					<Calculation datatype="1" position="0">
+						<Calculation>
+							<Text><![CDATA[$response]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="4C4821845F62DAA0628FB6FD361AB201" id="70" name="End If" enable="True">
+		</Step>
+		<Step hash="D13D5ED997B75D114DC6CE57227B63C9" id="89" name="# (comment)" enable="True">
+			<ParameterValues membercount="1">
+				<Parameter type="Comment">
+					<Comment></Comment>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="4B425563C5E23423281E82FE9A6F096B" id="89" name="# (comment)" enable="False">
+			<Options>4</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Comment">
+					<Comment value="MARK: Interactive mode"></Comment>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="861D45493E0C4023E2EE22901A103879" id="89" name="# (comment)" enable="True">
+			<Options>4</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Comment">
+					<Comment value="DEPENDENCY: The companion server must be running (agent/scripts/companion_server.py)"></Comment>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="B8EBBEE391E86BE4B2D6AA9C57BA6001" id="89" name="# (comment)" enable="True">
+			<ParameterValues membercount="1">
+				<Parameter type="Comment">
+					<Comment></Comment>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="95782B7CC130F7BB986EF1AD7C442AEE" id="1" name="Perform Script" enable="True">
+			<Options>64</Options>
+			<ParameterValues membercount="2">
+				<Parameter type="List">
+					<List name="From list" value="1">
+						<ScriptReference id="3" name="Get agentic-fm path"></ScriptReference>
+					</List>
+				</Parameter>
+				<Parameter type="Parameter">
+					<Parameter></Parameter>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="2AEA0A619232177835DC6FC4806FF48B" id="68" name="If" enable="True">
+			<Options>16384</Options>
+			<ParameterValues membercount="2">
+				<Parameter type="Boolean">
+					<Boolean type="Collapsed" id="33554432" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="Calculation">
+					<Calculation datatype="7" position="0">
+						<Calculation>
+							<Text><![CDATA[not Get ( ScriptResult )]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="316E492A3ED13C8096E2E47664F2877A" id="87" name="Show Custom Dialog" enable="True">
+			<Options>16388</Options>
+			<ParameterValues membercount="5">
+				<Parameter type="Title">
+					<Calculation datatype="1" position="0">
+						<Calculation>
+							<Text><![CDATA["Bad install"]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+				<Parameter type="Message">
+					<Calculation datatype="1" position="1">
+						<Calculation>
+							<Text><![CDATA["The agentic-fm install was not found. Please check the $$AGENTIC.FM global variable"]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+				<Parameter type="Button1" value="OK">
+					<Boolean type="Commit" value="True"></Boolean>
+				</Parameter>
+				<Parameter type="Button2">
+					<Boolean type="Commit" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="Button3">
+					<Boolean type="Commit" value="False"></Boolean>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="5B79CF878C29CAAD1035CBCE13135811" id="103" name="Exit Script" enable="True">
+		</Step>
+		<Step hash="D57D4F29F41F5E110CC0D7696424BEB6" id="70" name="End If" enable="True">
+		</Step>
+		<Step hash="031A872B26A0BC090F72D0B9CABF0ACF" id="89" name="# (comment)" enable="True">
+			<ParameterValues membercount="1">
+				<Parameter type="Comment">
+					<Comment></Comment>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="507270548AE1BF0DFDD0F7EC7BB49E53" id="141" name="Set Variable" enable="True">
+			<Options>16388</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Variable">
+					<value>
+						<Calculation datatype="1" position="1">
+							<Calculation>
+								<Text><![CDATA[Get ( DesktopPath ) & Get ( FileName ) & ".xml"]]></Text>
+							</Calculation>
+						</Calculation>
+					</value>
+					<Name value="$output"></Name>
+					<repetition>
+						<Calculation datatype="1" position="2">
+							<Calculation>
+								<Text><![CDATA[1]]></Text>
+							</Calculation>
+						</Calculation>
+					</repetition>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="AA093C0C4E2F3ADA9CD867F29EC736D1" id="3" name="Save a Copy as XML" enable="True">
+			<Options>16416</Options>
+			<ParameterValues membercount="6">
+				<Parameter type="Calculation">
+					<Calculation datatype="1" position="0">
+						<Calculation>
+							<Text><![CDATA[Get ( WindowName )]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+				<Parameter type="UniversalPathList">
+					<UniversalPathList membercount="1">
+						<ObjectList>
+							<Location><![CDATA[$output]]></Location>
+						</ObjectList>
+					</UniversalPathList>
+				</Parameter>
+				<Parameter type="Boolean">
+					<Boolean type="Include details for analysis tools" id="256" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="Boolean">
+					<Boolean type="Save each layout object&apos;s binary data under its node" id="512" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="Boolean">
+					<Boolean type="Specify options as JSON" id="32768" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="JSONOutput">
+					<Calculation datatype="1" position="1">
+						<Calculation>
+							<Text><![CDATA[JSONSetElement ( "{}" ;
+  [ "catalogs_included" ; JSONMakeArray (
+  "PersistentStoreCatalog
+  BaseDirectoryCatalog
+  FileAccessCatalog
+  ExternalDataSourceCatalog
+  BaseTableCatalog
+  TableOccurrenceCatalog
+  CustomFunctionsCatalog
+  ValueListCatalog
+  FieldCatalog
+  RelationshipCatalog
+  CustomMenuCatalog
+  CustomMenuSetCatalog
+  ScriptCatalog
+  ThemeCatalog
+  LayoutCatalog
+  LibraryCatalog
+  PrivilegeSetsCatalog
+  ExtendedPrivilegesCatalog
+  AccountsCatalog
+  Metadata"
+  ; " " ; JSONString ) ; JSONArray ] ;
+  [ "include_details" ; False ; JSONBoolean ] ;
+  [ "split_catalogs" ; False ; JSONBoolean ] ;
+  [ "standalone_binarydata" ; False ; JSONBoolean ]
+)]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="878F94C07E90AA530657BDBAF88B6D59" id="89" name="# (comment)" enable="True">
+			<ParameterValues membercount="1">
+				<Parameter type="Comment">
+					<Comment></Comment>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="492E3118430AAB46777DF874EFD8FA28" id="141" name="Set Variable" enable="True">
+			<Options>16388</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Variable">
+					<value>
+						<Calculation datatype="1" position="1">
+							<Calculation>
+								<Text><![CDATA[JSONSetElement ( "{}" ;	[ "solution_name" ; Get ( FileName ) ; JSONString ] ;	[ "export_file_path" ; ConvertFromFileMakerPath ( $output ; 1 ) ; JSONString ] ;	[ "repo_path" ; ConvertFromFileMakerPath ( JSONGetElement ( $$AGENTIC.FM ; "path" ) ; 1 ) ; JSONString ] ;	[ "exploder_bin_path" ; "~/bin/fm-xml-export-exploder" ; JSONString ])]]></Text>
+							</Calculation>
+						</Calculation>
+					</value>
+					<Name value="$payload"></Name>
+					<repetition>
+						<Calculation datatype="1" position="2">
+							<Calculation>
+								<Text><![CDATA[1]]></Text>
+							</Calculation>
+						</Calculation>
+					</repetition>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="7A39C2C5170891B73E84E5AA59644737" id="89" name="# (comment)" enable="True">
+			<ParameterValues membercount="1">
+				<Parameter type="Comment">
+					<Comment></Comment>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="CD7BB762A6EF7E90B5400CC9DD6D0A70" id="160" name="Insert from URL" enable="True">
+			<Options>20613</Options>
+			<ParameterValues membercount="6">
+				<Parameter type="Boolean">
+					<Boolean type="Verify SSL Certificates" id="268435456" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="Boolean">
+					<Boolean type="Select" id="4096" value="True"></Boolean>
+				</Parameter>
+				<Parameter type="Boolean">
+					<Boolean type="With dialog" id="128" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="Target">
+					<Variable value="$response">
+						<repetition>
+							<Calculation datatype="1" position="32">
+								<Calculation>
+									<Text><![CDATA[1]]></Text>
+								</Calculation>
+							</Calculation>
+						</repetition>
+					</Variable>
+				</Parameter>
+				<Parameter type="URL">
+					<URL autoEncode="True">
+						<Calculation datatype="1" position="0">
+							<Calculation>
+								<Text><![CDATA["http://localhost:8765/explode"]]></Text>
+							</Calculation>
+						</Calculation>
+					</URL>
+				</Parameter>
+				<Parameter type="Calculation">
+					<Calculation datatype="1" position="1">
+						<Calculation>
+							<Text><![CDATA["-X POST -H \"Content-Type: application/json\" -d " & Quote ( $payload )]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="EC3D06BDCE908AA1DE474B04A7728159" id="141" name="Set Variable" enable="True">
+			<Options>16388</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Variable">
+					<value>
+						<Calculation datatype="1" position="1">
+							<Calculation>
+								<Text><![CDATA[Get ( LastError )]]></Text>
+							</Calculation>
+						</Calculation>
+					</value>
+					<Name value="$httpError"></Name>
+					<repetition>
+						<Calculation datatype="1" position="2">
+							<Calculation>
+								<Text><![CDATA[1]]></Text>
+							</Calculation>
+						</Calculation>
+					</repetition>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="6C86168FE01B419A7DB77DB7542F78DB" id="89" name="# (comment)" enable="True">
+			<ParameterValues membercount="1">
+				<Parameter type="Comment">
+					<Comment></Comment>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="0DD04459EA07D6A0E9C14975B9D1B9B5" id="68" name="If" enable="True">
+			<Options>16384</Options>
+			<ParameterValues membercount="2">
+				<Parameter type="Boolean">
+					<Boolean type="Collapsed" id="33554432" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="Calculation">
+					<Calculation datatype="7" position="0">
+						<Calculation>
+							<Text><![CDATA[$httpError ≠ 0]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="5C0AFE9484D58E455A1A3621E384181E" id="87" name="Show Custom Dialog" enable="True">
+			<Options>16388</Options>
+			<ParameterValues membercount="5">
+				<Parameter type="Title">
+					<Calculation datatype="1" position="0">
+						<Calculation>
+							<Text><![CDATA["Companion server not running"]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+				<Parameter type="Message">
+					<Calculation datatype="1" position="1">
+						<Calculation>
+							<Text><![CDATA["Start the companion server first:¶¶python3 agent/scripts/companion_server.py¶¶Then run Explode XML again."]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+				<Parameter type="Button1" value="OK">
+					<Boolean type="Commit" value="True"></Boolean>
+				</Parameter>
+				<Parameter type="Button2">
+					<Boolean type="Commit" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="Button3">
+					<Boolean type="Commit" value="False"></Boolean>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="FAE16A5C6BD5E69F77098B199F1BB9D2" id="103" name="Exit Script" enable="True">
+		</Step>
+		<Step hash="D5C2E4C4AD6F65B4896E00B08FD364EA" id="70" name="End If" enable="True">
+		</Step>
+		<Step hash="26E792878A6ABA7A0EF5C3A95EC97703" id="89" name="# (comment)" enable="True">
+			<ParameterValues membercount="1">
+				<Parameter type="Comment">
+					<Comment></Comment>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="00AB9C0F84736C478586D5DEB451088F" id="141" name="Set Variable" enable="True">
+			<Options>16388</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Variable">
+					<value>
+						<Calculation datatype="1" position="1">
+							<Calculation>
+								<Text><![CDATA[JSONGetElement ( $response ; "success" )]]></Text>
+							</Calculation>
+						</Calculation>
+					</value>
+					<Name value="$success"></Name>
+					<repetition>
+						<Calculation datatype="1" position="2">
+							<Calculation>
+								<Text><![CDATA[1]]></Text>
+							</Calculation>
+						</Calculation>
+					</repetition>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="BAF363152DCD15C3D0F4EC00B6AF171E" id="141" name="Set Variable" enable="True">
+			<Options>16388</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Variable">
+					<value>
+						<Calculation datatype="1" position="1">
+							<Calculation>
+								<Text><![CDATA[JSONGetElement ( $response ; "stdout" )]]></Text>
+							</Calculation>
+						</Calculation>
+					</value>
+					<Name value="$stdout"></Name>
+					<repetition>
+						<Calculation datatype="1" position="2">
+							<Calculation>
+								<Text><![CDATA[1]]></Text>
+							</Calculation>
+						</Calculation>
+					</repetition>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="FE6CBF3D36670DDF9DD6C605FE31EF6F" id="141" name="Set Variable" enable="True">
+			<Options>16388</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Variable">
+					<value>
+						<Calculation datatype="1" position="1">
+							<Calculation>
+								<Text><![CDATA[JSONGetElement ( $response ; "stderr" )]]></Text>
+							</Calculation>
+						</Calculation>
+					</value>
+					<Name value="$stderr"></Name>
+					<repetition>
+						<Calculation datatype="1" position="2">
+							<Calculation>
+								<Text><![CDATA[1]]></Text>
+							</Calculation>
+						</Calculation>
+					</repetition>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="C522C975AE5E03449DE6753A495C316C" id="141" name="Set Variable" enable="True">
+			<Options>16388</Options>
+			<ParameterValues membercount="1">
+				<Parameter type="Variable">
+					<value>
+						<Calculation datatype="1" position="1">
+							<Calculation>
+								<Text><![CDATA[JSONGetElement ( $response ; "exit_code" )]]></Text>
+							</Calculation>
+						</Calculation>
+					</value>
+					<Name value="$exitCode"></Name>
+					<repetition>
+						<Calculation datatype="1" position="2">
+							<Calculation>
+								<Text><![CDATA[1]]></Text>
+							</Calculation>
+						</Calculation>
+					</repetition>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="991944E472A407682500D25B1D555A73" id="89" name="# (comment)" enable="True">
+			<ParameterValues membercount="1">
+				<Parameter type="Comment">
+					<Comment></Comment>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="6E7B670C06826B96EACF7272E503E6EE" id="68" name="If" enable="True">
+			<Options>16384</Options>
+			<ParameterValues membercount="2">
+				<Parameter type="Boolean">
+					<Boolean type="Collapsed" id="33554432" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="Calculation">
+					<Calculation datatype="7" position="0">
+						<Calculation>
+							<Text><![CDATA[not $success or $exitCode ≠ 0]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="39105DA4CD8A54ED1BE3147E3FAF2124" id="87" name="Show Custom Dialog" enable="True">
+			<Options>16388</Options>
+			<ParameterValues membercount="5">
+				<Parameter type="Title">
+					<Calculation datatype="1" position="0">
+						<Calculation>
+							<Text><![CDATA["Error"]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+				<Parameter type="Message">
+					<Calculation datatype="1" position="1">
+						<Calculation>
+							<Text><![CDATA[$stderr & If ( not IsEmpty ( $stdout ) ; ¶ & $stdout ; "" )]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+				<Parameter type="Button1" value="OK">
+					<Boolean type="Commit" value="True"></Boolean>
+				</Parameter>
+				<Parameter type="Button2">
+					<Boolean type="Commit" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="Button3">
+					<Boolean type="Commit" value="False"></Boolean>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="13437E79543F21B8DE44B1A0508F10C9" id="69" name="Else" enable="True">
+			<ParameterValues membercount="2">
+				<Parameter type="Boolean">
+					<Boolean type="Collapsed" id="33554432" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="Boolean">
+					<Boolean type="Collapsed" id="33554432" value="False"></Boolean>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="1299EC0C89527665EFC38B7C7142D706" id="87" name="Show Custom Dialog" enable="True">
+			<Options>16388</Options>
+			<ParameterValues membercount="5">
+				<Parameter type="Title">
+					<Calculation datatype="1" position="0">
+						<Calculation>
+							<Text><![CDATA["Finished"]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+				<Parameter type="Message">
+					<Calculation datatype="1" position="1">
+						<Calculation>
+							<Text><![CDATA["The XML has been placed into agentic-fm's xml_parsed folder." & If ( not IsEmpty ( $stdout ) ; "¶¶" & $stdout ; "" )]]></Text>
+						</Calculation>
+					</Calculation>
+				</Parameter>
+				<Parameter type="Button1" value="OK">
+					<Boolean type="Commit" value="True"></Boolean>
+				</Parameter>
+				<Parameter type="Button2">
+					<Boolean type="Commit" value="False"></Boolean>
+				</Parameter>
+				<Parameter type="Button3">
+					<Boolean type="Commit" value="False"></Boolean>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="98410B2F9666D1BF0204519BF8895BEE" id="70" name="End If" enable="True">
+		</Step>
+		<Step hash="D9BC951B3A75AFF4D08A66529DD229A4" id="89" name="# (comment)" enable="True">
+			<ParameterValues membercount="1">
+				<Parameter type="Comment">
+					<Comment></Comment>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+		<Step hash="01529F696ECA60ED5A80A2FC5774C19D" id="103" name="Exit Script" enable="True">
+		</Step>
+		<Step hash="B74D4D3A45640210E568C9931EF35B1E" id="89" name="# (comment)" enable="True">
+			<ParameterValues membercount="1">
+				<Parameter type="Comment">
+					<Comment></Comment>
+				</Parameter>
+			</ParameterValues>
+		</Step>
+	</ObjectList>
+</Script>

@@ -1,0 +1,2 @@
+# LeftTO|LeftTOID|RightTO|RightTOID|JoinType|JoinFields|CascadeCreate|CascadeDelete
+EverythingBagel__EVERYTHINGBAGEL__selfJoin|1065090|EverythingBagel|1065089|Equal|textField=textField|False|False

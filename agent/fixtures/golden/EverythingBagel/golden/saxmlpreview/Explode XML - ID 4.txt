@@ -1,0 +1,64 @@
+Script: Explode XML
+
+1	# PURPOSE: Push out solution XML to be parsed for AI use.
+2	// Insert Text [ Target: $README ; “INTERACTIVE MODE (FM Pro): Run with no parameter. Saves XML to desktop, POSTs to localhost:8765/explode. Requires companion server running and $$AGENTIC.FM configured. SERVER MODE (OData via AGFMScriptBridge): Pass JSON parameter with keys: repo_path — absolute POSIX path to the agentic-fm project root on the companion server host export_path — absolute POSIX path where FMS will write the XML export (must be host-accessible) companion_url — base URL of the companion server (e.g. http://host.docker.internal:8765) solution_name — (optional) override solution name; defaults to Get(FileName) NOTE: export_path must be a path FMS can write to AND the companion server host can read. On a Linux FMS container with a host-mounted Data dir, use that mount path. The FM path is constructed as \"filelinux:\" & export_path — adjust prefix for other OS. RETURNS (server mode): companion server response JSON { success, exit_code, stdout, stderr }” ]
+3	
+4	// # MARK: Server mode
+5	Set Variable [ $input ; Value: Get ( ScriptParameter ) ]
+6	If [ JSONGetElementType ( $input ; "repo_path" ) = JSONString ]
+7	    Set Variable [ $repoPath ; Value: JSONGetElement ( $input ; "repo_path" ) ]
+8	    Set Variable [ $exportPath ; Value: JSONGetElement ( $input ; "export_path" ) ]
+9	    Set Variable [ $companionUrl ; Value: JSONGetElement ( $input ; "companion_url" ) ]
+10	    Set Variable [ $solutionName ; Value: Let ( ~override = JSONGetElement ( $input ; "solution_name" ) ; If ( IsEmpty ( ~override ) ; Get ( FileName ) ; ~override ) ) ]
+11	    # Build FM path: filelinux: prefix for FMS on Linux. Adjust for other OS.
+12	    Set Variable [ $xmlFmPath ; Value: "filelinux:" & $exportPath ]
+13	    Save a Copy as XML [ Window name: Get ( WindowName ) ; Destination file: “$xmlFmPath” ; Specify options as JSON: JSONSetElement ( "{}" ; [ "catalogs_included" ; JSONMakeArray ( "PersistentStoreCatalog BaseDirectoryCatalog FileAccessCatalog ExternalDataSourceCatalog BaseTableCatalog TableOccurrenceCatalog CustomFunctionsCatalog ValueListCatalog FieldCatalog RelationshipCatalog CustomMenuCatalog CustomMenuSetCatalog ScriptCatalog ThemeCatalog LayoutCatalog LibraryCatalog PrivilegeSetsCatalog ExtendedPrivilegesCatalog AccountsCatalog Metadata" ; " " ; JSONString ) ; JSONArray ] ; [ "include_details" ; False ; JSONBoolean ] ; [ "split_catalogs" ; False ; JSONBoolean ] ; [ "standalone_binarydata" ; False ; JSONBoolean ] ) ]
+14	    Set Variable [ $saveError ; Value: Get ( LastError ) ]
+15	    If [ $saveError ≠ 0 ]
+16	        Exit Script [ Text Result: JSONSetElement ( "{}" ; [ "success" ; False ; JSONBoolean ] ; [ "error" ; "Save as XML failed (error " & $saveError & ")" ; JSONString ] ) ]
+17	    End If
+18	    
+19	    Set Variable [ $payload ; Value: JSONSetElement ( "{}" ; [ "solution_name" ; $solutionName ; JSONString ] ; [ "export_file_path" ; $exportPath ; JSONString ] ; [ "repo_path" ; $repoPath ; JSONString ] ) ]
+20	    Insert from URL [ Select ; With dialog: Off ; Target: $response ; $companionUrl & "/explode" ; cURL options: "-X POST -H \"Content-Type: application/json\" -d " & Quote ( $payload ) ]
+21	    Set Variable [ $httpError ; Value: Get ( LastError ) ]
+22	    If [ $httpError ≠ 0 ]
+23	        Exit Script [ Text Result: JSONSetElement ( "{}" ; [ "success" ; False ; JSONBoolean ] ; [ "error" ; "Companion server unreachable (error " & $httpError & ")" ; JSONString ] ) ]
+24	    End If
+25	    Exit Script [ Text Result: $response ]
+26	End If
+27	
+28	// # MARK: Interactive mode
+29	# DEPENDENCY: The companion server must be running (agent/scripts/companion_server.py)
+30	
+31	Perform Script [ "Get agentic-fm path" ]
+32	If [ not Get ( ScriptResult ) ]
+33	    Show Custom Dialog [ "Bad install" ; "The agentic-fm install was not found. Please check the $$AGENTIC.FM global variable" ; Buttons: commit=True, label="OK" | commit=False | commit=False ]
+34	    Exit Script [ Text Result:    ]
+35	End If
+36	
+37	Set Variable [ $output ; Value: Get ( DesktopPath ) & Get ( FileName ) & ".xml" ]
+38	Save a Copy as XML [ Window name: Get ( WindowName ) ; Destination file: “$output” ; Specify options as JSON: JSONSetElement ( "{}" ; [ "catalogs_included" ; JSONMakeArray ( "PersistentStoreCatalog BaseDirectoryCatalog FileAccessCatalog ExternalDataSourceCatalog BaseTableCatalog TableOccurrenceCatalog CustomFunctionsCatalog ValueListCatalog FieldCatalog RelationshipCatalog CustomMenuCatalog CustomMenuSetCatalog ScriptCatalog ThemeCatalog LayoutCatalog LibraryCatalog PrivilegeSetsCatalog ExtendedPrivilegesCatalog AccountsCatalog Metadata" ; " " ; JSONString ) ; JSONArray ] ; [ "include_details" ; False ; JSONBoolean ] ; [ "split_catalogs" ; False ; JSONBoolean ] ; [ "standalone_binarydata" ; False ; JSONBoolean ] ) ]
+39	
+40	Set Variable [ $payload ; Value: JSONSetElement ( "{}" ; [ "solution_name" ; Get ( FileName ) ; JSONString ] ; [ "export_file_path" ; ConvertFromFileMakerPath ( $output ; 1 ) ; JSONString ] ; [ "repo_path" ; ConvertFromFileMakerPath ( JSONGetElement ( $$AGENTIC.FM ; "path" ) ; 1 ) ; JSONString ] ; [ "exploder_bin_path" ; "~/bin/fm-xml-export-exploder" ; JSONString ] ) ]
+41	
+42	Insert from URL [ Select ; With dialog: Off ; Target: $response ; "http://localhost:8765/explode" ; cURL options: "-X POST -H \"Content-Type: application/json\" -d " & Quote ( $payload ) ]
+43	Set Variable [ $httpError ; Value: Get ( LastError ) ]
+44	
+45	If [ $httpError ≠ 0 ]
+46	    Show Custom Dialog [ "Companion server not running" ; "Start the companion server first:¶¶python3 agent/scripts/companion_server.py¶¶Then run Explode XML again." ; Buttons: commit=True, label="OK" | commit=False | commit=False ]
+47	    Exit Script [ Text Result:    ]
+48	End If
+49	
+50	Set Variable [ $success ; Value: JSONGetElement ( $response ; "success" ) ]
+51	Set Variable [ $stdout ; Value: JSONGetElement ( $response ; "stdout" ) ]
+52	Set Variable [ $stderr ; Value: JSONGetElement ( $response ; "stderr" ) ]
+53	Set Variable [ $exitCode ; Value: JSONGetElement ( $response ; "exit_code" ) ]
+54	
+55	If [ not $success or $exitCode ≠ 0 ]
+56	    Show Custom Dialog [ "Error" ; $stderr & If ( not IsEmpty ( $stdout ) ; ¶ & $stdout ; "" ) ; Buttons: commit=True, label="OK" | commit=False | commit=False ]
+57	Else
+58	    Show Custom Dialog [ "Finished" ; "The XML has been placed into agentic-fm's xml_parsed folder." & If ( not IsEmpty ( $stdout ) ; "¶¶" & $stdout ; "" ) ; Buttons: commit=True, label="OK" | commit=False | commit=False ]
+59	End If
+60	
+61	Exit Script [ Text Result:    ]
+62	

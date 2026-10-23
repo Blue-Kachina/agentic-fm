@@ -1,0 +1,7 @@
+<CustomMenuSet name="Custom Menu Set" id="2" comment="Custom Menu Set Comments">
+	<UUID modifications="1" userName="Admin" accountName="Admin" timestamp="2026-10-21T13:51:57">4629F04A-F682-3448-A37F-2D33ED047415</UUID>
+	<CustomMenuList membercount="2">
+		<CustomMenuReference name="[Format]" id="1"></CustomMenuReference>
+		<CustomMenuReference name="Custom Custom Menu" id="25"></CustomMenuReference>
+	</CustomMenuList>
+</CustomMenuSet>

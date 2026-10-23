@@ -1,0 +1,4 @@
+# TOName|TOID|BaseTableName|BaseTableID|Type|DataSource
+Empty|1065091|||External|Empty
+EverythingBagel|1065089|EverythingBagel|129|Local|
+EverythingBagel__EVERYTHINGBAGEL__selfJoin|1065090|EverythingBagel|129|Local|
