@@ -12,14 +12,49 @@ Usage:
     Start on custom port:
         python agent/scripts/companion_server.py --port 9000
 
-    FileMaker calls it via Insert from URL:
-        POST http://localhost:8765/explode
+    FileMaker calls it via Insert from URL, e.g. to convert a Save a Copy as XML
+    export with fm-saxml:
+        POST http://localhost:8765/convert
+        GET  http://localhost:8765/convert/<job id>
+
+POST /convert  (body: JSON object)
+    solution_name  required  Solution name; the docs go to <docs root>/<solution_name>.
+                             For a multi-file export, one name for the whole batch.
+    export_path    required  The export folder FileMaker wrote (or one .xml file).
+    docs_root      optional  Folder holding every converted solution; defaults to
+                             $FM_SAXML_DOCS_ROOT in the companion's environment.
+  202 → {"success": true, "job_id": "3f9c0a1b2c4d", "state": "queued",
+         "status_url": "/convert/3f9c0a1b2c4d"}
+  400 → {"success": false, "error": "..."}            (bad body, path, or no docs root)
+  409 → {"success": false, "error": "...", "job_id": "..."}  (that solution is converting)
+
+GET /convert/<job id>
+  200 → {"success": true, "job_id", "state": "queued|running|succeeded|failed",
+         "done": false|true, "solution_name", "export_path", "docs_root", "output_path",
+         "created_at", "started_at", "finished_at", "exit_code", "error",
+         and once succeeded: "kind": "single|batch",
+         "counts": {"files", "tables", "fields", "table_occurrences", "relationships",
+                    "layouts", "scripts", "custom_functions", "value_lists"},
+         "files": [{"name", "counts": {...}, "warning_count"}],
+         "warning_count", "warnings": [{"file", "code", "entity", "message"}],
+         and once failed: "log_tail" (the end of fm-saxml's output)}
+  404 → {"success": false, "error": "No such job: ..."}
+  Poll until "done" is true, then check "state".
+
+POST /explode is a deprecated alias of POST /convert for one release: it takes
+the old body (export_file_path for export_path) and adds "deprecated": true.
+
+fm-saxml runs as `sys.executable -m fm_saxml build`, so start the companion with
+the Python that has fm-saxml-converter installed (the DIS harness .venv). The
+launchers in agent/scripts/launchers/ find it: start_companion.cmd / .ps1 on
+Windows, start_companion.sh on macOS.
 """
 
 import argparse
 import json
 import logging
 import os
+import platform
 import re
 import signal
 import subprocess
@@ -28,6 +63,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import uuid
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
@@ -81,6 +117,32 @@ def _wsl_translate_path(path: str) -> str:
         drive = m.group(1).lower()
         rest = m.group(2)
         return f"/mnt/{drive}{rest}"
+    return path
+
+
+def _is_wsl() -> bool:
+    """True when the companion runs inside WSL (a Linux kernel built by Microsoft)."""
+    if not sys.platform.startswith("linux"):
+        return False
+    if os.environ.get("WSL_DISTRO_NAME"):
+        return True
+    return "microsoft" in platform.uname().release.lower()
+
+
+def _is_native_windows() -> bool:
+    """True when the companion runs on Windows itself (not WSL)."""
+    return sys.platform == "win32"
+
+
+def _translate_incoming_path(path: str) -> str:
+    """Map a path FileMaker sent to one this process can open.
+
+    Only WSL needs a translation (/C:/... → /mnt/c/...). On native Windows and
+    macOS the path FileMaker sends is used unchanged — drive paths
+    (C:\\Users\\...) and UNC paths (\\\\server\\share\\...) included.
+    """
+    if _is_wsl():
+        return _wsl_translate_path(path)
     return path
 
 
@@ -141,6 +203,34 @@ def _resolve_export_path_for_wsl(solution_name: str) -> str:
         log.warning("WSL2 export path auto-detection failed: %s", exc)
 
     return ""
+
+
+def _incoming_export_path(path: str, solution_name: str) -> str:
+    """The export path FileMaker sent, made usable here; "" when it is an unresolvable '?'.
+
+    '?' means FileMaker's ConvertFromFileMakerPath failed. Under WSL the Desktop
+    path is rebuilt (PowerShell + wslpath, or export_dir_override); anywhere else
+    there is nothing to rebuild it from, so it is reported as unresolved.
+    """
+    path = os.path.expanduser(path)
+    if path == "?":
+        return _resolve_export_path_for_wsl(solution_name) if _is_wsl() else ""
+    return _translate_incoming_path(path)
+
+
+def _unresolved_export_path_error(field: str) -> str:
+    if _is_wsl():
+        return (
+            f"{field} is '?' — FileMaker could not convert the Desktop path to POSIX "
+            "and WSL2 auto-detection failed. "
+            "Add 'export_dir_override' to agent/config/automation.json with the WSL2 path "
+            "to your Windows Desktop (e.g. \"/mnt/c/Users/<you>/Desktop\"). "
+            "See agent/docs/SANDBOXED_ENVIRONMENT.md for details."
+        )
+    return (
+        f"{field} is '?' — FileMaker could not convert the export path. "
+        "Send the full path of the export file or folder."
+    )
 
 # ---------------------------------------------------------------------------
 # Webviewer process state (module-level, shared across request threads)
@@ -359,8 +449,10 @@ def _run_command_streaming(cmd, *, cwd, env, label):
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        stdin=subprocess.DEVNULL,
         text=True,
         encoding="utf-8",
+        errors="replace",
         bufsize=1,
     )
 
@@ -413,6 +505,227 @@ def _run_command_streaming(cmd, *, cwd, env, label):
 
 
 # ---------------------------------------------------------------------------
+# fm-saxml conversion jobs (POST /convert, GET /convert/<job id>)
+# ---------------------------------------------------------------------------
+#
+# A conversion runs fm-saxml in a subprocess on a worker thread, so the POST
+# returns a job ID at once and FileMaker's Insert from URL never waits on it.
+# fm-saxml runs under sys.executable: the companion is started with the DIS
+# harness .venv's Python, which is where fm-saxml-converter is installed (see
+# the launchers in agent/scripts/launchers/).
+
+DOCS_ROOT_ENV = "FM_SAXML_DOCS_ROOT"
+CONVERT_MAX_JOBS = 50           # finished jobs kept for polling; the oldest are dropped
+CONVERT_MAX_WARNINGS = 200      # warnings listed per job; warning_count is always the full count
+CONVERT_LOG_TAIL_CHARS = 4000
+
+# Counted per FileMaker file, from its entities.json: response key → entities.json collection.
+CONVERT_COUNT_KEYS = {
+    "tables": "tables",
+    "fields": "fields",
+    "table_occurrences": "tableOccurrences",
+    "relationships": "relationships",
+    "layouts": "layouts",
+    "scripts": "scripts",
+    "custom_functions": "customFunctions",
+    "value_lists": "valueLists",
+}
+
+_convert_jobs: dict = {}        # job id → job dict; insertion-ordered
+_convert_lock = threading.Lock()
+_convert_slot = threading.Semaphore(1)   # one conversion at a time; the rest stay "queued"
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+_WARNING_TOTAL_RE = re.compile(r"_(\d+) warning\(s\) total_")
+_WARNING_ROW_RE = re.compile(r"^\| `(?P<code>[^`]*)` \| (?P<entity>.*?) \| (?P<message>.*) \| (?P<detail>.*?) \|\s*$")
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _convert_command(export_path: str, docs_root: str, solution_name: str) -> list:
+    """The fm-saxml command for one conversion (tests replace this)."""
+    return [
+        sys.executable, "-m", "fm_saxml", "build", export_path,
+        "--docs-root", docs_root, "--solution", solution_name,
+        "--force", "--yes",
+    ]
+
+
+def _convert_env() -> dict:
+    env = os.environ.copy()
+    env.update({"PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8", "NO_COLOR": "1", "TERM": "dumb",
+                "COLUMNS": "120"})
+    return env
+
+
+def _find_output_folder(docs_root: str, solution_name: str) -> str:
+    """The folder fm-saxml wrote for solution_name: <docs root>/<slug>, found by docs.json."""
+    direct = os.path.join(docs_root, solution_name)
+    if os.path.isfile(os.path.join(direct, "docs.json")):
+        return direct
+    try:
+        names = sorted(os.listdir(docs_root))
+    except OSError:
+        return ""
+    for name in names:
+        catalog = os.path.join(docs_root, name, "docs.json")
+        try:
+            with open(catalog, "r", encoding="utf-8") as f:
+                solution = json.load(f).get("solution", "")
+        except (OSError, ValueError, AttributeError):
+            continue
+        if isinstance(solution, str) and solution.casefold() == solution_name.casefold():
+            return os.path.join(docs_root, name)
+    return ""
+
+
+def _read_warnings(report_path: str) -> tuple:
+    """(count, [{code, entity, message}]) from a file's Reports/warnings.md.
+
+    fm-saxml writes warnings only to this report (not to JSON); messages there are
+    cut at 80 characters.
+    """
+    try:
+        with open(report_path, "r", encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return 0, []
+    rows = []
+    for line in text.splitlines():
+        m = _WARNING_ROW_RE.match(line)
+        if m:
+            entity = m.group("entity").strip()
+            rows.append({
+                "code": m.group("code"),
+                "entity": "" if entity == "_" else entity,
+                "message": m.group("message").strip(),
+            })
+    m = _WARNING_TOTAL_RE.search(text)
+    return (int(m.group(1)) if m else len(rows)), rows
+
+
+def _summarize_output(output_path: str) -> dict:
+    """Counts and warnings for a finished conversion, read from fm-saxml's output files."""
+    with open(os.path.join(output_path, "docs.json"), "r", encoding="utf-8") as f:
+        catalog = json.load(f)
+    totals = {key: 0 for key in CONVERT_COUNT_KEYS}
+    files, warnings, warning_count = [], [], 0
+    for entry in catalog.get("files", []):
+        name = entry.get("name", "")
+        folder = os.path.join(output_path, entry.get("folder") or "")
+        counts = {key: 0 for key in CONVERT_COUNT_KEYS}
+        try:
+            with open(os.path.join(folder, "entities.json"), "r", encoding="utf-8") as f:
+                entities = json.load(f)
+            for key, collection in CONVERT_COUNT_KEYS.items():
+                counts[key] = len(entities.get(collection) or {})
+        except (OSError, ValueError) as exc:
+            log.warning("convert: could not count %s's entities: %s", name, exc)
+        file_warning_count, file_warnings = _read_warnings(os.path.join(folder, "Reports", "warnings.md"))
+        for key in totals:
+            totals[key] += counts[key]
+        warning_count += file_warning_count
+        warnings.extend({"file": name, **w} for w in file_warnings)
+        files.append({"name": name, "counts": counts, "warning_count": file_warning_count})
+    totals["files"] = len(files)
+    return {
+        "kind": catalog.get("kind", ""),
+        "counts": totals,
+        "files": files,
+        "warning_count": warning_count,
+        "warnings": warnings[:CONVERT_MAX_WARNINGS],
+    }
+
+
+def _log_tail(text: str) -> str:
+    text = _ANSI_RE.sub("", text or "")
+    return text[-CONVERT_LOG_TAIL_CHARS:]
+
+
+def _update_job(job_id: str, **fields) -> None:
+    with _convert_lock:
+        job = _convert_jobs.get(job_id)
+        if job is not None:
+            job.update(fields)
+
+
+def _run_convert_job(job_id: str) -> None:
+    """Worker thread: run one conversion and record its outcome. Never raises."""
+    with _convert_lock:
+        job = dict(_convert_jobs[job_id])
+    try:
+        with _convert_slot:
+            _update_job(job_id, state="running", started_at=_utc_now())
+            cmd = _convert_command(job["export_path"], job["docs_root"], job["solution_name"])
+            log.info("convert %s: %s", job_id, " ".join(cmd))
+            result = _run_command_streaming(cmd, cwd=None, env=_convert_env(), label=f"fm-saxml {job_id}")
+        output = result["stdout"] + result["stderr"]
+        if result["returncode"] != 0:
+            _update_job(job_id, state="failed", done=True, finished_at=_utc_now(),
+                        exit_code=result["returncode"],
+                        error=f"fm-saxml exited with code {result['returncode']}",
+                        log_tail=_log_tail(output))
+            log.warning("convert %s failed: exit code %d", job_id, result["returncode"])
+            return
+        output_path = _find_output_folder(job["docs_root"], job["solution_name"])
+        if not output_path:
+            _update_job(job_id, state="failed", done=True, finished_at=_utc_now(), exit_code=0,
+                        error=f"fm-saxml finished but no docs.json for {job['solution_name']!r} "
+                              f"under {job['docs_root']}",
+                        log_tail=_log_tail(output))
+            log.warning("convert %s: no output folder found", job_id)
+            return
+        summary = _summarize_output(output_path)
+        _update_job(job_id, state="succeeded", done=True, finished_at=_utc_now(), exit_code=0,
+                    output_path=output_path, **summary)
+        log.info("convert %s succeeded: %s (%d file(s), %d warning(s))",
+                 job_id, output_path, summary["counts"]["files"], summary["warning_count"])
+    except Exception as exc:    # a crash in the runner must not take the server down
+        log.exception("convert %s crashed: %s", job_id, exc)
+        _update_job(job_id, state="failed", done=True, finished_at=_utc_now(),
+                    error=f"Conversion crashed: {exc}")
+
+
+def _start_convert_job(solution_name: str, export_path: str, docs_root: str) -> tuple:
+    """Queue a conversion. Returns (job, None), or (None, running job) for a solution already converting."""
+    with _convert_lock:
+        for other in _convert_jobs.values():
+            if other["solution_name"].casefold() == solution_name.casefold() and not other["done"]:
+                return None, dict(other)
+        job_id = uuid.uuid4().hex[:12]
+        job = {
+            "job_id": job_id,
+            "state": "queued",
+            "done": False,
+            "solution_name": solution_name,
+            "export_path": export_path,
+            "docs_root": docs_root,
+            "output_path": "",
+            "created_at": _utc_now(),
+            "started_at": "",
+            "finished_at": "",
+            "exit_code": None,
+            "error": "",
+        }
+        _convert_jobs[job_id] = job
+        finished = [jid for jid, j in _convert_jobs.items() if j["done"]]
+        for jid in finished[: max(0, len(finished) - CONVERT_MAX_JOBS)]:
+            del _convert_jobs[jid]
+        snapshot = dict(job)
+    threading.Thread(target=_run_convert_job, args=(job_id,), daemon=True,
+                     name=f"convert-{job_id}").start()
+    return snapshot, None
+
+
+def _get_convert_job(job_id: str):
+    with _convert_lock:
+        job = _convert_jobs.get(job_id)
+        return json.loads(json.dumps(job)) if job is not None else None
+
+
+# ---------------------------------------------------------------------------
 # Idle activity tracking
 # ---------------------------------------------------------------------------
 
@@ -431,13 +744,27 @@ def _seconds_since_activity() -> float:
         return time.monotonic() - _last_activity
 
 
+def _convert_job_active() -> bool:
+    with _convert_lock:
+        return any(not job["done"] for job in _convert_jobs.values())
+
+
+def _idle_shutdown_due(idle_timeout: int) -> bool:
+    """True once idle_timeout seconds have passed with no requests and no conversion queued or running.
+
+    A conversion counts as activity: nobody may be polling it (FileMaker's loop
+    can be cancelled), and shutting down would kill fm-saxml partway through.
+    """
+    return _seconds_since_activity() >= idle_timeout and not _convert_job_active()
+
+
 def _idle_watchdog(server, idle_timeout: int) -> None:
     """Shut the server down after idle_timeout seconds with no requests."""
     check_interval = min(30, idle_timeout)
     while True:
         time.sleep(check_interval)
         idle = _seconds_since_activity()
-        if idle >= idle_timeout:
+        if _idle_shutdown_due(idle_timeout):
             log.info("Idle for %.0fs (timeout %ds) — shutting down.", idle, idle_timeout)
             server.shutdown()  # unblocks serve_forever() in the main thread
             return
@@ -481,6 +808,8 @@ class CompanionHandler(BaseHTTPRequestHandler):
             self._handle_webviewer_status()
         elif self.path == "/clipboard":
             self._handle_clipboard_read()
+        elif self.path.startswith("/convert/"):
+            self._handle_convert_get(self.path[len("/convert/"):].split("?", 1)[0])
         elif self.path.startswith("/preview/"):
             layout_name = self.path[len("/preview/"):]
             self._handle_preview_get(layout_name)
@@ -491,8 +820,10 @@ class CompanionHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         _touch_activity()
-        if self.path == "/explode":
-            self._handle_explode()
+        if self.path == "/convert":
+            self._handle_convert()
+        elif self.path == "/explode":
+            self._handle_explode_alias()
         elif self.path == "/context":
             self._handle_context()
         elif self.path == "/debug":
@@ -578,7 +909,94 @@ class CompanionHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(raw)
 
-    def _handle_explode(self):
+    def _handle_convert(self, payload: "dict | None" = None, extra: "dict | None" = None):
+        """POST /convert — queue an fm-saxml conversion and return its job ID at once."""
+        if payload is None:
+            try:
+                payload = json.loads(self._read_body() or b"{}")
+            except (ValueError, OSError) as exc:
+                self._send_json({"success": False, "error": f"Invalid request: {exc}"}, status=400)
+                return
+        extra = extra or {}
+        if not isinstance(payload, dict):
+            self._send_json({"success": False, "error": "Request body must be a JSON object", **extra},
+                            status=400)
+            return
+
+        missing = [f for f in ("solution_name", "export_path") if not payload.get(f)]
+        if missing:
+            self._send_json(
+                {"success": False, "error": f"Missing required fields: {', '.join(missing)}", **extra},
+                status=400,
+            )
+            return
+
+        solution_name = str(payload["solution_name"]).strip()
+        export_path = _incoming_export_path(str(payload["export_path"]), solution_name)
+        if not export_path:
+            self._send_json({"success": False, "error": _unresolved_export_path_error("export_path"), **extra},
+                            status=400)
+            return
+        if not os.path.exists(export_path):
+            self._send_json({"success": False, "error": f"export_path not found: {export_path}", **extra},
+                            status=400)
+            return
+
+        docs_root = payload.get("docs_root") or os.environ.get(DOCS_ROOT_ENV, "")
+        if not docs_root:
+            self._send_json(
+                {"success": False,
+                 "error": f"No docs root: send docs_root, or set {DOCS_ROOT_ENV} where the companion runs.",
+                 **extra},
+                status=400,
+            )
+            return
+        docs_root = _translate_incoming_path(os.path.expanduser(str(docs_root)))
+
+        job, running = _start_convert_job(solution_name, export_path, docs_root)
+        if job is None:
+            self._send_json(
+                {"success": False,
+                 "error": f"{solution_name!r} is already converting (job {running['job_id']})",
+                 "job_id": running["job_id"], "state": running["state"],
+                 "status_url": f"/convert/{running['job_id']}", **extra},
+                status=409,
+            )
+            return
+        log.info("convert %s queued: solution=%r export=%r docs_root=%r",
+                 job["job_id"], solution_name, export_path, docs_root)
+        self._send_json(
+            {"success": True, "job_id": job["job_id"], "state": job["state"],
+             "status_url": f"/convert/{job['job_id']}", **extra},
+            status=202,
+        )
+
+    def _handle_convert_get(self, job_id: str):
+        """GET /convert/<job id> — a conversion's state, then its counts and warnings."""
+        job = _get_convert_job(job_id)
+        if job is None:
+            self._send_json({"success": False, "error": f"No such job: {job_id}"}, status=404)
+            return
+        self._send_json({"success": True, **job})
+
+    def _handle_explode_alias(self):
+        """POST /explode — deprecated alias for POST /convert (kept for one release)."""
+        notice = "POST /explode is deprecated: use POST /convert, which runs fm-saxml as a background job."
+        log.warning("%s (request from %s)", notice, self.address_string())
+        extra = {"deprecated": True, "deprecation": notice}
+        try:
+            payload = json.loads(self._read_body() or b"{}")
+        except (ValueError, OSError) as exc:
+            self._send_json({"success": False, "error": f"Invalid request: {exc}", **extra}, status=400)
+            return
+        if isinstance(payload, dict) and not payload.get("export_path"):
+            payload["export_path"] = payload.get("export_file_path", "")
+        self._handle_convert(payload, extra)
+
+    # The fmparse.sh / fm-xml-export-exploder runner that POST /explode used to call.
+    # No route reaches it any more (/explode is an alias of /convert); it is removed,
+    # together with fmparse.sh, by roadmap unit P3-09.
+    def _handle_explode_legacy(self):
         # Read and parse request body
         try:
             body = self._read_body()
@@ -615,11 +1033,12 @@ class CompanionHandler(BaseHTTPRequestHandler):
         repo_path = os.path.expanduser(repo_path)
         export_file_path = os.path.expanduser(export_file_path)
 
-        # Translate Windows-POSIX paths (/C:/...) to WSL2 mount points (/mnt/c/...).
-        # FileMaker on Windows uses ConvertFromFileMakerPath(...; 1) which produces
-        # paths like /C:/Users/... that are invalid in WSL2.
-        export_file_path = _wsl_translate_path(export_file_path)
-        repo_path = _wsl_translate_path(repo_path)
+        # Under WSL2, translate Windows-POSIX paths (/C:/...) to mount points
+        # (/mnt/c/...). FileMaker on Windows uses ConvertFromFileMakerPath(...; 1)
+        # which produces paths like /C:/Users/... that are invalid in WSL2.
+        # On native Windows and macOS the paths are used unchanged.
+        export_file_path = _incoming_export_path(export_file_path, solution_name)
+        repo_path = _translate_incoming_path(repo_path)
 
         # If repo_path is "?" it means FileMaker's ConvertFromFileMakerPath failed —
         # this happens on WSL2 when the repo lives on the WSL filesystem and FileMaker
@@ -650,29 +1069,17 @@ class CompanionHandler(BaseHTTPRequestHandler):
                 )
                 return
 
-        # If export_file_path is "?" FileMaker's ConvertFromFileMakerPath failed to
-        # produce a POSIX path for the Windows Desktop location. Reconstruct it from
-        # the Windows USERPROFILE env var via cmd.exe + wslpath, or from automation.json.
-        if export_file_path == "?":
-            resolved = _resolve_export_path_for_wsl(solution_name)
-            if resolved:
-                export_file_path = resolved
-            else:
-                self._send_json(
-                    {
-                        "success": False,
-                        "exit_code": -1,
-                        "error": (
-                            "export_file_path is '?' — FileMaker could not convert the Desktop path to POSIX "
-                            "and WSL2 auto-detection failed. "
-                            "Add 'export_dir_override' to agent/config/automation.json with the WSL2 path "
-                            "to your Windows Desktop (e.g. \"/mnt/c/Users/<you>/Desktop\"). "
-                            "See agent/docs/SANDBOXED_ENVIRONMENT.md for details."
-                        ),
-                    },
-                    status=400,
-                )
-                return
+        # An export path of "?" that _incoming_export_path could not rebuild.
+        if not export_file_path:
+            self._send_json(
+                {
+                    "success": False,
+                    "exit_code": -1,
+                    "error": _unresolved_export_path_error("export_file_path"),
+                },
+                status=400,
+            )
+            return
 
         # Build environment for subprocess
         env = os.environ.copy()
@@ -1300,7 +1707,7 @@ def _load_companion_config() -> dict:
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="agentic-fm companion server — exposes fmparse.sh over HTTP for FileMaker.",
+        description="agentic-fm companion server — runs fm-saxml and other local tools over HTTP for FileMaker.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
@@ -1369,7 +1776,7 @@ def main():
         threading.Thread(target=_idle_watchdog, args=(server, idle_timeout), daemon=True).start()
     else:
         log.info("Idle auto-shutdown: disabled (always-on).")
-    log.info("Endpoints: GET /health  GET /clipboard  GET /webviewer/status  GET /preview/<name>  GET|POST /plugin/<path>  POST /explode  POST /context  POST /clipboard  POST /trigger  POST /debug  POST /webviewer/start  POST /webviewer/stop  POST /webviewer/push  POST /preview/<name>")
+    log.info("Endpoints: GET /health  GET /clipboard  GET /webviewer/status  GET /preview/<name>  GET /convert/<job id>  GET|POST /plugin/<path>  POST /convert  POST /explode (deprecated alias of /convert)  POST /context  POST /clipboard  POST /trigger  POST /debug  POST /webviewer/start  POST /webviewer/stop  POST /webviewer/push  POST /preview/<name>")
     log.info("Press Ctrl-C to stop.")
 
     try:

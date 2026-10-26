@@ -4,13 +4,15 @@ The companion server is a lightweight HTTP server that exposes `fmparse.sh` as a
 
 **Why this exists:** FileMaker has no built-in mechanism to execute arbitrary shell commands. The companion server fills this gap — no third-party plugin is required. As long as the server is running on the developer's machine, FileMaker can trigger XML parsing and context generation through a simple HTTP POST.
 
-**Windows gap:** The companion server approach is macOS-only at this time. `fmparse.sh` and `fm-xml-export-exploder` are Unix binaries.
+**Platforms:** The companion runs on macOS and Windows. `POST /convert` (fm-saxml) works on both. Endpoints that drive FileMaker through AppleScript (`/trigger`, the clipboard) are macOS-only, as is the deprecated `fmparse.sh` runner.
 
 ---
 
 ## Starting the server
 
-The server is a single Python file with no external dependencies beyond the standard library. No virtual environment is required — run it directly with `python3`:
+The easiest way is a launcher from `agent/scripts/launchers/`: `start_companion.cmd` (or `.ps1`) on Windows, `start_companion.sh` on macOS. They find the right virtual environment, start the server in the foreground or the background, check `/health`, stop it, and optionally start it at logon (Task Scheduler on Windows, launchd on macOS). See [Starting, stopping and checking the companion](../../README.md#starting-stopping-and-checking-the-companion) in the README.
+
+The server itself is a single Python file that needs only the standard library, except for `POST /convert`, which runs fm-saxml with the server's own Python, so that Python needs `fm-saxml-converter` installed. To run it directly:
 
 ```bash
 # Default port 8765
@@ -60,7 +62,7 @@ Startup log output:
 
 ```
 2026-03-09T14:22:01 INFO companion_server v1.0 listening on 127.0.0.1:8765
-2026-03-09T14:22:01 INFO Endpoints: GET /health  POST /explode
+2026-03-09T14:22:01 INFO Endpoints: GET /health  ...  GET /convert/<job id>  ...  POST /convert  POST /explode (deprecated alias of /convert)  ...
 2026-03-09T14:22:01 INFO Press Ctrl-C to stop.
 ```
 
@@ -80,7 +82,7 @@ python3 agent/scripts/companion_server.py > /tmp/companion_server.log 2>&1 &
 
 ### Auto-start with launchd (Mac)
 
-To have the server start automatically at login, create a launchd plist. Replace the paths with your actual username and repo location:
+`bash agent/scripts/launchers/start_companion.sh --install-launchd` writes and loads a plist like the one below for you (it runs the launcher, so the venv is looked up at each start, logs to `~/Library/Logs/agentic-fm/`, and restarts the server only if it crashes); `--uninstall-launchd` removes it. To write it by hand instead, replace the paths with your actual username and repo location:
 
 **`~/Library/LaunchAgents/com.agentic-fm.companion-server.plist`**
 
@@ -95,7 +97,7 @@ To have the server start automatically at login, create a launchd plist. Replace
 
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/python3</string>
+        <string>/Users/yourname/agentic-fm/.venv/bin/python</string>
         <string>/Users/yourname/agentic-fm/agent/scripts/companion_server.py</string>
     </array>
 
@@ -142,7 +144,7 @@ launchctl unload ~/Library/LaunchAgents/com.agentic-fm.companion-server.plist
 
 ### GET /health
 
-A lightweight liveness check. FileMaker or the developer can poll this to confirm the server is up before triggering an explode operation.
+A lightweight liveness check. FileMaker or the developer can poll this to confirm the server is up before starting a conversion.
 
 **Request:**
 
@@ -163,9 +165,84 @@ No request body. No required headers.
 
 ---
 
-### POST /explode
+### POST /convert
 
-The primary endpoint. Accepts a JSON payload describing the export to parse, invokes `fmparse.sh` as a subprocess, and returns the exit code and output so FileMaker can detect success or failure.
+Converts a Save a Copy as XML export with [fm-saxml](https://github.com/Blue-Kachina/fm-doc-saxml) in the background. The request returns a job ID straight away, so FileMaker's **Insert from URL** never waits on the conversion; poll `GET /convert/<job id>` until `done` is `true`.
+
+The conversion runs `fm-saxml build` with the same Python the companion runs under, so start the companion with the Python that has `fm-saxml-converter` installed (the DIS harness `.venv`). Only one conversion runs at a time; others wait as `queued`.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `solution_name` | string | Yes | The solution's name. The docs are written to `<docs root>/<solution_name>`, which is where `solution_context.py` (`load_solution` / `find_docs`) looks. For a multi-file export, send one name for the whole batch. |
+| `export_path` | string | Yes | The export folder FileMaker wrote (a multi-file export), or a single `.xml` file. On Windows and macOS the path is used as sent; under WSL, `/C:/...` paths are translated to `/mnt/c/...`. |
+| `docs_root` | string | No | The folder that holds every converted solution. Defaults to `FM_SAXML_DOCS_ROOT` in the companion's environment. |
+
+```json
+{
+  "solution_name": "Invoices",
+  "export_path": "C:\\Users\\you\\Desktop\\Invoices_2026-10-26_1405",
+  "docs_root": "C:\\Users\\you\\SaXML_docs"
+}
+```
+
+**Started (202):**
+
+```json
+{ "success": true, "job_id": "3f9c0a1b2c4d", "state": "queued", "status_url": "/convert/3f9c0a1b2c4d" }
+```
+
+**Refused:** `400` for a bad body, a missing field, an export path that doesn't exist, or no docs root; `409` (with the running `job_id`) when that solution is already converting. Both have `"success": false` and an `error` message.
+
+### GET /convert/&lt;job id&gt;
+
+The job's state. `state` is `queued`, `running`, `succeeded` or `failed`; `done` is `true` once it is `succeeded` or `failed`. A failed or crashed conversion is reported here — it never stops the companion.
+
+```json
+{
+  "success": true,
+  "job_id": "3f9c0a1b2c4d",
+  "state": "succeeded",
+  "done": true,
+  "solution_name": "Invoices",
+  "export_path": "C:\\Users\\you\\Desktop\\Invoices_2026-10-26_1405",
+  "docs_root": "C:\\Users\\you\\SaXML_docs",
+  "output_path": "C:\\Users\\you\\SaXML_docs\\Invoices",
+  "created_at": "2026-10-26T14:05:12Z",
+  "started_at": "2026-10-26T14:05:12Z",
+  "finished_at": "2026-10-26T14:05:31Z",
+  "exit_code": 0,
+  "error": "",
+  "kind": "batch",
+  "counts": { "files": 2, "tables": 14, "fields": 220, "table_occurrences": 40, "relationships": 31,
+              "layouts": 58, "scripts": 112, "custom_functions": 9, "value_lists": 12 },
+  "files": [
+    { "name": "Invoices_UI", "counts": { "tables": 1, "fields": 3, "...": 0 }, "warning_count": 2 },
+    { "name": "Invoices_Data", "counts": { "tables": 13, "fields": 217, "...": 0 }, "warning_count": 0 }
+  ],
+  "warning_count": 2,
+  "warnings": [
+    { "file": "Invoices_UI", "code": "UNRESOLVED_REF", "entity": "script:Go Home", "message": "..." }
+  ]
+}
+```
+
+- `counts`, `files`, `kind`, `warning_count` and `warnings` appear once the job has succeeded. Counts come from each file's `entities.json`; warnings come from each file's `Reports/warnings.md` (messages there are cut at 80 characters, and at most 200 warnings are listed — `warning_count` is always the full number).
+- A failed job has `exit_code` (fm-saxml's exit code, or `null` if it never started), `error`, and `log_tail` — the last 4000 characters of fm-saxml's output.
+- An unknown job ID gives `404`. The companion keeps the last 50 finished jobs; restarting it forgets them.
+
+In FileMaker, read the fields with `JSONGetElement ( $response ; "state" )`, `JSONGetElement ( $response ; "counts.fields" )`, `JSONGetElement ( $response ; "warnings[0].message" )` and so on.
+
+---
+
+### POST /explode (deprecated)
+
+**Deprecated — use `POST /convert`.** For one release, `/explode` is an alias of `/convert`: it takes the old body (`export_file_path` stands in for `export_path`; `repo_path` and `exploder_bin_path` are ignored), starts the same background job, and adds `"deprecated": true` and a `deprecation` message to the response. The companion also logs a warning each time it is called. `docs_root` can be added to the old body; otherwise `FM_SAXML_DOCS_ROOT` applies.
+
+The rest of this section describes the old `fmparse.sh` behaviour, which no longer runs. `fmparse.sh` and the runner code are removed in a later release.
+
+Accepts a JSON payload describing the export to parse, invokes `fmparse.sh` as a subprocess, and returns the exit code and output so FileMaker can detect success or failure.
 
 **Request headers:**
 
@@ -352,13 +429,17 @@ Accepts a JSON payload of runtime debug state and writes it to `agent/debug/outp
 
 The server binds exclusively to `127.0.0.1` (localhost) by default. It is not reachable from other machines on the network — only processes running on the same machine can connect. No authentication is implemented, which is acceptable because the attack surface is limited to local processes already running under the same user account.
 
-Do not set `bind_host` (`companion.json`) or `COMPANION_BIND_HOST` to `0.0.0.0`, or expose the server through a reverse proxy. The `/explode` endpoint executes arbitrary shell scripts with the permissions of the user who started the server.
+Do not set `bind_host` (`companion.json`) or `COMPANION_BIND_HOST` to `0.0.0.0`, or expose the server through a reverse proxy. Endpoints such as `/convert` and `/trigger` run programs with the permissions of the user who started the server.
 
 > **Note for Docker users:** When running the agent in a container, `COMPANION_BIND_HOST=0.0.0.0` is required so the container can reach the host-side server. This is still safe as long as the host machine is on a private, firewalled network — the port should never be forwarded to a public interface.
 
 ---
 
 ## FileMaker integration
+
+The export script sends one `POST /convert` with the export folder and one solution name for the whole (multi-file) batch, then polls `GET /convert/<job id>` every few seconds until `done` is `true`, and reads `state`, `counts` and `warnings` with `JSONGetElement`. See [POST /convert](#post-convert).
+
+The older "Explode XML" companion script, described below, still works for one release through the deprecated `/explode` alias, but it now gets back a job ID instead of the finished result.
 
 FileMaker calls the server from an "Explode XML" companion script using the **Insert from URL** step. The step is configured with:
 

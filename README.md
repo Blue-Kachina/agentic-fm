@@ -52,7 +52,7 @@ See **[filemaker/README.md](filemaker/README.md)** for the full dependency list 
    python3 agent/scripts/companion_server.py
    ```
 
-   The server listens on port 8765 by default. Keep it running in a terminal while you work.
+   The server listens on port 8765 by default. Keep it running in a terminal while you work. To convert exports with fm-saxml (`POST /convert`), start it with a Python that has `fm-saxml-converter` installed — the launchers below find one for you. See [Starting, stopping and checking the companion](#starting-stopping-and-checking-the-companion).
 
 4. **Configure the repo path** — run the **Get agentic-fm path** script once. It will prompt you to select the agentic-fm folder on disk and store the path in `$$AGENTIC.FM` for use by the other scripts.
 
@@ -251,6 +251,52 @@ A keyword-indexed manifest at `agent/docs/knowledge/MANIFEST.md` enables fast lo
 | **AGFMEvaluation**       | Evaluates a FileMaker calculation expression server-side and returns the result; optionally navigates to a layout first.                                                                                 |
 
 **Requirement:** **Explode XML**, **Agentic-fm Debug**, and **Agentic-fm webviewer** communicate with `agent/scripts/companion_server.py` via `Insert from URL`. Start the companion server before running these scripts (`python3 agent/scripts/companion_server.py`, port 8765). **Get agentic-fm path**, **Push Context**, and the OData scripts use only native FileMaker steps.
+
+## Starting, stopping and checking the companion
+
+The launchers in `agent/scripts/launchers/` start `companion_server.py` with a virtual environment's Python, so `POST /convert` can run fm-saxml. They never use a `python`/`python3` from `PATH` (on Windows that is often the Microsoft Store stub). They use the first of:
+
+1. the `AGENTIC_FM_PYTHON` environment variable, if set (the full path to a Python executable);
+2. the DIS harness's `.venv`, when agentic-fm is the harness's `tools/agentic-fm` submodule;
+3. `.venv` in the agentic-fm folder;
+4. `agent/.venv` in the agentic-fm folder.
+
+If none exists, the launcher stops and lists where it looked. The Python needs `fm-saxml-converter` installed (`<venv python> -m pip install fm-saxml-converter`); the launcher warns if it isn't.
+
+**Windows** (Command Prompt or PowerShell, from the agentic-fm folder):
+
+| To | Run |
+|---|---|
+| Start in this window (Ctrl-C stops it) | `agent\scripts\launchers\start_companion.cmd` |
+| Start hidden, in the background | `agent\scripts\launchers\start_companion.cmd -Background` (log: `%LOCALAPPDATA%\agentic-fm\companion.log`) |
+| Check it | `agent\scripts\launchers\start_companion.cmd -Status` |
+| Stop it | `agent\scripts\launchers\start_companion.cmd -Stop` |
+| Start it at every logon (optional) | `agent\scripts\launchers\start_companion.cmd -InstallLogonTask` — adds a Task Scheduler task named *agentic-fm companion server* |
+| Stop starting it at logon | `agent\scripts\launchers\start_companion.cmd -RemoveLogonTask` |
+
+`start_companion.cmd` runs `start_companion.ps1` (same options) with `-ExecutionPolicy Bypass`, so it works even where PowerShell scripts are blocked. Options for the server go after `--`, e.g. `start_companion.cmd -- --port 9000`.
+
+**macOS** (Terminal, from the agentic-fm folder):
+
+| To | Run |
+|---|---|
+| Start in this window (Ctrl-C stops it) | `bash agent/scripts/launchers/start_companion.sh` |
+| Start in the background | `bash agent/scripts/launchers/start_companion.sh --background` (log: `~/Library/Logs/agentic-fm/companion.log`) |
+| Check it | `bash agent/scripts/launchers/start_companion.sh --status` |
+| Stop it | `bash agent/scripts/launchers/start_companion.sh --stop` |
+| Start it at every login (optional) | `bash agent/scripts/launchers/start_companion.sh --install-launchd` — installs `~/Library/LaunchAgents/com.agentic-fm.companion-server.plist` and starts it now |
+| Stop starting it at login | `bash agent/scripts/launchers/start_companion.sh --uninstall-launchd` |
+
+The launchd agent restarts the companion if it crashes, but not after a clean shutdown (`--idle-timeout`). While it is installed, use `--uninstall-launchd` rather than `--stop` to stop it for good.
+
+**Checking it by hand:** `GET /health` answers whenever the companion is up, on any platform:
+
+```bash
+curl http://127.0.0.1:8765/health
+# {"status": "ok", "version": "1.0.0", "plugin": {...}}
+```
+
+On Windows PowerShell: `Invoke-RestMethod http://127.0.0.1:8765/health`. Use your port instead of 8765 if you changed it in `agent/config/companion.json`. Full endpoint reference: [agent/docs/COMPANION_SERVER.md](agent/docs/COMPANION_SERVER.md).
 
 ## Closed-Loop Operation with OData
 
