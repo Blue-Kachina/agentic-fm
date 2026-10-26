@@ -21,8 +21,11 @@ POST /convert  (body: JSON object)
     solution_name  required  Solution name; the docs go to <docs root>/<solution_name>.
                              For a multi-file export, one name for the whole batch.
     export_path    required  The export folder FileMaker wrote (or one .xml file).
-    docs_root      optional  Folder holding every converted solution; defaults to
-                             $FM_SAXML_DOCS_ROOT in the companion's environment.
+    docs_root      optional  Folder holding every converted solution. Without it:
+                             $FM_SAXML_DOCS_ROOT in the companion's environment, else
+                             the DIS harness's exports/ folder when agentic-fm is its
+                             tools/agentic-fm submodule (created if missing), else 400.
+                             The startup log names the default and where it came from.
   202 → {"success": true, "job_id": "3f9c0a1b2c4d", "state": "queued",
          "status_url": "/convert/3f9c0a1b2c4d"}
   400 → {"success": false, "error": "..."}            (bad body, path, or no docs root)
@@ -544,6 +547,70 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+# The agentic-fm root (this file is agent/scripts/companion_server.py).
+AFM_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DOCS_ROOT_SOURCES = {
+    "request": "docs_root in the request",
+    "env": f"${DOCS_ROOT_ENV}",
+    "harness": "harness exports/",
+}
+
+
+def _harness_root(afm_root: "str | None" = None) -> str:
+    """The DIS harness folder when agentic-fm is its tools/agentic-fm submodule, else "".
+
+    Same test as the launchers (a submodule has a .git *file*), plus: the parent
+    folder is named "tools" and the harness root has a .gitmodules.
+    """
+    root = os.path.abspath(afm_root or AFM_ROOT)
+    harness = os.path.dirname(os.path.dirname(root))
+    if (os.path.isfile(os.path.join(root, ".git"))
+            and os.path.basename(os.path.dirname(root)).casefold() == "tools"
+            and os.path.isfile(os.path.join(harness, ".gitmodules"))):
+        return harness
+    return ""
+
+
+def _resolve_docs_root(requested: str = "", afm_root: "str | None" = None, create: bool = True) -> tuple:
+    """(docs root, source key) for a conversion; ("", "") when none applies.
+
+    Order: docs_root in the request, then $FM_SAXML_DOCS_ROOT, then the harness's
+    exports/ folder (created if missing) when agentic-fm is the harness submodule.
+    """
+    if requested:
+        return _translate_incoming_path(os.path.expanduser(str(requested))), "request"
+    env = os.environ.get(DOCS_ROOT_ENV, "")
+    if env:
+        return os.path.expanduser(env), "env"
+    harness = _harness_root(afm_root)
+    if harness:
+        exports = os.path.join(harness, "exports")
+        if create:
+            try:
+                os.makedirs(exports, exist_ok=True)
+            except OSError as exc:
+                log.warning("Could not create the harness exports folder %s: %s", exports, exc)
+        return exports, "harness"
+    return "", ""
+
+
+def _docs_root_startup_message() -> str:
+    """The default docs root for /convert and where it comes from, for the startup log."""
+    docs_root, source = _resolve_docs_root()
+    if docs_root:
+        return f"Docs root: {docs_root} ({DOCS_ROOT_SOURCES[source]})"
+    return (f"Docs root: none set — /convert requests must send docs_root (or set {DOCS_ROOT_ENV}, "
+            "or run agentic-fm as the DIS harness submodule).")
+
+
+def _no_docs_root_error() -> str:
+    return (
+        "No docs root: send docs_root in the request, set "
+        f"{DOCS_ROOT_ENV} where the companion runs, or run agentic-fm as the DIS harness's "
+        "tools/agentic-fm submodule (the docs then go to the harness's exports/ folder)."
+    )
+
+
 def _convert_command(export_path: str, docs_root: str, solution_name: str) -> list:
     """The fm-saxml command for one conversion (tests replace this)."""
     return [
@@ -942,16 +1009,10 @@ class CompanionHandler(BaseHTTPRequestHandler):
                             status=400)
             return
 
-        docs_root = payload.get("docs_root") or os.environ.get(DOCS_ROOT_ENV, "")
+        docs_root, docs_root_source = _resolve_docs_root(payload.get("docs_root") or "")
         if not docs_root:
-            self._send_json(
-                {"success": False,
-                 "error": f"No docs root: send docs_root, or set {DOCS_ROOT_ENV} where the companion runs.",
-                 **extra},
-                status=400,
-            )
+            self._send_json({"success": False, "error": _no_docs_root_error(), **extra}, status=400)
             return
-        docs_root = _translate_incoming_path(os.path.expanduser(str(docs_root)))
 
         job, running = _start_convert_job(solution_name, export_path, docs_root)
         if job is None:
@@ -963,8 +1024,8 @@ class CompanionHandler(BaseHTTPRequestHandler):
                 status=409,
             )
             return
-        log.info("convert %s queued: solution=%r export=%r docs_root=%r",
-                 job["job_id"], solution_name, export_path, docs_root)
+        log.info("convert %s queued: solution=%r export=%r docs_root=%r (%s)",
+                 job["job_id"], solution_name, export_path, docs_root, DOCS_ROOT_SOURCES[docs_root_source])
         self._send_json(
             {"success": True, "job_id": job["job_id"], "state": job["state"],
              "status_url": f"/convert/{job['job_id']}", **extra},
@@ -1777,6 +1838,7 @@ def main():
     else:
         log.info("Idle auto-shutdown: disabled (always-on).")
     log.info("Endpoints: GET /health  GET /clipboard  GET /webviewer/status  GET /preview/<name>  GET /convert/<job id>  GET|POST /plugin/<path>  POST /convert  POST /explode (deprecated alias of /convert)  POST /context  POST /clipboard  POST /trigger  POST /debug  POST /webviewer/start  POST /webviewer/stop  POST /webviewer/push  POST /preview/<name>")
+    log.info(_docs_root_startup_message())
     log.info("Press Ctrl-C to stop.")
 
     try:

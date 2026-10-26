@@ -177,7 +177,7 @@ The conversion runs `fm-saxml build` with the same Python the companion runs und
 |---|---|---|---|
 | `solution_name` | string | Yes | The solution's name. The docs are written to `<docs root>/<solution_name>`, which is where `solution_context.py` (`load_solution` / `find_docs`) looks. For a multi-file export, send one name for the whole batch. |
 | `export_path` | string | Yes | The export folder FileMaker wrote (a multi-file export), or a single `.xml` file. On Windows and macOS the path is used as sent; under WSL, `/C:/...` paths are translated to `/mnt/c/...`. |
-| `docs_root` | string | No | The folder that holds every converted solution. Defaults to `FM_SAXML_DOCS_ROOT` in the companion's environment. |
+| `docs_root` | string | No | The folder that holds every converted solution. Without it, the companion uses its default docs root (see [Where the docs go](#where-the-docs-go)). |
 
 ```json
 {
@@ -194,6 +194,16 @@ The conversion runs `fm-saxml build` with the same Python the companion runs und
 ```
 
 **Refused:** `400` for a bad body, a missing field, an export path that doesn't exist, or no docs root; `409` (with the running `job_id`) when that solution is already converting. Both have `"success": false` and an `error` message.
+
+#### Where the docs go
+
+fm-saxml writes each conversion to `<docs root>/<solution name>` (the name made safe for a folder). The docs root is the first of:
+
+1. `docs_root` in the request body;
+2. the `FM_SAXML_DOCS_ROOT` environment variable where the companion runs;
+3. the DIS harness's `exports/` folder, when agentic-fm is the harness's `tools/agentic-fm` submodule (its `.git` is a file, its parent folder is `tools`, and the harness has a `.gitmodules`). The folder is created if it is missing.
+
+If none applies, `/convert` answers `400` with a message naming these three options. At startup the companion logs its default, for example `Docs root: D:\dis-harness\exports (harness exports/)`, or `Docs root: none set`. Every job reports the `docs_root` it used.
 
 ### GET /convert/&lt;job id&gt;
 
@@ -238,7 +248,7 @@ In FileMaker, read the fields with `JSONGetElement ( $response ; "state" )`, `JS
 
 ### POST /explode (deprecated)
 
-**Deprecated — use `POST /convert`.** For one release, `/explode` is an alias of `/convert`: it takes the old body (`export_file_path` stands in for `export_path`; `repo_path` and `exploder_bin_path` are ignored), starts the same background job, and adds `"deprecated": true` and a `deprecation` message to the response. The companion also logs a warning each time it is called. `docs_root` can be added to the old body; otherwise `FM_SAXML_DOCS_ROOT` applies.
+**Deprecated — use `POST /convert`.** For one release, `/explode` is an alias of `/convert`: it takes the old body (`export_file_path` stands in for `export_path`; `repo_path` and `exploder_bin_path` are ignored), starts the same background job, and adds `"deprecated": true` and a `deprecation` message to the response. The companion also logs a warning each time it is called. `docs_root` can be added to the old body; otherwise the default docs root applies (see [Where the docs go](#where-the-docs-go)).
 
 The rest of this section describes the old `fmparse.sh` behaviour, which no longer runs. `fmparse.sh` and the runner code are removed in a later release.
 

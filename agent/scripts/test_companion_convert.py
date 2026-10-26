@@ -45,8 +45,24 @@ def server():
 
 
 @pytest.fixture(autouse=True)
-def no_env_root(monkeypatch):
+def no_default_docs_root(monkeypatch, tmp_path):
+    """No $FM_SAXML_DOCS_ROOT, and agentic-fm not a harness submodule (whatever this checkout is)."""
     monkeypatch.delenv(cs.DOCS_ROOT_ENV, raising=False)
+    monkeypatch.setattr(cs, "AFM_ROOT", str(tmp_path / "standalone" / "agentic-fm"))
+
+
+def _make_afm(base, git_file: bool = True, parent: str = "tools", gitmodules: bool = True) -> str:
+    """An agentic-fm root at <base>/harness/<parent>/agentic-fm, laid out like a (non-)submodule."""
+    harness = base / "harness"
+    root = harness / parent / "agentic-fm"
+    root.mkdir(parents=True)
+    if git_file:
+        (root / ".git").write_text("gitdir: ../../.git/modules/tools/agentic-fm\n", encoding="utf-8")
+    else:
+        (root / ".git").mkdir()
+    if gitmodules:
+        (harness / ".gitmodules").write_text('[submodule "tools/agentic-fm"]\n', encoding="utf-8")
+    return str(root)
 
 
 @pytest.fixture
@@ -230,6 +246,67 @@ def test_explode_is_a_deprecated_alias(server, export, tmp_path, monkeypatch, ca
 
     status, body = _request(f"{server}/explode", {"solution_name": "Multi"})
     assert status == 400 and body["deprecated"] is True
+
+
+# -- docs root -----------------------------------------------------------------------
+
+def test_harness_detection(tmp_path):
+    root = _make_afm(tmp_path / "ok")
+    assert cs._harness_root(root) == str(tmp_path / "ok" / "harness")
+    assert cs._harness_root(_make_afm(tmp_path / "gitdir", git_file=False)) == ""      # a clone, not a submodule
+    assert cs._harness_root(_make_afm(tmp_path / "nomods", gitmodules=False)) == ""
+    assert cs._harness_root(_make_afm(tmp_path / "notools", parent="vendor")) == ""
+
+
+def test_docs_root_order(tmp_path, monkeypatch):
+    afm = _make_afm(tmp_path)
+    exports = tmp_path / "harness" / "exports"
+    monkeypatch.setattr(cs, "AFM_ROOT", afm)
+
+    # c) harness default; exports/ is created
+    assert not exports.exists()
+    assert cs._resolve_docs_root() == (str(exports), "harness")
+    assert exports.is_dir()
+
+    # b) the env var beats the harness default
+    monkeypatch.setenv(cs.DOCS_ROOT_ENV, str(tmp_path / "envdocs"))
+    assert cs._resolve_docs_root() == (str(tmp_path / "envdocs"), "env")
+
+    # a) the request beats the env var
+    assert cs._resolve_docs_root(str(tmp_path / "reqdocs")) == (str(tmp_path / "reqdocs"), "request")
+
+    # d) nothing applies
+    monkeypatch.delenv(cs.DOCS_ROOT_ENV)
+    monkeypatch.setattr(cs, "AFM_ROOT", _make_afm(tmp_path / "clone", git_file=False))
+    assert cs._resolve_docs_root() == ("", "")
+
+
+def test_startup_message(tmp_path, monkeypatch):
+    assert "none set" in cs._docs_root_startup_message()
+    monkeypatch.setattr(cs, "AFM_ROOT", _make_afm(tmp_path))
+    assert cs._docs_root_startup_message() == (
+        f"Docs root: {tmp_path / 'harness' / 'exports'} (harness exports/)")
+
+
+def test_convert_uses_harness_exports_by_default(server, export, tmp_path, monkeypatch):
+    monkeypatch.setattr(cs, "AFM_ROOT", _make_afm(tmp_path))
+    monkeypatch.setattr(cs, "_convert_command", lambda *a: _python("pass"))
+    status, body = _request(f"{server}/convert", {"solution_name": "Multi", "export_path": export})
+    assert status == 202, body
+    job = _wait(server, body["job_id"])
+    assert job["docs_root"] == str(tmp_path / "harness" / "exports")
+
+    # the same through the /explode alias, with the old body
+    status, body = _request(f"{server}/explode", {"solution_name": "Multi", "export_file_path": export,
+                                                  "repo_path": REPO_ROOT})
+    assert status == 202, body
+    assert _wait(server, body["job_id"])["docs_root"] == str(tmp_path / "harness" / "exports")
+
+
+def test_no_docs_root_message_names_all_three_ways(server, export):
+    status, body = _request(f"{server}/convert", {"solution_name": "Multi", "export_path": export})
+    assert status == 400
+    assert "docs_root" in body["error"] and cs.DOCS_ROOT_ENV in body["error"] and "submodule" in body["error"]
 
 
 # -- idle auto-shutdown --------------------------------------------------------------
