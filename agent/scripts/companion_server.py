@@ -521,6 +521,9 @@ DOCS_ROOT_ENV = "FM_SAXML_DOCS_ROOT"
 CONVERT_MAX_JOBS = 50           # finished jobs kept for polling; the oldest are dropped
 CONVERT_MAX_WARNINGS = 200      # warnings listed per job; warning_count is always the full count
 CONVERT_LOG_TAIL_CHARS = 4000
+# Request fields that turn on an fm-saxml build switch of the same name. Only these: --serve
+# would never finish (and hold the one conversion slot), --out would write outside the docs root.
+CONVERT_SWITCHES = ("html", "webmcp")
 
 # Counted per FileMaker file, from its entities.json: response key → entities.json collection.
 CONVERT_COUNT_KEYS = {
@@ -611,13 +614,19 @@ def _no_docs_root_error() -> str:
     )
 
 
-def _convert_command(export_path: str, docs_root: str, solution_name: str) -> list:
+def _convert_command(export_path: str, docs_root: str, solution_name: str, *,
+                     html: bool = False, webmcp: bool = False) -> list:
     """The fm-saxml command for one conversion (tests replace this)."""
-    return [
+    cmd = [
         sys.executable, "-m", "fm_saxml", "build", export_path,
         "--docs-root", docs_root, "--solution", solution_name,
         "--force", "--yes",
     ]
+    if html:
+        cmd.append("--html")
+    if webmcp:
+        cmd.append("--webmcp")
+    return cmd
 
 
 def _convert_env() -> dict:
@@ -697,8 +706,10 @@ def _summarize_output(output_path: str) -> dict:
         warnings.extend({"file": name, **w} for w in file_warnings)
         files.append({"name": name, "counts": counts, "warning_count": file_warning_count})
     totals["files"] = len(files)
+    viewer = os.path.join(output_path, "index.html")
     return {
         "kind": catalog.get("kind", ""),
+        "viewer_path": viewer if os.path.isfile(viewer) else "",
         "counts": totals,
         "files": files,
         "warning_count": warning_count,
@@ -725,7 +736,8 @@ def _run_convert_job(job_id: str) -> None:
     try:
         with _convert_slot:
             _update_job(job_id, state="running", started_at=_utc_now())
-            cmd = _convert_command(job["export_path"], job["docs_root"], job["solution_name"])
+            cmd = _convert_command(job["export_path"], job["docs_root"], job["solution_name"],
+                                   html=job["html"], webmcp=job["webmcp"])
             log.info("convert %s: %s", job_id, " ".join(cmd))
             result = _run_command_streaming(cmd, cwd=None, env=_convert_env(), label=f"fm-saxml {job_id}")
         output = result["stdout"] + result["stderr"]
@@ -755,7 +767,8 @@ def _run_convert_job(job_id: str) -> None:
                     error=f"Conversion crashed: {exc}")
 
 
-def _start_convert_job(solution_name: str, export_path: str, docs_root: str) -> tuple:
+def _start_convert_job(solution_name: str, export_path: str, docs_root: str, *,
+                       html: bool = False, webmcp: bool = False) -> tuple:
     """Queue a conversion. Returns (job, None), or (None, running job) for a solution already converting."""
     with _convert_lock:
         for other in _convert_jobs.values():
@@ -769,6 +782,8 @@ def _start_convert_job(solution_name: str, export_path: str, docs_root: str) -> 
             "solution_name": solution_name,
             "export_path": export_path,
             "docs_root": docs_root,
+            "html": html,
+            "webmcp": webmcp,
             "output_path": "",
             "created_at": _utc_now(),
             "started_at": "",
@@ -998,6 +1013,16 @@ class CompanionHandler(BaseHTTPRequestHandler):
             )
             return
 
+        switches = {name: payload.get(name, False) for name in CONVERT_SWITCHES}
+        wrong = [name for name, value in switches.items() if not isinstance(value, bool)]
+        if wrong:
+            self._send_json(
+                {"success": False, "error": f"{', '.join(wrong)} must be true or false", **extra},
+                status=400,
+            )
+            return
+        switches["html"] = switches["html"] or switches["webmcp"]    # as in fm-saxml: --webmcp turns on --html
+
         solution_name = str(payload["solution_name"]).strip()
         export_path = _incoming_export_path(str(payload["export_path"]), solution_name)
         if not export_path:
@@ -1014,7 +1039,7 @@ class CompanionHandler(BaseHTTPRequestHandler):
             self._send_json({"success": False, "error": _no_docs_root_error(), **extra}, status=400)
             return
 
-        job, running = _start_convert_job(solution_name, export_path, docs_root)
+        job, running = _start_convert_job(solution_name, export_path, docs_root, **switches)
         if job is None:
             self._send_json(
                 {"success": False,
@@ -1024,8 +1049,9 @@ class CompanionHandler(BaseHTTPRequestHandler):
                 status=409,
             )
             return
-        log.info("convert %s queued: solution=%r export=%r docs_root=%r (%s)",
-                 job["job_id"], solution_name, export_path, docs_root, DOCS_ROOT_SOURCES[docs_root_source])
+        log.info("convert %s queued: solution=%r export=%r docs_root=%r (%s) html=%s webmcp=%s",
+                 job["job_id"], solution_name, export_path, docs_root, DOCS_ROOT_SOURCES[docs_root_source],
+                 job["html"], job["webmcp"])
         self._send_json(
             {"success": True, "job_id": job["job_id"], "state": job["state"],
              "status_url": f"/convert/{job['job_id']}", **extra},

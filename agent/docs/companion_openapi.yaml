@@ -1,0 +1,950 @@
+openapi: 3.1.0
+info:
+  title: agentic-fm companion server
+  version: "1.0"
+  summary: Local HTTP bridge between FileMaker Pro, the agent and the host machine.
+  description: |
+    The companion server (`agent/scripts/companion_server.py`) lets FileMaker call
+    host-side tools through **Insert from URL**, and lets the agent (or a container)
+    reach the clipboard, FileMaker and the plug-in. Prose documentation, setup and
+    troubleshooting: `agent/docs/COMPANION_SERVER.md`.
+
+    **Local development only.** The server binds to `127.0.0.1:8765` by default and has
+    no authentication. Several endpoints run programs or write files with the
+    permissions of the user who started it. Never expose it beyond the local machine.
+
+    **Routing rules (all endpoints):**
+    - Paths are matched exactly, including any query string: `GET /health?x=1` is a 404.
+      Only `GET /convert/{job_id}` ignores a query string.
+    - An unknown path answers `404` with `{"error": "Not found"}`.
+    - Only `GET` and `POST` are handled. There is no CORS support and no `OPTIONS`.
+    - Request bodies are JSON (except the `/plugin/` proxy, which forwards bytes) and
+      need a `Content-Length` header; a body without one is read as empty.
+    - Every request except `GET /health` counts as activity for the idle auto-shutdown.
+
+    **Platforms:** `/convert`, `/context`, `/debug`, `/lint`, `/pending`, `/preview` and
+    `/health` work on macOS and Windows. `/trigger` and `GET /clipboard` need macOS
+    (`osascript`). `POST /clipboard` uses `clipboard.py` on macOS and `clipboard_win.py`
+    under WSL. `/webviewer/stop` uses POSIX process groups.
+  license:
+    name: See the repository LICENSE
+servers:
+  - url: http://127.0.0.1:8765
+    description: Default bind address and port (`companion.json` or `--port` change it)
+  - url: http://local.hub:8765
+    description: Default advertise host, for clients such as a container
+tags:
+  - name: Status
+  - name: Conversion
+    description: fm-saxml conversion of Save a Copy as XML exports
+  - name: FileMaker bridge
+    description: Calls made by, or into, FileMaker Pro
+  - name: Clipboard
+  - name: Webviewer
+    description: The agentic-fm webviewer dev server and its output feed
+  - name: Preview
+    description: Layout HTML previews
+  - name: Lint
+  - name: Plug-in
+    description: Pass-through to the agentic-fm FileMaker plug-in's HTTP server
+
+paths:
+  /health:
+    get:
+      tags: [Status]
+      operationId: getHealth
+      summary: Liveness check
+      description: |
+        Confirms the server is up and reports the plug-in capability block (cached
+        for about 60 seconds). Does not count as activity for the idle auto-shutdown,
+        so monitors can poll it freely.
+      responses:
+        "200":
+          description: Server is up.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+              example:
+                status: ok
+                version: "1.0"
+                plugin: { installed: false, usable: false, server: {}, license: {}, solutions: [] }
+
+  /convert:
+    post:
+      tags: [Conversion]
+      operationId: startConvert
+      summary: Queue an fm-saxml conversion
+      description: |
+        Starts `fm-saxml build` as a background job and returns at once with a job ID;
+        poll `GET /convert/{job_id}` until `done` is `true`. One conversion runs at a
+        time; others wait as `queued`. The docs go to `<docs root>/<solution_name>`,
+        where the docs root is the first of: `docs_root` in the body, the
+        `FM_SAXML_DOCS_ROOT` environment variable, or the DIS harness's `exports/`
+        folder when agentic-fm is its `tools/agentic-fm` submodule.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConvertRequest" }
+            example:
+              solution_name: Invoices
+              export_path: "C:\\Users\\you\\Desktop\\Invoices_2026-10-26_1405"
+              webmcp: true
+      responses:
+        "202":
+          description: Job queued.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConvertStarted" }
+              example: { success: true, job_id: 3f9c0a1b2c4d, state: queued, status_url: /convert/3f9c0a1b2c4d }
+        "400":
+          description: |
+            Invalid JSON, body not an object, missing `solution_name` or `export_path`,
+            `html` or `webmcp` not a JSON boolean, export path not found (or an
+            unresolvable `?` from FileMaker), or no docs root.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
+        "409":
+          description: That solution (compared case-insensitively) is already queued or running.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConvertConflict" }
+
+  /convert/{job_id}:
+    get:
+      tags: [Conversion]
+      operationId: getConvertJob
+      summary: State and results of a conversion job
+      description: |
+        `counts`, `files`, `kind`, `warning_count` and `warnings` appear once the job has
+        succeeded; `log_tail` appears when it failed. The server keeps the last 50
+        finished jobs and forgets all of them when it restarts.
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[0-9a-f]{12}$" }
+      responses:
+        "200":
+          description: The job.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConvertJob" }
+        "404":
+          description: Unknown job ID.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
+
+  /explode:
+    post:
+      tags: [Conversion]
+      operationId: explode
+      deprecated: true
+      summary: Deprecated alias of POST /convert
+      description: |
+        Takes the old `fmparse.sh` body; `export_file_path` stands in for `export_path`
+        when the latter is absent, and `repo_path` / `exploder_bin_path` are ignored.
+        Behaves like `POST /convert` and adds `deprecated` and `deprecation` to every
+        response. Logs a warning on each call.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [solution_name]
+              properties:
+                solution_name: { type: string }
+                export_file_path: { type: string }
+                export_path: { type: string }
+                docs_root: { type: string }
+                html: { type: boolean, default: false }
+                webmcp: { type: boolean, default: false }
+                repo_path: { type: string, description: Ignored. }
+                exploder_bin_path: { type: string, description: Ignored. }
+      responses:
+        "202":
+          description: Job queued.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ConvertStarted"
+                  - $ref: "#/components/schemas/DeprecationNotice"
+        "400":
+          description: As for `POST /convert`.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Failure"
+                  - $ref: "#/components/schemas/DeprecationNotice"
+        "409":
+          description: As for `POST /convert`.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ConvertConflict"
+                  - $ref: "#/components/schemas/DeprecationNotice"
+
+  /context:
+    post:
+      tags: [FileMaker bridge]
+      operationId: writeContext
+      summary: Write CONTEXT.json
+      description: |
+        Writes `context` to `<repo_path>/agent/CONTEXT.json`. Called by the Push Context
+        FileMaker script in server mode. Logs a warning when `context_version` is
+        missing or below 2.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [repo_path, context]
+              properties:
+                repo_path:
+                  type: string
+                  description: Absolute path to the agentic-fm folder; `~` is expanded.
+                context:
+                  description: The context, as a JSON string or as an object.
+                  oneOf:
+                    - type: string
+                    - type: object
+      responses:
+        "200":
+          description: Written.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PathResult" }
+        "400":
+          description: Invalid JSON, missing field, or `context` string is not valid JSON.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
+        "500":
+          description: Could not write the file.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
+
+  /debug:
+    post:
+      tags: [FileMaker bridge]
+      operationId: writeDebug
+      summary: Write runtime debug state
+      description: |
+        Writes the request body to `agent/debug/output.json` under the agentic-fm root
+        (overwriting it). Called by the Agentic-fm Debug FileMaker script.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              description: Any JSON value, typically the `$$DEBUG` variable from FileMaker.
+      responses:
+        "200":
+          description: Written.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PathResult" }
+        "400":
+          description: Invalid JSON.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
+
+  /pending:
+    get:
+      tags: [FileMaker bridge]
+      operationId: takePendingJob
+      summary: Read and clear the pending paste job
+      description: |
+        Returns the job set by `POST /pending` or `POST /trigger` and clears it
+        (consumed once). Returns `{}` when nothing is pending. Called by the
+        Agentic-fm Paste FileMaker script.
+      responses:
+        "200":
+          description: The pending job, or an empty object.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/PendingJob"
+                  - type: object
+                    maxProperties: 0
+    post:
+      tags: [FileMaker bridge]
+      operationId: setPendingJob
+      summary: Set the pending paste job
+      description: Replaces the pending job without triggering a script.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                target: { type: string, default: "" }
+                auto_save: { type: boolean, default: false }
+                select_all: { type: boolean, default: true }
+      responses:
+        "200":
+          description: Set.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Success" }
+        "400":
+          description: Invalid JSON.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
+
+  /trigger:
+    post:
+      tags: [FileMaker bridge]
+      operationId: triggerScript
+      summary: Run a FileMaker script through AppleScript (macOS)
+      description: |
+        Runs `osascript` to `do script` in FileMaker Pro. When `parameter` is given it is
+        stored as the pending job's `target` (FileMaker reads it back with
+        `GET /pending`), because `given parameter:` is unreliable in FM Pro 22.
+        With `raw_applescript`, that AppleScript runs instead and `script` is not needed.
+
+        Requires macOS, FileMaker Pro running with the file open, and the
+        `fmextscriptaccess` extended privilege. A failing `osascript` still answers
+        `200` with `success: false`; check `stderr`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fm_app_name:
+                  type: string
+                  default: FileMaker Pro
+                  description: Exact AppleScript application name, e.g. `FileMaker Pro — 22.0.4.406`.
+                script:
+                  type: string
+                  description: Script to run. Required unless `raw_applescript` is set.
+                parameter:
+                  type: string
+                  description: Stored as the pending job's `target`.
+                target_file:
+                  type: string
+                  description: Address the first open document whose name contains this, instead of document 1.
+                auto_save: { type: boolean, default: false }
+                select_all: { type: boolean, default: true }
+                raw_applescript:
+                  type: string
+                  description: Run this AppleScript as-is.
+            example:
+              fm_app_name: FileMaker Pro — 22.0.4.406
+              script: Agentic-fm Paste
+              parameter: TargetScriptName
+      responses:
+        "200":
+          description: osascript ran; `success` is its exit status.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, stdout, stderr]
+                properties:
+                  success: { type: boolean }
+                  stdout: { type: string }
+                  stderr: { type: string }
+        "400":
+          description: Invalid JSON, or neither `script` nor `raw_applescript`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
+        "500":
+          description: osascript timed out (30 s), is missing (not macOS), or another error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
+
+  /clipboard:
+    get:
+      tags: [Clipboard]
+      operationId: readClipboard
+      summary: Read FileMaker objects from the clipboard (macOS)
+      description: Runs `clipboard.py read` and returns the clipboard's FileMaker objects as XML.
+      responses:
+        "200":
+          description: Clipboard XML.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, xml]
+                properties:
+                  success: { type: boolean, const: true }
+                  xml: { type: string }
+        "404":
+          description: No FileMaker objects on the clipboard.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
+        "500":
+          description: The read failed or timed out (10 s).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
+    post:
+      tags: [Clipboard]
+      operationId: writeClipboard
+      summary: Put fmxmlsnippet XML on the clipboard
+      description: |
+        Writes the XML to the clipboard as FileMaker objects, with `clipboard.py`
+        (macOS) or `clipboard_win.py` (Linux/WSL, through `powershell.exe`). Used by
+        `deploy.py`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [xml]
+              properties:
+                xml: { type: string, description: fmxmlsnippet XML. }
+      responses:
+        "200":
+          description: Written.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Success" }
+        "400":
+          description: Invalid JSON or missing `xml`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
+        "500":
+          description: The clipboard script failed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
+
+  /webviewer/status:
+    get:
+      tags: [Webviewer]
+      operationId: getWebviewerStatus
+      summary: Whether the webviewer dev server started by the companion is running
+      responses:
+        "200":
+          description: Status.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [running]
+                properties:
+                  running: { type: boolean }
+
+  /webviewer/start:
+    post:
+      tags: [Webviewer]
+      operationId: startWebviewer
+      summary: Start the webviewer dev server
+      description: Runs `npm run dev` in `<repo_path>/webviewer`, unless it is already running.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [repo_path]
+              properties:
+                repo_path: { type: string, description: The agentic-fm folder; `~` is expanded. }
+      responses:
+        "200":
+          description: Started, or already running.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, status]
+                properties:
+                  success: { type: boolean, const: true }
+                  status: { type: string, enum: [started, already_running] }
+                  pid: { type: integer, description: Present when `status` is `started`. }
+        "400":
+          description: Invalid JSON or missing `repo_path`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
+        "500":
+          description: Could not start npm.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
+
+  /webviewer/stop:
+    post:
+      tags: [Webviewer]
+      operationId: stopWebviewer
+      summary: Stop the webviewer dev server
+      description: Sends SIGTERM to the dev server's process group (POSIX only). Takes no body.
+      responses:
+        "200":
+          description: Stopped, or was not running.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, status]
+                properties:
+                  success: { type: boolean, const: true }
+                  status: { type: string, enum: [stopped, not_running] }
+        "500":
+          description: Could not stop it.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
+
+  /webviewer/push:
+    post:
+      tags: [Webviewer]
+      operationId: pushAgentOutput
+      summary: Publish agent output for the webviewer
+      description: |
+        Writes `<repo_path>/agent/config/.agent-output.json` (with a `timestamp`), which
+        the webviewer polls.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, repo_path]
+              properties:
+                type: { type: string, enum: [preview, diff, result, diagram, layout-preview] }
+                repo_path: { type: string, description: The agentic-fm folder; `~` is expanded. }
+                content: { type: string, default: "" }
+                before: { type: string, default: "", description: The "before" side of a diff. }
+                styles: { type: string, description: CSS for `layout-preview`; written only when non-empty. }
+      responses:
+        "200":
+          description: Written.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PathResult" }
+        "400":
+          description: Invalid JSON, unknown `type`, or missing `repo_path`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
+        "500":
+          description: Could not write the file.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
+
+  /preview/{layout_name}:
+    parameters:
+      - name: layout_name
+        in: path
+        required: true
+        description: |
+          Used as-is in the file name `agent/sandbox/<layout_name>_web.html`. The server
+          does not URL-decode it, so `My%20Layout` names the file `My%20Layout_web.html`.
+        schema: { type: string }
+    get:
+      tags: [Preview]
+      operationId: getLayoutPreview
+      summary: Serve a layout HTML preview
+      description: |
+        Returns `agent/sandbox/<layout_name>_web.html`; failing that, the `content` of
+        `agent/config/.agent-output.json`; failing that, a placeholder heading. Always 200.
+      responses:
+        "200":
+          description: HTML.
+          content:
+            text/html:
+              schema: { type: string }
+    post:
+      tags: [Preview]
+      operationId: saveLayoutPreview
+      summary: Store a layout HTML preview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [html]
+              properties:
+                html: { type: string }
+                solution: { type: string, description: Accepted but not used. }
+      responses:
+        "200":
+          description: Written. `path` is relative to the agentic-fm root.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PathResult" }
+              example: { success: true, path: agent/sandbox/Invoices_web.html }
+        "400":
+          description: Invalid JSON or missing `html`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
+        "500":
+          description: Could not write the file.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
+
+  /lint:
+    post:
+      tags: [Lint]
+      operationId: lint
+      summary: Lint FileMaker code with FMLint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, description: fmxmlsnippet XML or a human-readable script. }
+                format:
+                  type: [string, "null"]
+                  enum: [xml, hr, null]
+                  description: Detected from the content when omitted.
+                tier:
+                  type: [integer, "null"]
+                  enum: [1, 2, 3, null]
+                  description: Highest rule tier to run.
+                disable:
+                  type: array
+                  items: { type: string }
+                  description: Rule IDs to skip, e.g. `N003`.
+      responses:
+        "200":
+          description: Lint result.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LintResult" }
+        "400":
+          description: Invalid JSON or missing `content`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorOnly" }
+        "500":
+          description: FMLint raised an error.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorOnly" }
+
+  /plugin/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        description: |
+          Path on the plug-in's server, e.g. `api/discover`. May contain slashes; it is
+          appended to the plug-in base URL as-is, query string included.
+        schema: { type: string }
+    get:
+      tags: [Plug-in]
+      operationId: pluginProxyGet
+      summary: Proxy a GET to the plug-in
+      description: |
+        Forwards to the plug-in's HTTP server with its bearer token added, and returns
+        the plug-in's status, Content-Type and body unchanged. Optional: direct
+        plug-in access is the baseline. `GET /health` → `plugin.discover` lists the
+        plug-in's live endpoints.
+      responses:
+        default:
+          description: The plug-in's response, passed through.
+        "502":
+          description: Plug-in not usable (not installed, unreachable or unlicensed), or the proxy call failed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PluginProxyFailure" }
+    post:
+      tags: [Plug-in]
+      operationId: pluginProxyPost
+      summary: Proxy a POST to the plug-in
+      description: As for GET; the body and Content-Type (default `application/json`) are forwarded.
+      requestBody:
+        content:
+          "*/*":
+            schema: {}
+      responses:
+        default:
+          description: The plug-in's response, passed through.
+        "502":
+          description: Plug-in not usable, or the proxy call failed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PluginProxyFailure" }
+
+components:
+  schemas:
+    Success:
+      type: object
+      required: [success]
+      properties:
+        success: { type: boolean, const: true }
+
+    Failure:
+      type: object
+      required: [success, error]
+      properties:
+        success: { type: boolean, const: false }
+        error: { type: string }
+
+    ErrorOnly:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+
+    PathResult:
+      type: object
+      required: [success, path]
+      properties:
+        success: { type: boolean, const: true }
+        path: { type: string, description: Where the file was written. }
+
+    DeprecationNotice:
+      type: object
+      required: [deprecated, deprecation]
+      properties:
+        deprecated: { type: boolean, const: true }
+        deprecation: { type: string }
+
+    Health:
+      type: object
+      required: [status, version, plugin]
+      properties:
+        status: { type: string, const: ok }
+        version: { type: string, description: From the agentic-fm `version.txt`. }
+        plugin: { $ref: "#/components/schemas/PluginBlock" }
+
+    PluginBlock:
+      type: object
+      description: What the companion knows about the agentic-fm FileMaker plug-in.
+      required: [installed, usable, server, license, solutions]
+      properties:
+        installed: { type: boolean, description: The plug-in's Application Support folder exists. }
+        usable: { type: boolean, description: Installed, reachable and licensed. }
+        server:
+          type: object
+          properties:
+            reachable: { type: boolean }
+            base: { type: string, examples: ["http://127.0.0.1:8766"] }
+            token: { type: string }
+            remote: { type: boolean }
+        license:
+          type: object
+          properties:
+            status: { type: string }
+            licensed: { type: boolean }
+            edition: { type: string }
+            sub: { type: string }
+            exp: { type: string }
+            daysRemaining: { type: integer }
+          additionalProperties: true
+        solutions:
+          type: array
+          items:
+            type: object
+            properties:
+              key: { type: string }
+              name: { type: string }
+              catalog: { type: string }
+              files: { type: array, items: {} }
+              parsed_at: { type: string }
+        repoPath: { type: string }
+        catalogBaseUrl: { type: string }
+        gates:
+          type: object
+          additionalProperties: { type: boolean }
+        discover:
+          type: object
+          description: The plug-in's `GET /api/discover` response (its live endpoint catalog).
+          additionalProperties: true
+
+    PluginProxyFailure:
+      type: object
+      required: [success, error]
+      properties:
+        success: { type: boolean, const: false }
+        error: { type: string }
+        plugin:
+          type: object
+          properties:
+            installed: { type: boolean }
+            usable: { type: boolean, const: false }
+
+    ConvertRequest:
+      type: object
+      required: [solution_name, export_path]
+      properties:
+        solution_name:
+          type: string
+          description: |
+            The solution's name; the docs go to `<docs root>/<solution_name>`. For a
+            multi-file export, one name for the whole batch.
+        export_path:
+          type: string
+          description: |
+            The export folder (multi-file) or a single `.xml` file. Used as sent on
+            Windows and macOS; under WSL, `/C:/...` becomes `/mnt/c/...`.
+        docs_root:
+          type: string
+          description: Folder that holds every converted solution. Defaults as described on the operation.
+        html:
+          type: boolean
+          default: false
+          description: Also write the HTML viewer (`index.html`), fm-saxml's `--html`.
+        webmcp:
+          type: boolean
+          default: false
+          description: |
+            Add WebMCP tools to the viewer, fm-saxml's `--webmcp`. Turns on `html`. Browsers
+            give the viewer WebMCP only when it is served over `http://127.0.0.1`
+            (`fm-saxml serve <output_path>`), not when it is opened from disk.
+
+    ConvertStarted:
+      type: object
+      required: [success, job_id, state, status_url]
+      properties:
+        success: { type: boolean, const: true }
+        job_id: { type: string }
+        state: { type: string, const: queued }
+        status_url: { type: string, examples: [/convert/3f9c0a1b2c4d] }
+
+    ConvertConflict:
+      type: object
+      required: [success, error, job_id, state, status_url]
+      properties:
+        success: { type: boolean, const: false }
+        error: { type: string }
+        job_id: { type: string, description: The job already converting this solution. }
+        state: { type: string, enum: [queued, running] }
+        status_url: { type: string }
+
+    ConvertCounts:
+      type: object
+      properties:
+        tables: { type: integer }
+        fields: { type: integer }
+        table_occurrences: { type: integer }
+        relationships: { type: integer }
+        layouts: { type: integer }
+        scripts: { type: integer }
+        custom_functions: { type: integer }
+        value_lists: { type: integer }
+
+    ConvertJob:
+      type: object
+      required:
+        - success
+        - job_id
+        - state
+        - done
+        - solution_name
+        - export_path
+        - docs_root
+        - html
+        - webmcp
+        - output_path
+        - created_at
+        - started_at
+        - finished_at
+        - exit_code
+        - error
+      properties:
+        success: { type: boolean, const: true }
+        job_id: { type: string }
+        state: { type: string, enum: [queued, running, succeeded, failed] }
+        done: { type: boolean, description: "`true` once `succeeded` or `failed`." }
+        solution_name: { type: string }
+        export_path: { type: string }
+        docs_root: { type: string }
+        html: { type: boolean, description: The job writes the HTML viewer (also `true` when `webmcp` is). }
+        webmcp: { type: boolean, description: The job adds WebMCP tools to the viewer. }
+        output_path: { type: string, description: The solution's docs folder; empty until succeeded. }
+        created_at: { type: string, description: "UTC, `YYYY-MM-DDTHH:MM:SSZ`." }
+        started_at: { type: string, description: Empty while queued. }
+        finished_at: { type: string, description: Empty until done. }
+        exit_code:
+          type: [integer, "null"]
+          description: fm-saxml's exit code; `null` if it never ran.
+        error: { type: string, description: Empty unless failed. }
+        log_tail:
+          type: string
+          description: Failed jobs only. The last 4000 characters of fm-saxml's output.
+        kind: { type: string, description: Succeeded jobs only. The catalog kind, e.g. `batch`. }
+        viewer_path:
+          type: string
+          description: Succeeded jobs only. The viewer's `index.html`; empty when the job ran without `html`.
+        counts:
+          description: Succeeded jobs only. Totals over all files, plus the number of files.
+          allOf:
+            - $ref: "#/components/schemas/ConvertCounts"
+            - type: object
+              properties:
+                files: { type: integer }
+        files:
+          type: array
+          description: Succeeded jobs only.
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              counts: { $ref: "#/components/schemas/ConvertCounts" }
+              warning_count: { type: integer }
+        warning_count: { type: integer, description: Succeeded jobs only. The full count. }
+        warnings:
+          type: array
+          maxItems: 200
+          description: Succeeded jobs only. From each file's `Reports/warnings.md`; messages are cut at 80 characters.
+          items:
+            type: object
+            properties:
+              file: { type: string }
+              code: { type: string }
+              entity: { type: string }
+              message: { type: string }
+
+    PendingJob:
+      type: object
+      required: [target, auto_save, select_all]
+      properties:
+        target: { type: string, description: Script the paste is for. }
+        auto_save: { type: boolean }
+        select_all: { type: boolean }
+
+    LintResult:
+      type: object
+      required: [source, ok, error_count, warning_count, diagnostics]
+      properties:
+        source: { type: string }
+        ok: { type: boolean }
+        error_count: { type: integer }
+        warning_count: { type: integer }
+        diagnostics:
+          type: array
+          items:
+            type: object
+            required: [rule_id, severity, message, line, column, end_line, end_column]
+            properties:
+              rule_id: { type: string }
+              severity: { type: string, enum: [error, warning, info, hint] }
+              message: { type: string }
+              line: { type: integer, description: "1-based; 0 means the whole file." }
+              column: { type: integer, description: "1-based; 0 means the whole line." }
+              end_line: { type: integer }
+              end_column: { type: integer }
+              fix_hint: { type: string }

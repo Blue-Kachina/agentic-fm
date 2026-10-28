@@ -110,7 +110,7 @@ def test_start_returns_job_at_once_and_server_keeps_serving(server, export, tmp_
         return real_run(cmd, **kwargs)
 
     monkeypatch.setattr(cs, "_run_command_streaming", slow_run)
-    monkeypatch.setattr(cs, "_convert_command", lambda *a: _python("pass"))
+    monkeypatch.setattr(cs, "_convert_command", lambda *a, **k: _python("pass"))
 
     started = time.monotonic()
     status, body = _request(f"{server}/convert", {"solution_name": "Multi", "export_path": export,
@@ -151,6 +151,7 @@ def test_success_reports_counts_and_lands_where_solution_context_looks(server, e
     assert [f["name"] for f in job["files"]] == ["FileA", "FileB"]
     assert isinstance(job["warning_count"], int) and isinstance(job["warnings"], list)
     assert os.path.isfile(os.path.join(job["output_path"], "docs.json"))
+    assert job["html"] is False and job["viewer_path"] == ""
 
     import solution_context as sc
     ctx = sc.load_solution("MultiSol", docs_root=str(docs_root), file="FileB")
@@ -171,7 +172,7 @@ def test_docs_root_falls_back_to_env(server, export, tmp_path, monkeypatch):
 
 def test_non_zero_exit_is_failed(server, export, tmp_path, monkeypatch):
     monkeypatch.setattr(cs, "_convert_command",
-                        lambda *a: _python("import sys; sys.stderr.write('boom: bad export'); sys.exit(3)"))
+                        lambda *a, **k: _python("import sys; sys.stderr.write('boom: bad export'); sys.exit(3)"))
     _, body = _request(f"{server}/convert", {"solution_name": "Multi", "export_path": export,
                                              "docs_root": str(tmp_path / "docs")})
     job = _wait(server, body["job_id"])
@@ -191,7 +192,7 @@ def test_crash_is_failed_and_server_keeps_serving(server, export, tmp_path, monk
     assert job["state"] == "failed" and "cannot start fm-saxml" in job["error"]
 
     assert _request(f"{server}/health")[0] == 200
-    monkeypatch.setattr(cs, "_convert_command", lambda *a: _python("import sys; sys.exit(1)"))
+    monkeypatch.setattr(cs, "_convert_command", lambda *a, **k: _python("import sys; sys.exit(1)"))
     monkeypatch.setattr(cs, "_run_command_streaming", real_run)
     status, body = _request(f"{server}/convert", {"solution_name": "Multi", "export_path": export,
                                                   "docs_root": str(tmp_path / "docs")})
@@ -222,17 +223,65 @@ def test_export_path_sent_unchanged_outside_wsl(server, export, tmp_path, monkey
 
     seen = {}
     monkeypatch.setattr(cs, "_wsl_translate_path", boom)
-    monkeypatch.setattr(cs, "_convert_command", lambda path, root, name: seen.update(path=path) or _python("pass"))
+    monkeypatch.setattr(cs, "_convert_command", lambda path, root, name, **k: seen.update(path=path) or _python("pass"))
     _, body = _request(f"{server}/convert", {"solution_name": "Multi", "export_path": export,
                                              "docs_root": str(tmp_path / "docs")})
     _wait(server, body["job_id"])
     assert seen["path"] == export
 
 
+# -- html / webmcp switches ----------------------------------------------------------
+
+def test_convert_command_switches():
+    base = cs._convert_command("in.xml", "docs", "Sol")
+    assert "--html" not in base and "--webmcp" not in base
+    assert cs._convert_command("in.xml", "docs", "Sol", html=True)[len(base):] == ["--html"]
+    assert cs._convert_command("in.xml", "docs", "Sol", html=True, webmcp=True)[len(base):] == ["--html", "--webmcp"]
+
+
+@pytest.mark.parametrize("sent, expected", [
+    ({}, {"html": False, "webmcp": False}),
+    ({"html": True}, {"html": True, "webmcp": False}),
+    ({"webmcp": True}, {"html": True, "webmcp": True}),     # --webmcp turns on --html, as in fm-saxml
+    ({"html": False, "webmcp": False}, {"html": False, "webmcp": False}),
+])
+def test_switches_reach_fm_saxml_and_the_job(server, export, tmp_path, monkeypatch, sent, expected):
+    seen = {}
+    monkeypatch.setattr(cs, "_convert_command", lambda *a, **k: seen.update(k) or _python("pass"))
+    status, body = _request(f"{server}/convert", {"solution_name": "Multi", "export_path": export,
+                                                  "docs_root": str(tmp_path / "docs"), **sent})
+    assert status == 202, body
+    job = _wait(server, body["job_id"])
+    assert seen == expected
+    assert {k: job[k] for k in expected} == expected
+
+
+@pytest.mark.parametrize("field, value", [("html", "true"), ("html", 1), ("webmcp", None), ("webmcp", "yes")])
+def test_switches_must_be_booleans(server, export, tmp_path, field, value):
+    status, body = _request(f"{server}/convert", {"solution_name": "Multi", "export_path": export,
+                                                  "docs_root": str(tmp_path / "docs"), field: value})
+    assert status == 400 and field in body["error"] and "true or false" in body["error"]
+    with cs._convert_lock:
+        assert not cs._convert_jobs     # nothing was queued
+
+
+@needs_fm_saxml
+def test_webmcp_build_reports_the_viewer(server, export, tmp_path):
+    status, body = _request(f"{server}/convert", {"solution_name": "MultiSol", "export_path": export,
+                                                  "docs_root": str(tmp_path / "docs"), "webmcp": True})
+    assert status == 202, body
+    job = _wait(server, body["job_id"])
+    assert job["state"] == "succeeded", job
+    assert job["html"] is True and job["webmcp"] is True
+    assert job["viewer_path"] == os.path.join(job["output_path"], "index.html")
+    assert os.path.isfile(job["viewer_path"])
+    assert os.path.isdir(os.path.join(job["output_path"], "_viewer", "data"))
+
+
 # -- /explode alias ------------------------------------------------------------------
 
 def test_explode_is_a_deprecated_alias(server, export, tmp_path, monkeypatch, caplog):
-    monkeypatch.setattr(cs, "_convert_command", lambda *a: _python("import sys; sys.exit(2)"))
+    monkeypatch.setattr(cs, "_convert_command", lambda *a, **k: _python("import sys; sys.exit(2)"))
     with caplog.at_level(logging.WARNING, logger="companion_server"):
         status, body = _request(f"{server}/explode", {
             "solution_name": "Multi", "export_file_path": export,
@@ -290,7 +339,7 @@ def test_startup_message(tmp_path, monkeypatch):
 
 def test_convert_uses_harness_exports_by_default(server, export, tmp_path, monkeypatch):
     monkeypatch.setattr(cs, "AFM_ROOT", _make_afm(tmp_path))
-    monkeypatch.setattr(cs, "_convert_command", lambda *a: _python("pass"))
+    monkeypatch.setattr(cs, "_convert_command", lambda *a, **k: _python("pass"))
     status, body = _request(f"{server}/convert", {"solution_name": "Multi", "export_path": export})
     assert status == 202, body
     job = _wait(server, body["job_id"])

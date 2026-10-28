@@ -1,10 +1,10 @@
 # Companion Server
 
-The companion server is a lightweight HTTP server that exposes `fmparse.sh` as a local API endpoint. FileMaker calls it via the native **Insert from URL** script step, which functions as a curl-compatible HTTP client.
+The companion server is a lightweight local HTTP server that runs host-side tools for FileMaker and the agent: fm-saxml conversion, context and debug output, the clipboard, script triggering, linting, the webviewer and layout previews. FileMaker calls it via the native **Insert from URL** script step, which functions as a curl-compatible HTTP client.
 
-**Why this exists:** FileMaker has no built-in mechanism to execute arbitrary shell commands. The companion server fills this gap — no third-party plugin is required. As long as the server is running on the developer's machine, FileMaker can trigger XML parsing and context generation through a simple HTTP POST.
+**Why this exists:** FileMaker has no built-in mechanism to execute arbitrary shell commands. The companion server fills this gap — no third-party plugin is required. As long as the server is running on the developer's machine, FileMaker can trigger XML conversion and context generation through a simple HTTP POST.
 
-**Platforms:** The companion runs on macOS and Windows. `POST /convert` (fm-saxml) works on both. Endpoints that drive FileMaker through AppleScript (`/trigger`, the clipboard) are macOS-only, as is the deprecated `fmparse.sh` runner.
+**Platforms:** The companion runs on macOS and Windows. `POST /convert` (fm-saxml), `/context`, `/debug`, `/lint`, `/pending` and `/preview` work on both. Endpoints that drive FileMaker through AppleScript (`/trigger`, `GET /clipboard`) are macOS-only. `POST /clipboard` works on macOS and under WSL. `POST /webviewer/stop` needs macOS or Linux.
 
 ---
 
@@ -142,9 +142,36 @@ launchctl unload ~/Library/LaunchAgents/com.agentic-fm.companion-server.plist
 
 ## Endpoints
 
+Every route, with its request and response schemas, is in [`companion_openapi.yaml`](companion_openapi.yaml) (OpenAPI 3.1).
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/health` | Liveness check and plug-in status |
+| POST | `/convert` | Queue an fm-saxml conversion |
+| GET | `/convert/<job id>` | A conversion's state and results |
+| POST | `/explode` | Deprecated alias of `POST /convert` |
+| POST | `/context` | Write `CONTEXT.json` |
+| GET, POST | `/pending` | Read and clear, or set, the pending paste job |
+| GET, POST | `/clipboard` | Read FileMaker objects from, or write XML to, the clipboard |
+| POST | `/trigger` | Run a FileMaker script through AppleScript (macOS) |
+| POST | `/debug` | Write runtime debug state |
+| POST | `/lint` | Lint FileMaker code with FMLint |
+| GET | `/webviewer/status` | Whether the webviewer dev server is running |
+| POST | `/webviewer/start`, `/webviewer/stop` | Start or stop the webviewer dev server |
+| POST | `/webviewer/push` | Publish agent output for the webviewer |
+| GET, POST | `/preview/<layout name>` | Serve or store a layout HTML preview |
+| GET, POST | `/plugin/<path>` | Pass-through to the agentic-fm plug-in's HTTP server |
+
+Rules that apply to every route:
+
+- Paths are matched exactly, query string included: `GET /health?x=1` is a `404`. Only `GET /convert/<job id>` ignores a query string.
+- An unknown path answers `404` with `{"error": "Not found"}`. Only `GET` and `POST` are handled; there is no CORS support.
+- Request bodies are JSON with a `Content-Length` header (Insert from URL sends one). A body without it is read as empty.
+- Every request except `GET /health` counts as activity for the [idle auto-shutdown](#idle-auto-shutdown).
+
 ### GET /health
 
-A lightweight liveness check. FileMaker or the developer can poll this to confirm the server is up before starting a conversion.
+A lightweight liveness check. FileMaker or the developer can poll this to confirm the server is up before starting a conversion. It does not count as activity, so monitors can poll it without keeping the server alive.
 
 **Request:**
 
@@ -159,9 +186,12 @@ No request body. No required headers.
 ```json
 {
   "status": "ok",
-  "version": "1.0"
+  "version": "1.0",
+  "plugin": { "installed": false, "usable": false, "server": {}, "license": {}, "solutions": [] }
 }
 ```
+
+`version` comes from `version.txt`. `plugin` describes the agentic-fm FileMaker plug-in, cached for about 60 seconds: whether it is installed and `usable` (installed, reachable and licensed), its server address and token, license details, indexed solutions and, when the plug-in is reachable, its live endpoint catalog in `discover`. See [PLUGIN_INTEGRATION.md](PLUGIN_INTEGRATION.md).
 
 ---
 
@@ -178,14 +208,21 @@ The conversion runs `fm-saxml build` with the same Python the companion runs und
 | `solution_name` | string | Yes | The solution's name. The docs are written to `<docs root>/<solution_name>`, which is where `solution_context.py` (`load_solution` / `find_docs`) looks. For a multi-file export, send one name for the whole batch. |
 | `export_path` | string | Yes | The export folder FileMaker wrote (a multi-file export), or a single `.xml` file. On Windows and macOS the path is used as sent; under WSL, `/C:/...` paths are translated to `/mnt/c/...`. |
 | `docs_root` | string | No | The folder that holds every converted solution. Without it, the companion uses its default docs root (see [Where the docs go](#where-the-docs-go)). |
+| `html` | boolean | No | Also write the HTML viewer (`index.html`), fm-saxml's `--html`. Default `false`. |
+| `webmcp` | boolean | No | Make the viewer agent-ready with WebMCP tools, fm-saxml's `--webmcp`. Turns on `html`. Default `false`. |
 
 ```json
 {
   "solution_name": "Invoices",
   "export_path": "C:\\Users\\you\\Desktop\\Invoices_2026-10-26_1405",
-  "docs_root": "C:\\Users\\you\\SaXML_docs"
+  "docs_root": "C:\\Users\\you\\SaXML_docs",
+  "webmcp": true
 }
 ```
+
+`html` and `webmcp` must be JSON booleans; anything else (`"true"`, `1`, `null`) is refused with `400`. In FileMaker, send them with `JSONSetElement ( $body ; "webmcp" ; True ; JSONBoolean )`. They are the only fm-saxml switches a request can set: the companion always runs `fm-saxml build <export_path> --docs-root <docs root> --solution <solution_name> --force --yes`, plus `--html` / `--webmcp`.
+
+Browsers give the viewer its WebMCP tools only when it is served over `http://127.0.0.1`, not when `index.html` is opened from disk. To use them, serve the finished docs with `fm-saxml serve <output_path>` (the `.venv`'s `fm-saxml`). These switches need an fm-saxml that has them; an older one rejects the switch, and the job fails with fm-saxml's message in `log_tail`.
 
 **Started (202):**
 
@@ -218,6 +255,8 @@ The job's state. `state` is `queued`, `running`, `succeeded` or `failed`; `done`
   "solution_name": "Invoices",
   "export_path": "C:\\Users\\you\\Desktop\\Invoices_2026-10-26_1405",
   "docs_root": "C:\\Users\\you\\SaXML_docs",
+  "html": true,
+  "webmcp": true,
   "output_path": "C:\\Users\\you\\SaXML_docs\\Invoices",
   "created_at": "2026-10-26T14:05:12Z",
   "started_at": "2026-10-26T14:05:12Z",
@@ -225,6 +264,7 @@ The job's state. `state` is `queued`, `running`, `succeeded` or `failed`; `done`
   "exit_code": 0,
   "error": "",
   "kind": "batch",
+  "viewer_path": "C:\\Users\\you\\SaXML_docs\\Invoices\\index.html",
   "counts": { "files": 2, "tables": 14, "fields": 220, "table_occurrences": 40, "relationships": 31,
               "layouts": 58, "scripts": 112, "custom_functions": 9, "value_lists": 12 },
   "files": [
@@ -238,7 +278,8 @@ The job's state. `state` is `queued`, `running`, `succeeded` or `failed`; `done`
 }
 ```
 
-- `counts`, `files`, `kind`, `warning_count` and `warnings` appear once the job has succeeded. Counts come from each file's `entities.json`; warnings come from each file's `Reports/warnings.md` (messages there are cut at 80 characters, and at most 200 warnings are listed — `warning_count` is always the full number).
+- `html` and `webmcp` are the switches the job ran with (`webmcp` turns on `html`).
+- `counts`, `files`, `kind`, `viewer_path`, `warning_count` and `warnings` appear once the job has succeeded. `viewer_path` is the viewer's `index.html`, or `""` when the job was run without `html`. Counts come from each file's `entities.json`; warnings come from each file's `Reports/warnings.md` (messages there are cut at 80 characters, and at most 200 warnings are listed — `warning_count` is always the full number).
 - A failed job has `exit_code` (fm-saxml's exit code, or `null` if it never started), `error`, and `log_tail` — the last 4000 characters of fm-saxml's output.
 - An unknown job ID gives `404`. The companion keeps the last 50 finished jobs; restarting it forgets them.
 
@@ -347,40 +388,50 @@ Writes a CONTEXT.json file to the agentic-fm project on the host. Called by the 
 
 ### GET /pending
 
-Returns and clears the pending paste job set by the most recent `/trigger` call. Called by the `Agentic-fm Paste` FM script to retrieve the target script name and `auto_save` flag without relying on AppleScript parameter passing (which is unreliable in FM Pro 22).
+Returns and clears the pending paste job set by the most recent `/trigger` or `POST /pending` call. Called by the `Agentic-fm Paste` FM script to retrieve the target script name and flags without relying on AppleScript parameter passing (which is unreliable in FM Pro 22).
 
 **Response:**
 ```json
-{ "target": "ScriptName", "auto_save": false }
+{ "target": "ScriptName", "auto_save": false, "select_all": true }
 ```
 
-Returns `{ "target": "", "auto_save": false }` if no pending job is set. The job is cleared on read (consumed once).
+Returns `{}` if no pending job is set. The job is cleared on read (consumed once).
 
 ---
 
 ### POST /pending
 
-Sets the pending paste job directly (without triggering a script). Used for testing or custom trigger flows.
+Sets the pending paste job directly (without triggering a script), replacing any job already set. Used for testing or custom trigger flows.
 
 **Request body:**
 ```json
-{ "target": "ScriptName", "auto_save": true }
+{ "target": "ScriptName", "auto_save": true, "select_all": true }
 ```
+
+All fields are optional: `target` defaults to `""`, `auto_save` to `false`, `select_all` to `true`.
 
 **Response:** `{ "success": true }`
 
 ---
 
+### GET /clipboard
+
+Reads the FileMaker objects on the macOS clipboard with `clipboard.py read` and returns them as XML. macOS only.
+
+**Response:** `{ "success": true, "xml": "<fmxmlsnippet ...>" }`. `404` when the clipboard holds no FileMaker objects; `500` when the read fails or takes over 10 seconds.
+
+---
+
 ### POST /clipboard
 
-Accepts fmxmlsnippet XML content and writes it to the macOS clipboard using `clipboard.py`. Used by `deploy.py` (Tier 1/2/3) so the agent container can load the clipboard without running `osascript` directly.
+Accepts fmxmlsnippet XML content and writes it to the clipboard as FileMaker objects: with `clipboard.py` on macOS, or `clipboard_win.py` (through `powershell.exe`) under WSL. Used by `deploy.py` (Tier 1/2/3) so the agent container can load the clipboard without running `osascript` directly.
 
 **Request body:**
 ```json
 { "xml": "<?xml version=\"1.0\"?>..." }
 ```
 
-**Response:** `{ "success": true }`
+**Response:** `{ "success": true }`. `400` without `xml`; `500` when the clipboard script fails.
 
 ---
 
@@ -396,23 +447,27 @@ Triggers FM Pro on the host to run a named FileMaker script via AppleScript (`os
   "parameter": "TargetScriptName"
 }
 ```
-`parameter` is optional. `fm_app_name` must match the exact AppleScript application name (versioned, with em dash).
+`script` is required unless `raw_applescript` is set. `fm_app_name` defaults to `FileMaker Pro` and must match the exact AppleScript application name (versioned, with em dash). `parameter`, `target_file`, `auto_save` and `select_all` are optional.
 
 The AppleScript template used:
 ```applescript
 tell application "FileMaker Pro — 22.0.4.406"
     activate
     tell document 1
-        do script "Agentic-fm Paste" given parameter:"TargetScriptName"
+        do script "Agentic-fm Paste"
     end tell
 end tell
 ```
 
-**Response:** `{ "success": bool, "stdout": str, "stderr": str }`
+With `target_file`, `tell document 1` becomes `tell (first document whose name contains "<target_file>")`, so the right file is addressed when several are open.
 
-**Parameter passing note:** FM Pro 22 does not reliably receive script parameters via `given parameter:` in `do script`. When `parameter` is provided, the server stores it in an internal pending job before firing AppleScript. The triggered FM script calls `GET /pending` via Insert from URL to retrieve the target and `auto_save` flag. The pending job is cleared on first read.
+**Response:** `{ "success": bool, "stdout": str, "stderr": str }`. This is `200` even when `osascript` fails: check `success` and `stderr`. `400` when neither `script` nor `raw_applescript` is sent; `500` when `osascript` takes over 30 seconds or is missing (not macOS).
+
+**Parameter passing note:** FM Pro 22 does not reliably receive script parameters via `given parameter:` in `do script`, so the server does not send one. When `parameter` is provided, the server stores it as the pending job's `target` (with `auto_save` and `select_all`) before firing AppleScript. The triggered FM script calls `GET /pending` via Insert from URL to retrieve them. The pending job is cleared on first read.
 
 **`auto_save` field:** Pass `"auto_save": true` to instruct `Agentic-fm Paste` to save all scripts after paste (via `Perform AppleScript: tell application "System Events" to keystroke "s" using {command down}`). Defaults to `false`.
+
+**`select_all` field:** Passed to `Agentic-fm Paste` through the pending job. Defaults to `true`.
 
 **Requirements:**
 - macOS only (`osascript` must be available on the host)
@@ -425,11 +480,88 @@ end tell
 
 ### POST /debug
 
-Accepts a JSON payload of runtime debug state and writes it to `agent/debug/output.json` at the repo root. Called by the Agentic-fm Debug FM script.
+Accepts a JSON payload of runtime debug state and writes it to `agent/debug/output.json` at the repo root, replacing the previous one. Called by the Agentic-fm Debug FM script.
 
 **Request body:** Any JSON object (typically `$$DEBUG` variable contents from FM).
 
 **Response:** `{ "success": true, "path": "/path/to/output.json" }`
+
+---
+
+### POST /lint
+
+Lints FileMaker code with the FMLint engine (`agent/fmlint`).
+
+**Request body:**
+```json
+{ "content": "Set Variable [ $x ; Value: 1 ]", "format": "hr", "tier": 2, "disable": ["N003"] }
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `content` | string | Yes | fmxmlsnippet XML or a human-readable script. |
+| `format` | string | No | `xml` or `hr`; detected from the content when omitted. |
+| `tier` | integer | No | Highest rule tier to run (1–3). |
+| `disable` | array | No | Rule IDs to skip. |
+
+**Response:**
+```json
+{
+  "source": "",
+  "ok": false,
+  "error_count": 1,
+  "warning_count": 0,
+  "diagnostics": [
+    { "rule_id": "B001", "severity": "error", "message": "...", "line": 1, "column": 0,
+      "end_line": 0, "end_column": 0, "fix_hint": "..." }
+  ]
+}
+```
+
+`severity` is `error`, `warning`, `info` or `hint`. `line` and `column` are 1-based; `0` means the whole file or the whole line. `fix_hint` appears only when FMLint has one. Errors are `{"error": "..."}` without `success`: `400` for a bad body or missing `content`, `500` when FMLint raises.
+
+---
+
+### Webviewer endpoints
+
+These drive the agentic-fm webviewer (`webviewer/`) from the agent.
+
+- **`GET /webviewer/status`** → `{ "running": bool }`: whether the dev server the companion started is still running.
+- **`POST /webviewer/start`** with `{ "repo_path": "/path/to/agentic-fm" }` runs `npm run dev` in `<repo_path>/webviewer`. Response: `{ "success": true, "status": "started", "pid": 1234 }`, or `"status": "already_running"`. `400` without `repo_path`; `500` if npm cannot start.
+- **`POST /webviewer/stop`** (no body) stops the dev server's process group. Response: `"status": "stopped"` or `"not_running"`. macOS and Linux only.
+- **`POST /webviewer/push`** writes agent output to `<repo_path>/agent/config/.agent-output.json`, which the webviewer polls:
+
+  ```json
+  { "type": "diff", "repo_path": "/path/to/agentic-fm", "content": "...", "before": "...", "styles": "..." }
+  ```
+
+  `type` is `preview`, `diff`, `result`, `diagram` or `layout-preview`. `content` and `before` default to `""`; `styles` (CSS for `layout-preview`) is written only when sent. The file also gets a `timestamp`. Response: `{ "success": true, "path": "..." }`.
+
+---
+
+### GET /preview/&lt;layout name&gt;
+
+Serves a layout's HTML preview as `text/html`: `agent/sandbox/<layout name>_web.html` if it exists, else the `content` of `agent/config/.agent-output.json`, else a "No preview available" heading. Always `200`. See [LAYOUT_PREVIEW_SYSTEM.md](../../docs/LAYOUT_PREVIEW_SYSTEM.md).
+
+The layout name is used as-is in the file name; the server does not URL-decode it, so `/preview/My%20Layout` looks for `My%20Layout_web.html`.
+
+### POST /preview/&lt;layout name&gt;
+
+Stores a preview at `agent/sandbox/<layout name>_web.html`, replacing any earlier one.
+
+**Request body:** `{ "html": "<!doctype html>...", "solution": "Invoices" }` (`solution` is accepted but not used).
+
+**Response:** `{ "success": true, "path": "agent/sandbox/<layout name>_web.html" }`. `400` without `html`.
+
+---
+
+### GET and POST /plugin/&lt;path&gt;
+
+An optional pass-through to the agentic-fm FileMaker plug-in's HTTP server, for clients that can reach the companion but not the plug-in's port (a container, for example) or that want one base URL. Direct plug-in access is the baseline.
+
+The companion appends `<path>` (query string included) to the plug-in's base URL, adds its bearer token, forwards a POST body with its `Content-Type`, and returns the plug-in's status, `Content-Type` and body unchanged. For example, `GET /plugin/api/discover` returns the plug-in's endpoint catalog.
+
+When the plug-in is not usable (not installed, unreachable or unlicensed) or the call fails, the companion answers `502` with `{"success": false, "error": "..."}`. See [PLUGIN_INTEGRATION.md](PLUGIN_INTEGRATION.md).
 
 ---
 
@@ -439,7 +571,7 @@ Accepts a JSON payload of runtime debug state and writes it to `agent/debug/outp
 
 The server binds exclusively to `127.0.0.1` (localhost) by default. It is not reachable from other machines on the network — only processes running on the same machine can connect. No authentication is implemented, which is acceptable because the attack surface is limited to local processes already running under the same user account.
 
-Do not set `bind_host` (`companion.json`) or `COMPANION_BIND_HOST` to `0.0.0.0`, or expose the server through a reverse proxy. Endpoints such as `/convert` and `/trigger` run programs with the permissions of the user who started the server.
+Do not set `bind_host` (`companion.json`) or `COMPANION_BIND_HOST` to `0.0.0.0`, or expose the server through a reverse proxy. Endpoints such as `/convert`, `/trigger` (which accepts arbitrary AppleScript) and `/webviewer/start` run programs, and `/context`, `/debug`, `/webviewer/push` and `/preview` write files, all with the permissions of the user who started the server.
 
 > **Note for Docker users:** When running the agent in a container, `COMPANION_BIND_HOST=0.0.0.0` is required so the container can reach the host-side server. This is still safe as long as the host machine is on a private, firewalled network — the port should never be forwarded to a public interface.
 
