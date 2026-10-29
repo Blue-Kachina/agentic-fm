@@ -49,6 +49,8 @@ def no_default_docs_root(monkeypatch, tmp_path):
     """No $FM_SAXML_DOCS_ROOT, and agentic-fm not a harness submodule (whatever this checkout is)."""
     monkeypatch.delenv(cs.DOCS_ROOT_ENV, raising=False)
     monkeypatch.setattr(cs, "AFM_ROOT", str(tmp_path / "standalone" / "agentic-fm"))
+    # An fm-saxml without --progress makes the companion remember that (P3-11); start each test fresh.
+    monkeypatch.setattr(cs, "_convert_progress_supported", True)
 
 
 def _make_afm(base, git_file: bool = True, parent: str = "tools", gitmodules: bool = True) -> str:

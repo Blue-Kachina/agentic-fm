@@ -66,6 +66,30 @@ Startup log output:
 2026-03-09T14:22:01 INFO Press Ctrl-C to stop.
 ```
 
+### Live progress panel
+
+While FileMaker exports a solution ([`POST /progress`](#post-progress)) and fm-saxml converts it ([`POST /convert`](#post-convert)), the companion draws one panel at the bottom of its terminal:
+
+```
+┌─ agentic-fm progress ───────────────────────────────────────────────────────────┐
+│ export   Invoices  file 3 of 12 Invoices.fmp12                                  │
+│                    ━━━━━━━━━━━━━━━  25.0s elapsed · about 30.0s left            │
+│                    finished: Contacts.fmp12 2.0s, Lines.fmp12 4.0s              │
+│ convert  Sales     Analyzing: file 2 of 5 Invoices                              │
+│                    ━━━━━━━━━━━━━━━  1m 15s elapsed · about 24.0s left in this … │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+It shows the step (export, then convert with its fm-saxml stage), the file N of M, the time of each finished file, the total elapsed time and an estimate of the time left (the average time of the files finished so far in that step or stage, times the files still to do; "estimating" until the first file is done). Log lines print above it. The panel is there only while an export or a conversion is in progress: when nothing runs, the terminal shows the log alone, and the end of each run is in the log (`Export done`, `convert ... succeeded`). An export with no event for 30 minutes is taken as abandoned and leaves the panel.
+
+The panel needs [Rich](https://github.com/Textualize/rich), which the DIS harness `.venv` has through fm-saxml, and a terminal (the VS Code task terminal counts). Otherwise the companion prints the plain log lines and no control codes:
+
+- stdout is not a terminal (redirected to a file, a launchd or background job), or `TERM=dumb`;
+- Rich cannot be imported (the companion itself needs only the standard library);
+- `--no-live`, or the `COMPANION_NO_LIVE` environment variable set to `1` (or anything but empty, `0`, `false`, `no`).
+
+The startup log says which applies, for example `Live progress panel: off, stdout is not a terminal; plain log lines only.` The code is in `agent/scripts/companion_live.py`.
+
 ### Background process (Mac)
 
 To run the server in the background without blocking the terminal:
@@ -149,6 +173,7 @@ Every route, with its request and response schemas, is in [`companion_openapi.ya
 | GET | `/health` | Liveness check and plug-in status |
 | POST | `/convert` | Queue an fm-saxml conversion |
 | GET | `/convert/<job id>` | A conversion's state and results |
+| POST | `/progress` | Report the export step's progress (FileMaker's export script) |
 | POST | `/explode` | Deprecated alias of `POST /convert` |
 | POST | `/context` | Write `CONTEXT.json` |
 | GET, POST | `/pending` | Read and clear, or set, the pending paste job |
@@ -263,6 +288,14 @@ The job's state. `state` is `queued`, `running`, `succeeded` or `failed`; `done`
   "finished_at": "2026-10-26T14:05:31Z",
   "exit_code": 0,
   "error": "",
+  "progress": {
+    "stage": null, "file": null, "index": 0, "total": 0, "elapsed": 18.6,
+    "files": [
+      { "stage": "read", "file": "Invoices_UI", "seconds": 0.4 },
+      { "stage": "read", "file": "Invoices_Data", "seconds": 2.1 },
+      { "stage": "analyze", "file": "Invoices_UI", "seconds": 0.9 }
+    ]
+  },
   "kind": "batch",
   "viewer_path": "C:\\Users\\you\\SaXML_docs\\Invoices\\index.html",
   "counts": { "files": 2, "tables": 14, "fields": 220, "table_occurrences": 40, "relationships": 31,
@@ -279,11 +312,61 @@ The job's state. `state` is `queued`, `running`, `succeeded` or `failed`; `done`
 ```
 
 - `html` and `webmcp` are the switches the job ran with (`webmcp` turns on `html`).
+- `progress` is where the build is, read from fm-saxml's `--progress json` output. It is `{}` until the first progress event, and stays `{}` with an fm-saxml that has no `--progress` (the companion then runs the build again without the option, once, and remembers that until it restarts). It is there while the job runs and after it finishes:
+  - `stage`: the stage under way: `read`, `scrub`, `analyze`, `write_raw` or `write_pages` (`null` after the last event, at the end of a successful build).
+  - `file`: the FileMaker file being worked on, or `null` at the start and end of a stage.
+  - `index` and `total`: that file's number in the stage (1-based) and the number of files in it. `index` is `0` at the start of a stage and equals `total` at its end.
+  - `elapsed`: seconds since the build started.
+  - `files`: one entry per finished file and stage, in order, with `seconds` for how long that file took in that stage.
+
+  While a job runs, show it as for example `Analyzing 3/12 Invoices` with `JSONGetElement ( $response ; "progress.index" )` and its neighbours. The companion's log has one readable line per event, such as `convert 3f9c0a1b2c4d: Analyzing 3/12 Invoices (4.2s)`.
 - `counts`, `files`, `kind`, `viewer_path`, `warning_count` and `warnings` appear once the job has succeeded. `viewer_path` is the viewer's `index.html`, or `""` when the job was run without `html`. Counts come from each file's `entities.json`; warnings come from each file's `Reports/warnings.md` (messages there are cut at 80 characters, and at most 200 warnings are listed — `warning_count` is always the full number).
 - A failed job has `exit_code` (fm-saxml's exit code, or `null` if it never started), `error`, and `log_tail` — the last 4000 characters of fm-saxml's output.
 - An unknown job ID gives `404`. The companion keeps the last 50 finished jobs; restarting it forgets them.
 
 In FileMaker, read the fields with `JSONGetElement ( $response ; "state" )`, `JSONGetElement ( $response ; "counts.fields" )`, `JSONGetElement ( $response ; "warnings[0].message" )` and so on.
+
+---
+
+### POST /progress
+
+FileMaker's export script calls this before and after each Save a Copy as XML, and once after the last file, so the companion can show the export step, which happens before `/convert` is called. It returns `200` at once: the companion only logs the event and keeps the latest export state of each solution in memory (for the [live progress panel](#live-progress-panel) and a later `/convert` of that solution). Like every request, it counts as activity for the idle auto-shutdown.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `solution_name` | string | Yes | The solution being exported, the same name later sent to `/convert`. Matched without case. |
+| `stage` | string | Yes | The step; the export script sends `export`. |
+| `event` | string | Yes | `file_start` before a file is saved, `file_done` after it, `done` once after the last file. |
+| `file` | string | Yes | The file being exported, e.g. `Invoices.fmp12`. May be empty for `done`. |
+| `index` | number | Yes | The file's number, 1 to `total`. Any whole number from 0 for `done`. |
+| `total` | number | Yes | How many files the export has. |
+
+```json
+{"solution_name": "Invoices", "stage": "export", "event": "file_start",
+ "file": "Invoices.fmp12", "index": 3, "total": 12}
+```
+
+`index` and `total` may be JSON numbers or integer text (`"3"`), since an Insert from URL body built as text often carries them that way.
+
+**Response (200):**
+
+```json
+{ "success": true, "solution_name": "Invoices", "event": "file_start", "index": 3, "total": 12, "done": false }
+```
+
+**Refused (400):** invalid JSON, a body that is not an object, or a missing or wrong field (an empty name or stage, an unknown `event`, an empty `file` for a file event, `index` or `total` not a whole number of at least 0, or `index` outside 1 to `total` for a file event). The `error` message names each problem; nothing is recorded.
+
+**Log lines:**
+
+```
+2026-10-29T14:05:12 INFO export Invoices: Exporting 3/12 Invoices.fmp12
+2026-10-29T14:05:20 INFO export Invoices: Exported 3/12 Invoices.fmp12 (8.4s)
+2026-10-29T14:06:53 INFO export Invoices: Export done: 12 file(s) in 101.2s
+```
+
+The time on `file_done` is measured by the companion from the `file_start` with the same `index` and `file`; without one, the line says the time is unknown. A `file_start` with `index` 1, or any file event after a `done`, starts a new run of that solution and clears its earlier files. Restarting the companion forgets every run.
 
 ---
 
@@ -671,3 +754,5 @@ When the server is running in the foreground (or writing to a log file), each re
 ```
 
 The `stdout` and `stderr` fields in the response body contain the full output of `fmparse.sh`, which is the first place to look when the exit code is non-zero.
+
+A `/convert` job logs the fm-saxml command, one line per progress event (`convert 3f9c0a1b2c4d: Analyzing 3/12 Invoices (4.2s)`) and fm-saxml's other output as it comes. FileMaker's `GET /convert/<job id>` polls are logged at debug, so they don't show at the default level; every other request is still logged.

@@ -430,22 +430,31 @@ log = logging.getLogger("companion_server")
 SUBPROCESS_HEARTBEAT_SECONDS = 5
 
 
-def _stream_pipe(pipe, level, prefix, output_buffer, state):
-    """Copy a subprocess pipe to the logger in real time while buffering it."""
+def _stream_pipe(pipe, level, prefix, output_buffer, state, on_line=None):
+    """Copy a subprocess pipe to the logger in real time while buffering it.
+
+    on_line, when set, sees each line first; a line it returns True for is handled
+    (logged its own way) and is neither logged here nor buffered.
+    """
     try:
         for line in iter(pipe.readline, ""):
             if not line:
                 break
-            output_buffer.append(line)
             with state["lock"]:
                 state["last_output_at"] = time.monotonic()
+            if on_line is not None and on_line(line):
+                continue
+            output_buffer.append(line)
             level("%s%s", prefix, line.rstrip("\n"))
     finally:
         pipe.close()
 
 
-def _run_command_streaming(cmd, *, cwd, env, label):
-    """Run a command, stream its output to the server log, and capture it."""
+def _run_command_streaming(cmd, *, cwd, env, label, on_stdout_line=None):
+    """Run a command, stream its output to the server log, and capture it.
+
+    on_stdout_line: optional per-line hook for stdout (see _stream_pipe).
+    """
     process = subprocess.Popen(
         cmd,
         cwd=cwd,
@@ -465,7 +474,7 @@ def _run_command_streaming(cmd, *, cwd, env, label):
 
     stdout_thread = threading.Thread(
         target=_stream_pipe,
-        args=(process.stdout, log.info, f"[{label} stdout] ", stdout_chunks, state),
+        args=(process.stdout, log.info, f"[{label} stdout] ", stdout_chunks, state, on_stdout_line),
         daemon=True,
     )
     stderr_thread = threading.Thread(
@@ -537,9 +546,21 @@ CONVERT_COUNT_KEYS = {
     "value_lists": "valueLists",
 }
 
+# fm-saxml's --progress json stage ids → labels for the log (same as its plain mode).
+CONVERT_STAGE_LABELS = {
+    "read": "Reading",
+    "scrub": "Scrubbing",
+    "analyze": "Analyzing",
+    "write_raw": "Writing raw XML",
+    "write_pages": "Writing pages",
+}
+
 _convert_jobs: dict = {}        # job id → job dict; insertion-ordered
 _convert_lock = threading.Lock()
 _convert_slot = threading.Semaphore(1)   # one conversion at a time; the rest stay "queued"
+# Whether the installed fm-saxml takes --progress json. Set to False the first time a build
+# rejects it (an fm-saxml before P3-10), so later builds don't pay the retry; a restart resets it.
+_convert_progress_supported = True
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 _WARNING_TOTAL_RE = re.compile(r"_(\d+) warning\(s\) total_")
@@ -615,13 +636,18 @@ def _no_docs_root_error() -> str:
 
 
 def _convert_command(export_path: str, docs_root: str, solution_name: str, *,
-                     html: bool = False, webmcp: bool = False) -> list:
-    """The fm-saxml command for one conversion (tests replace this)."""
+                     html: bool = False, webmcp: bool = False, progress: bool = True) -> list:
+    """The fm-saxml command for one conversion (tests replace this).
+
+    progress=False leaves out --progress json, for an fm-saxml that doesn't have it.
+    """
     cmd = [
         sys.executable, "-m", "fm_saxml", "build", export_path,
         "--docs-root", docs_root, "--solution", solution_name,
         "--force", "--yes",
     ]
+    if progress:
+        cmd += ["--progress", "json"]
     if html:
         cmd.append("--html")
     if webmcp:
@@ -729,17 +755,93 @@ def _update_job(job_id: str, **fields) -> None:
             job.update(fields)
 
 
+def _parse_progress_line(line: str):
+    """The event dict when line is one of fm-saxml's --progress json lines, else None."""
+    text = line.strip()
+    if not text.startswith("{"):
+        return None
+    try:
+        event = json.loads(text)
+    except ValueError:
+        return None
+    return event if isinstance(event, dict) and "event" in event else None
+
+
+def _seconds(value) -> str:
+    return f"{value:.1f}s" if isinstance(value, (int, float)) and not isinstance(value, bool) else "?s"
+
+
+def _progress_message(event: dict) -> str:
+    """One readable log line for a progress event, e.g. "Analyzing 3/12 Invoices (4.2s)"."""
+    kind = event.get("event")
+    stage = event.get("stage") or ""
+    label = CONVERT_STAGE_LABELS.get(stage, stage.replace("_", " ").capitalize())
+    counter = f"{event.get('index')}/{event.get('total')}"
+    if kind == "stage_start":
+        return f"{label}: {event.get('total')} file(s)"
+    if kind == "file_start":
+        return f"{label} {counter} {event.get('file')}"
+    if kind == "file_done":
+        return f"{label} {counter} {event.get('file')} ({_seconds(event.get('seconds'))})"
+    if kind == "stage_done":
+        return f"{label} done ({_seconds(event.get('seconds'))})"
+    if kind == "done":
+        return f"fm-saxml done ({_seconds(event.get('elapsed'))})"
+    return " ".join(str(part) for part in (kind, label, counter, event.get("file") or "") if part).strip()
+
+
+def _record_progress(job_id: str, event: dict) -> None:
+    """Fold one progress event into the job's progress block (see GET /convert in COMPANION_SERVER.md)."""
+    with _convert_lock:
+        job = _convert_jobs.get(job_id)
+        if job is None:
+            return
+        progress = job.setdefault("progress", {})
+        progress.update({key: event.get(key) for key in ("stage", "file", "index", "total", "elapsed")})
+        files = progress.setdefault("files", [])
+        if event.get("event") == "file_done":
+            files.append({"stage": event.get("stage"), "file": event.get("file"),
+                          "seconds": event.get("seconds")})
+
+
+def _progress_rejected(stderr: str) -> bool:
+    """True when fm-saxml's own option parser refused --progress (an fm-saxml before P3-10)."""
+    text = _ANSI_RE.sub("", stderr or "")
+    return "No such option" in text and "--progress" in text
+
+
 def _run_convert_job(job_id: str) -> None:
     """Worker thread: run one conversion and record its outcome. Never raises."""
+    global _convert_progress_supported
     with _convert_lock:
         job = dict(_convert_jobs[job_id])
+
+    def on_line(line: str) -> bool:
+        event = _parse_progress_line(line)
+        if event is None:
+            return False
+        _record_progress(job_id, event)
+        log.info("convert %s: %s", job_id, _progress_message(event))
+        return True
+
+    def run(progress: bool) -> dict:
+        extra = {} if progress else {"progress": False}
+        cmd = _convert_command(job["export_path"], job["docs_root"], job["solution_name"],
+                               html=job["html"], webmcp=job["webmcp"], **extra)
+        log.info("convert %s: %s", job_id, " ".join(cmd))
+        return _run_command_streaming(cmd, cwd=None, env=_convert_env(), label=f"fm-saxml {job_id}",
+                                      on_stdout_line=on_line)
+
     try:
         with _convert_slot:
             _update_job(job_id, state="running", started_at=_utc_now())
-            cmd = _convert_command(job["export_path"], job["docs_root"], job["solution_name"],
-                                   html=job["html"], webmcp=job["webmcp"])
-            log.info("convert %s: %s", job_id, " ".join(cmd))
-            result = _run_command_streaming(cmd, cwd=None, env=_convert_env(), label=f"fm-saxml {job_id}")
+            with_progress = _convert_progress_supported
+            result = run(with_progress)
+            if with_progress and result["returncode"] == 2 and _progress_rejected(result["stderr"]):
+                _convert_progress_supported = False
+                log.info("convert %s: this fm-saxml has no --progress; running it again without", job_id)
+                _update_job(job_id, progress={})
+                result = run(False)
         output = result["stdout"] + result["stderr"]
         if result["returncode"] != 0:
             _update_job(job_id, state="failed", done=True, finished_at=_utc_now(),
@@ -790,6 +892,7 @@ def _start_convert_job(solution_name: str, export_path: str, docs_root: str, *,
             "finished_at": "",
             "exit_code": None,
             "error": "",
+            "progress": {},     # filled from fm-saxml's --progress json lines; stays {} without them
         }
         _convert_jobs[job_id] = job
         finished = [jid for jid, j in _convert_jobs.items() if j["done"]]
@@ -805,6 +908,123 @@ def _get_convert_job(job_id: str):
     with _convert_lock:
         job = _convert_jobs.get(job_id)
         return json.loads(json.dumps(job)) if job is not None else None
+
+
+# ---------------------------------------------------------------------------
+# Export progress (POST /progress)
+# ---------------------------------------------------------------------------
+#
+# FileMaker's export script reports each Save a Copy as XML before (file_start)
+# and after (file_done) it runs, and once (done) after the last file, so the
+# companion can show the export step, which happens before /convert is called.
+# Only the latest run of each solution is kept, keyed by its casefolded name.
+
+PROGRESS_EVENTS = ("file_start", "file_done", "done")
+
+_export_progress: dict = {}
+_export_file_starts: dict = {}   # casefolded solution → {(index, casefolded file): monotonic of its file_start}
+_export_lock = threading.Lock()
+
+
+def _progress_int(value):
+    """value as an int >= 0, or None. Insert from URL may send numbers as text ("3")."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, float):
+        return int(value) if value.is_integer() and value >= 0 else None
+    if isinstance(value, str) and value.strip().isascii() and value.strip().isdigit():
+        return int(value.strip())
+    return None
+
+
+def _validate_progress(payload) -> tuple:
+    """Check a POST /progress body. Returns (event, None), or (None, error message)."""
+    if not isinstance(payload, dict):
+        return None, "Request body must be a JSON object"
+    errors = []
+    for name in ("solution_name", "stage"):
+        if not isinstance(payload.get(name), str) or not payload[name].strip():
+            errors.append(f"{name} must be a non-empty string")
+    event = payload.get("event")
+    if event not in PROGRESS_EVENTS:
+        errors.append(f"event must be one of {', '.join(PROGRESS_EVENTS)}")
+    file = payload.get("file")
+    if not isinstance(file, str) or (event != "done" and not file.strip()):
+        errors.append("file must be a string, not empty except for done")
+    numbers = {}
+    for name in ("index", "total"):
+        numbers[name] = _progress_int(payload.get(name))
+        if numbers[name] is None:
+            errors.append(f"{name} must be a whole number >= 0")
+    if (not errors and event != "done"
+            and not 1 <= numbers["index"] <= numbers["total"]):
+        errors.append("index must be between 1 and total")
+    if errors:
+        return None, "; ".join(errors)
+    return {"solution_name": payload["solution_name"].strip(), "stage": payload["stage"].strip(),
+            "event": event, "file": file.strip(), **numbers}, None
+
+
+def _record_export_progress(event: dict, now: "float | None" = None) -> dict:
+    """Record one validated export event, log it, and return a copy of that solution's state.
+
+    A new run starts with a file_start of index 1, or with any file event after a done.
+    file_done takes its time from the file_start of the same index and file.
+    """
+    now = time.monotonic() if now is None else now
+    key = event["solution_name"].casefold()
+    kind = event["event"]
+    with _export_lock:
+        state = _export_progress.get(key)
+        if (state is None or (state["done"] and kind != "done")
+                or (kind == "file_start" and event["index"] == 1)):
+            state = {"solution_name": event["solution_name"], "stage": event["stage"], "event": kind,
+                     "file": "", "index": 0, "total": 0, "started_at": now, "updated_at": now,
+                     "files": [], "done": False}
+            _export_progress[key] = state
+            _export_file_starts[key] = {}
+        starts = _export_file_starts.setdefault(key, {})
+        file_key = (event["index"], event["file"].casefold())
+        seconds = None
+        if kind == "file_start":
+            starts[file_key] = now
+        elif kind == "file_done":
+            started = starts.pop(file_key, None)
+            seconds = round(now - started, 1) if started is not None else None
+            state["files"].append({"file": event["file"], "seconds": seconds})
+        state.update(solution_name=event["solution_name"], stage=event["stage"], event=kind, updated_at=now)
+        if kind == "done":
+            state["done"] = True
+            if event["total"]:      # a done may carry 0/0: keep the last file's N of M
+                state.update(index=event["index"], total=event["total"])
+        else:
+            state.update(file=event["file"], index=event["index"], total=event["total"])
+        snapshot = json.loads(json.dumps(state))
+    name = event["solution_name"]
+    if kind == "file_start":
+        log.info("export %s: Exporting %d/%d %s", name, event["index"], event["total"], event["file"])
+    elif kind == "file_done" and seconds is not None:
+        log.info("export %s: Exported %d/%d %s (%.1fs)", name, event["index"], event["total"],
+                 event["file"], seconds)
+    elif kind == "file_done":
+        log.info("export %s: Exported %d/%d %s (no matching file_start, time unknown)", name,
+                 event["index"], event["total"], event["file"])
+    else:
+        log.info("export %s: Export done: %d file(s) in %.1fs", name, len(snapshot["files"]),
+                 now - snapshot["started_at"])
+    return snapshot
+
+
+def _get_export_progress(solution_name: "str | None" = None):
+    """A copy of one solution's latest export state (None if it has none), or with no name,
+    of every solution's, keyed by casefolded name."""
+    with _export_lock:
+        if solution_name is None:
+            return json.loads(json.dumps(_export_progress))
+        state = _export_progress.get(solution_name.casefold())
+        return json.loads(json.dumps(state)) if state is not None else None
 
 
 # ---------------------------------------------------------------------------
@@ -868,8 +1088,19 @@ class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
 class CompanionHandler(BaseHTTPRequestHandler):
 
     def log_message(self, fmt, *args):
-        """Route access log through the standard logger."""
-        log.info("%s - %s", self.address_string(), fmt % args)
+        """Route access log through the standard logger.
+
+        GET /convert/<job id> goes at debug: FileMaker polls it every second or so, and at
+        info those lines would bury the conversion's own progress lines. So does a successful
+        POST /progress, which already logs its own readable line per event.
+        """
+        command = getattr(self, "command", None)
+        path = str(getattr(self, "path", ""))
+        # log_request passes (request line, status code, size); errors come through other formats.
+        succeeded = len(args) == 3 and str(args[1]).startswith("2")
+        quiet = ((command == "GET" and path.startswith("/convert/"))
+                 or (command == "POST" and path == "/progress" and succeeded))
+        (log.debug if quiet else log.info)("%s - %s", self.address_string(), fmt % args)
 
     # ------------------------------------------------------------------
     # Routing
@@ -906,6 +1137,8 @@ class CompanionHandler(BaseHTTPRequestHandler):
             self._handle_convert()
         elif self.path == "/explode":
             self._handle_explode_alias()
+        elif self.path == "/progress":
+            self._handle_progress()
         elif self.path == "/context":
             self._handle_context()
         elif self.path == "/debug":
@@ -1059,7 +1292,7 @@ class CompanionHandler(BaseHTTPRequestHandler):
         )
 
     def _handle_convert_get(self, job_id: str):
-        """GET /convert/<job id> — a conversion's state, then its counts and warnings."""
+        """GET /convert/<job id> — a conversion's state and progress, then its counts and warnings."""
         job = _get_convert_job(job_id)
         if job is None:
             self._send_json({"success": False, "error": f"No such job: {job_id}"}, status=404)
@@ -1215,6 +1448,21 @@ class CompanionHandler(BaseHTTPRequestHandler):
             status = 500
 
         self._send_json(response, status=status)
+
+    def _handle_progress(self):
+        """POST /progress — record one export step event from FileMaker's export script."""
+        try:
+            payload = json.loads(self._read_body() or b"{}")
+        except (ValueError, OSError) as exc:
+            self._send_json({"success": False, "error": f"Invalid request: {exc}"}, status=400)
+            return
+        event, error = _validate_progress(payload)
+        if error:
+            self._send_json({"success": False, "error": error}, status=400)
+            return
+        state = _record_export_progress(event)
+        self._send_json({"success": True, "solution_name": state["solution_name"], "event": state["event"],
+                         "index": state["index"], "total": state["total"], "done": state["done"]})
 
     def _handle_context(self):
         try:
@@ -1819,6 +2067,14 @@ def parse_args():
             f"and companion.json (default: {DEFAULT_IDLE_TIMEOUT})."
         ),
     )
+    parser.add_argument(
+        "--no-live",
+        action="store_true",
+        help=(
+            "Print plain log lines only, without the live progress panel "
+            "(same as COMPANION_NO_LIVE=1). The panel needs a terminal and Rich."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -1832,6 +2088,31 @@ def _shutdown_cleanup(server):
                 log.info("Stopped webviewer (process group %d)", pgid)
             except Exception as exc:
                 log.warning("Failed to stop webviewer on shutdown: %s", exc)
+
+
+def _convert_jobs_snapshot() -> list:
+    with _convert_lock:
+        return json.loads(json.dumps(list(_convert_jobs.values())))
+
+
+def _start_live_panel(no_live: bool):
+    """Start the live progress panel (companion_live.py) when stdout is a terminal and Rich imports.
+
+    Returns the LiveView to stop, or None when the companion prints plain log lines.
+    """
+    try:
+        import companion_live
+    except ImportError as exc:
+        log.info("Live progress panel: off (%s); plain log lines only.", exc)
+        return None
+    try:
+        live, message = companion_live.start_live(_get_export_progress, _convert_jobs_snapshot,
+                                                  no_live=no_live, stage_labels=CONVERT_STAGE_LABELS)
+    except Exception as exc:    # the panel is a nicety: it must never stop the companion
+        log.warning("Live progress panel failed to start (%s); plain log lines only.", exc)
+        return None
+    log.info(message)
+    return live
 
 
 def main():
@@ -1863,8 +2144,9 @@ def main():
         threading.Thread(target=_idle_watchdog, args=(server, idle_timeout), daemon=True).start()
     else:
         log.info("Idle auto-shutdown: disabled (always-on).")
-    log.info("Endpoints: GET /health  GET /clipboard  GET /webviewer/status  GET /preview/<name>  GET /convert/<job id>  GET|POST /plugin/<path>  POST /convert  POST /explode (deprecated alias of /convert)  POST /context  POST /clipboard  POST /trigger  POST /debug  POST /webviewer/start  POST /webviewer/stop  POST /webviewer/push  POST /preview/<name>")
+    log.info("Endpoints: GET /health  GET /clipboard  GET /webviewer/status  GET /preview/<name>  GET /convert/<job id>  GET|POST /plugin/<path>  POST /convert  POST /explode (deprecated alias of /convert)  POST /progress  POST /context  POST /clipboard  POST /trigger  POST /debug  POST /webviewer/start  POST /webviewer/stop  POST /webviewer/push  POST /preview/<name>")
     log.info(_docs_root_startup_message())
+    live = _start_live_panel(args.no_live)
     log.info("Press Ctrl-C to stop.")
 
     try:
@@ -1872,6 +2154,8 @@ def main():
     except KeyboardInterrupt:
         log.info("Shutting down.")
     finally:
+        if live is not None:
+            live.stop()
         _shutdown_cleanup(server)
 
 

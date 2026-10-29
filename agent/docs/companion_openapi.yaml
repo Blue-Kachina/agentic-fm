@@ -137,6 +137,59 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Failure" }
 
+  /progress:
+    post:
+      tags: [Conversion]
+      operationId: reportExportProgress
+      summary: Report the export step's progress
+      description: |
+        Called by FileMaker's export script before (`file_start`) and after (`file_done`)
+        each Save a Copy as XML, and once (`done`) after the last file. Returns at once;
+        the companion only logs the event and keeps the latest state of each solution's
+        export in memory. `file_done` is logged with the time since the `file_start` of
+        the same `index` and `file`. A `file_start` with `index` 1, or any file event
+        after a `done`, starts a new run.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [solution_name, stage, event, file, index, total]
+              properties:
+                solution_name: { type: string, minLength: 1 }
+                stage: { type: string, minLength: 1, description: "`export` for the export script." }
+                event: { type: string, enum: [file_start, file_done, done] }
+                file: { type: string, description: The file being exported. May be empty for `done`. }
+                index:
+                  type: [integer, string]
+                  description: 1-based file number (1..total) for file events, any whole number >= 0 for `done`. Integer text such as `"3"` is accepted.
+                total:
+                  type: [integer, string]
+                  description: Number of files in the export. Integer text is accepted.
+            example: { solution_name: Invoices, stage: export, event: file_start, file: Invoices.fmp12, index: 3, total: 12 }
+      responses:
+        "200":
+          description: Recorded and logged.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, const: true }
+                  solution_name: { type: string }
+                  event: { type: string }
+                  index: { type: integer }
+                  total: { type: integer }
+                  done: { type: boolean }
+        "400":
+          description: |
+            Invalid JSON, body not an object, or a missing or wrong field; the message
+            names each one. Nothing is recorded.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
+
   /explode:
     post:
       tags: [Conversion]
@@ -882,6 +935,27 @@ components:
           type: [integer, "null"]
           description: fm-saxml's exit code; `null` if it never ran.
         error: { type: string, description: Empty unless failed. }
+        progress:
+          type: object
+          description: >-
+            Where the build is, from fm-saxml's `--progress json` output. `{}` until the first
+            event, and with an fm-saxml that has no `--progress`. After fm-saxml's `done` event,
+            `stage` and `file` are `null` and `index`/`total` are 0.
+          properties:
+            stage: { type: [string, "null"], description: "`read`, `scrub`, `analyze`, `write_raw` or `write_pages`." }
+            file: { type: [string, "null"] }
+            index: { type: integer, description: 1-based file number in the stage. }
+            total: { type: integer, description: Files in the stage. }
+            elapsed: { type: number, description: Seconds since fm-saxml's build started. }
+            files:
+              type: array
+              description: Every finished file, per stage.
+              items:
+                type: object
+                properties:
+                  stage: { type: string }
+                  file: { type: string }
+                  seconds: { type: number }
         log_tail:
           type: string
           description: Failed jobs only. The last 4000 characters of fm-saxml's output.
