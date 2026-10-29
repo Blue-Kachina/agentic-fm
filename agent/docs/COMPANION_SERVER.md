@@ -693,15 +693,25 @@ If Insert from URL itself fails (e.g. the server is not running), FileMaker disp
 ### Port already in use
 
 ```
-OSError: [Errno 48] Address already in use
+ERROR Port 8765 on 127.0.0.1 is already in use, probably by another companion server. Stop it (...), or start this one with --port.
 ```
 
-Another process — possibly a previous instance of the companion server — is already bound to port 8765. Find and stop it:
+Another process — possibly a previous instance of the companion server — is already bound to port 8765, and the companion exits. Find and stop it:
 
 ```bash
 lsof -i :8765
 kill <PID>
 ```
+
+On Windows (PowerShell):
+
+```powershell
+netstat -ano | findstr :8765
+Get-CimInstance Win32_Process -Filter "ProcessId=<PID>" | Select ProcessId, CreationDate, CommandLine
+Stop-Process -Id <PID>
+```
+
+On Windows the companion takes its port exclusively (`SO_EXCLUSIVEADDRUSE`, and no `SO_REUSEADDR`). Before, a second companion could listen on the same port without any error, and FileMaker's requests then reached either one: one terminal showed nothing while the other did the work. A companion from before this change can still share a port with another one from before it, so stop any old one that `netstat` shows.
 
 Or start the server on a different port and update the URL in the FileMaker companion script:
 

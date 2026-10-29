@@ -54,12 +54,14 @@ Windows, start_companion.sh on macOS.
 """
 
 import argparse
+import errno
 import json
 import logging
 import os
 import platform
 import re
 import signal
+import socket
 import subprocess
 import sys
 import threading
@@ -1077,8 +1079,28 @@ def _idle_watchdog(server, idle_timeout: int) -> None:
 # ---------------------------------------------------------------------------
 
 class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
-    """HTTPServer with thread-per-request concurrency."""
+    """HTTPServer with thread-per-request concurrency.
+
+    On Windows, SO_REUSEADDR lets a second process bind a port that is already
+    listening (elsewhere it only allows rebinding during TIME_WAIT). Two companions
+    would then share 8765 and FileMaker's requests would go to either one, so on
+    Windows the port is taken exclusively: a second companion fails to start.
+    """
     daemon_threads = True
+    allow_reuse_address = sys.platform != "win32"
+
+    def server_bind(self):
+        if sys.platform == "win32":
+            # Also keeps out a later process that does set SO_REUSEADDR (an older companion)
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
+
+
+def _port_in_use_message(host: str, port: int) -> str:
+    stop = ("netstat -ano | findstr :%d, then Stop-Process -Id <PID>" % port if sys.platform == "win32"
+            else "lsof -i :%d, then kill <PID>" % port)
+    return (f"Port {port} on {host} is already in use, probably by another companion server. "
+            f"Stop it (find it with {stop}), or start this one with --port.")
 
 
 # ---------------------------------------------------------------------------
@@ -2134,7 +2156,14 @@ def main():
     )
     advertise_host = comp.get("advertise_host") or DEFAULT_ADVERTISE_HOST
 
-    server = ThreadingHTTPServer((bind_host, port), CompanionHandler)
+    try:
+        server = ThreadingHTTPServer((bind_host, port), CompanionHandler)
+    except OSError as exc:
+        # EADDRINUSE; on Windows WSAEADDRINUSE (10048), or WSAEACCES (10013) against an exclusive bind
+        if exc.errno == errno.EADDRINUSE or getattr(exc, "winerror", None) in (10048, 10013):
+            log.error(_port_in_use_message(bind_host, port))
+            sys.exit(1)
+        raise
 
     log.info("companion_server v%s listening on %s:%d", VERSION, bind_host, port)
     log.info("Clients reach it at http://%s:%d (advertise_host).", advertise_host, port)
