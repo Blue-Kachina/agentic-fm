@@ -1612,6 +1612,9 @@ def _empty_slot_sibling_present(entry: CatalogEntry, step: ET.Element, param: St
 if __name__ == "__main__":
     import os
     import sys
+    # Windows pipes and redirects default to the ANSI code page: accented names would garble
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
 
     here = os.path.dirname(os.path.abspath(__file__))
     repo_root = os.path.dirname(os.path.dirname(here))

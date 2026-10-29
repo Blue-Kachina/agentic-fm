@@ -305,6 +305,9 @@ def convert_file(xml_path, raw=False):
 # ---------------------------------------------------------------------------
 
 if __name__ == '__main__':
+    # Windows pipes and redirects default to the ANSI code page: accented names would garble
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8', errors='backslashreplace')
     import argparse
 
     parser = argparse.ArgumentParser(
