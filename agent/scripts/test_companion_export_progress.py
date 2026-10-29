@@ -194,3 +194,16 @@ def test_progress_counts_as_activity(server, monkeypatch):
     monkeypatch.setattr(cs, "_last_activity", time.monotonic() - 1000)
     _post(server, _event())
     assert cs._seconds_since_activity() < 100
+
+
+@pytest.mark.parametrize("panel_on", [False, True])
+def test_file_start_lines_follow_the_live_panel(caplog, monkeypatch, panel_on):
+    monkeypatch.setattr(cs, "_live_panel_on", panel_on)
+    caplog.set_level(logging.DEBUG, logger="companion_server")
+    cs._record_export_progress(_event(index=1, total=1), now=1.0)
+    cs._record_export_progress(_event("file_done", index=1, total=1), now=2.0)
+    cs._record_export_progress(_event("done", index=1, total=1, file=""), now=2.5)
+    levels = {r.getMessage(): r.levelno for r in caplog.records}
+    assert levels["export Invoices: Exporting 1/1 Invoices.fmp12"] == (logging.DEBUG if panel_on else logging.INFO)
+    assert levels["export Invoices: Exported 1/1 Invoices.fmp12 (1.0s)"] == logging.INFO
+    assert levels["export Invoices: Export done: 1 file(s) in 1.5s"] == logging.INFO

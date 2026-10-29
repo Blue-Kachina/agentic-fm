@@ -430,6 +430,14 @@ logging.basicConfig(
 )
 log = logging.getLogger("companion_server")
 SUBPROCESS_HEARTBEAT_SECONDS = 5
+# True while the live progress panel is drawn (_start_live_panel sets it, _stop_live_panel clears it).
+# The panel shows the file in progress, so file_start lines (convert and export) then go to debug and
+# the log keeps one line per file. Without the panel they stay at info: the only sign of life in a long file.
+_live_panel_on = False
+
+
+def _file_start_level() -> int:
+    return logging.DEBUG if _live_panel_on else logging.INFO
 
 
 def _stream_pipe(pipe, level, prefix, output_buffer, state, on_line=None):
@@ -555,9 +563,14 @@ CONVERT_STAGE_LABELS = {
     "analyze": "Analyzing",
     "write_raw": "Writing raw XML",
     "write_pages": "Writing pages",
+    "write_viewer": "Writing HTML viewer",
+    "check": "Checking redactions",
 }
+# Keys of a stage's unit count in the progress block (from stage_progress and stage_done).
+CONVERT_UNIT_KEYS = ("done", "units", "unit", "stage_elapsed")
 
 _convert_jobs: dict = {}        # job id → job dict; insertion-ordered
+_convert_stage_starts: dict = {}    # job id → the "elapsed" of its current stage's stage_start
 _convert_lock = threading.Lock()
 _convert_slot = threading.Semaphore(1)   # one conversion at a time; the rest stay "queued"
 # Whether the installed fm-saxml takes --progress json. Set to False the first time a build
@@ -785,6 +798,11 @@ def _progress_message(event: dict) -> str:
         return f"{label} {counter} {event.get('file')}"
     if kind == "file_done":
         return f"{label} {counter} {event.get('file')} ({_seconds(event.get('seconds'))})"
+    if kind == "stage_progress":
+        return f"{label}: {event.get('done')}/{event.get('units')} {event.get('unit') or ''}".rstrip()
+    if kind == "stage_done" and event.get("done") is not None:
+        count = f"{event.get('done')} {event.get('unit') or ''}".rstrip()
+        return f"{label} done: {count} ({_seconds(event.get('seconds'))})"
     if kind == "stage_done":
         return f"{label} done ({_seconds(event.get('seconds'))})"
     if kind == "done":
@@ -792,8 +810,17 @@ def _progress_message(event: dict) -> str:
     return " ".join(str(part) for part in (kind, label, counter, event.get("file") or "") if part).strip()
 
 
+def _is_number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
 def _record_progress(job_id: str, event: dict) -> None:
-    """Fold one progress event into the job's progress block (see GET /convert in COMPANION_SERVER.md)."""
+    """Fold one progress event into the job's progress block (see GET /convert in COMPANION_SERVER.md).
+
+    A stage with units (stage_progress, and stage_done with done) adds done, units, unit and
+    stage_elapsed; the next stage_start, or the build's done, removes them.
+    """
+    kind = event.get("event")
     with _convert_lock:
         job = _convert_jobs.get(job_id)
         if job is None:
@@ -801,9 +828,26 @@ def _record_progress(job_id: str, event: dict) -> None:
         progress = job.setdefault("progress", {})
         progress.update({key: event.get(key) for key in ("stage", "file", "index", "total", "elapsed")})
         files = progress.setdefault("files", [])
-        if event.get("event") == "file_done":
+        if kind == "file_done":
             files.append({"stage": event.get("stage"), "file": event.get("file"),
                           "seconds": event.get("seconds")})
+        elif kind in ("stage_start", "done"):
+            for key in CONVERT_UNIT_KEYS:
+                progress.pop(key, None)
+            if kind == "stage_start":
+                _convert_stage_starts[job_id] = event.get("elapsed")
+            else:
+                _convert_stage_starts.pop(job_id, None)
+        elif kind == "stage_progress" or (kind == "stage_done" and _is_number(event.get("done"))):
+            done = event.get("done")
+            # stage_done may leave out units: keep the last stage_progress's, else the final count
+            units = event.get("units", progress.get("units", done))
+            progress.update(done=done, units=units, unit=event.get("unit") or progress.get("unit"))
+            started, elapsed = _convert_stage_starts.get(job_id), event.get("elapsed")
+            if _is_number(started) and _is_number(elapsed):
+                progress["stage_elapsed"] = round(max(0.0, elapsed - started), 1)
+            elif kind == "stage_done" and _is_number(event.get("seconds")):
+                progress["stage_elapsed"] = event["seconds"]
 
 
 def _progress_rejected(stderr: str) -> bool:
@@ -823,7 +867,11 @@ def _run_convert_job(job_id: str) -> None:
         if event is None:
             return False
         _record_progress(job_id, event)
-        log.info("convert %s: %s", job_id, _progress_message(event))
+        kind = event.get("event")
+        # stage_progress only updates the job; file_start is the panel's job while it is drawn
+        level = (logging.DEBUG if kind == "stage_progress"
+                 else _file_start_level() if kind == "file_start" else logging.INFO)
+        log.log(level, "convert %s: %s", job_id, _progress_message(event))
         return True
 
     def run(progress: bool) -> dict:
@@ -869,6 +917,9 @@ def _run_convert_job(job_id: str) -> None:
         log.exception("convert %s crashed: %s", job_id, exc)
         _update_job(job_id, state="failed", done=True, finished_at=_utc_now(),
                     error=f"Conversion crashed: {exc}")
+    finally:
+        with _convert_lock:
+            _convert_stage_starts.pop(job_id, None)
 
 
 def _start_convert_job(solution_name: str, export_path: str, docs_root: str, *,
@@ -1006,7 +1057,8 @@ def _record_export_progress(event: dict, now: "float | None" = None) -> dict:
         snapshot = json.loads(json.dumps(state))
     name = event["solution_name"]
     if kind == "file_start":
-        log.info("export %s: Exporting %d/%d %s", name, event["index"], event["total"], event["file"])
+        log.log(_file_start_level(), "export %s: Exporting %d/%d %s", name, event["index"], event["total"],
+                event["file"])
     elif kind == "file_done" and seconds is not None:
         log.info("export %s: Exported %d/%d %s (%.1fs)", name, event["index"], event["total"],
                  event["file"], seconds)
@@ -2120,8 +2172,10 @@ def _convert_jobs_snapshot() -> list:
 def _start_live_panel(no_live: bool):
     """Start the live progress panel (companion_live.py) when stdout is a terminal and Rich imports.
 
-    Returns the LiveView to stop, or None when the companion prints plain log lines.
+    Returns the LiveView to stop with _stop_live_panel, or None when the companion prints plain
+    log lines. While the panel is on, file_start lines are logged at debug (see _live_panel_on).
     """
+    global _live_panel_on
     try:
         import companion_live
     except ImportError as exc:
@@ -2133,8 +2187,17 @@ def _start_live_panel(no_live: bool):
     except Exception as exc:    # the panel is a nicety: it must never stop the companion
         log.warning("Live progress panel failed to start (%s); plain log lines only.", exc)
         return None
+    _live_panel_on = live is not None
     log.info(message)
     return live
+
+
+def _stop_live_panel(live) -> None:
+    """Stop the panel from _start_live_panel; file_start lines go back to info."""
+    global _live_panel_on
+    _live_panel_on = False
+    if live is not None:
+        live.stop()
 
 
 def main():
@@ -2183,8 +2246,7 @@ def main():
     except KeyboardInterrupt:
         log.info("Shutting down.")
     finally:
-        if live is not None:
-            live.stop()
+        _stop_live_panel(live)
         _shutdown_cleanup(server)
 
 

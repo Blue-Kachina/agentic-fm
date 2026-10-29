@@ -174,6 +174,32 @@ def test_convert_after_fm_saxmls_last_event_is_finishing():
     assert "Finishing:" in text and "1m 15s elapsed" in text and "left" not in text
 
 
+def _units_job(done, stage_elapsed=45.0):
+    return _job(progress={"stage": "write_viewer", "file": "Synapse", "index": 1, "total": 1, "elapsed": 61.3,
+                          "done": done, "units": 21193, "unit": "pages", "stage_elapsed": stage_elapsed,
+                          "files": [{"stage": "write_pages", "file": "Synapse", "seconds": 14.0}]})
+
+
+def test_stage_with_units_counts_and_estimates_by_unit():
+    (row,) = _rows([], [_units_job(5300)])
+    assert (row["done_units"], row["units"], row["unit"]) == (5300, 21193, "pages")
+    assert row["left"] == pytest.approx(45.0 / 5300 * (21193 - 5300))
+    text = _text([row])
+    assert "Writing HTML viewer: 5,300 of 21,193 pages, file 1 of 1 Synapse" in text
+    assert "about 2m 15s left in this stage" in text
+
+
+def test_stage_with_units_before_the_first_unit_is_estimating():
+    text = _text(_rows([], [_units_job(0, stage_elapsed=0.0)]))
+    assert "0 of 21,193 pages" in text and "time left: estimating" in text
+
+
+def test_stage_without_units_keeps_the_per_file_estimate():
+    (row,) = _rows([], [_job()])
+    assert "units" not in row and row["left"] == pytest.approx(6.0 * 4)
+    assert " of " not in _text([row]).split("Analyzing:")[1].split("file 2 of 5")[0]
+
+
 def test_format_seconds():
     assert [cl.format_seconds(s) for s in (None, 8.44, 65, 3725)] == ["?", "8.4s", "1m 05s", "1h 02m"]
 

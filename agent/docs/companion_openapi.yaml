@@ -942,11 +942,24 @@ components:
             event, and with an fm-saxml that has no `--progress`. After fm-saxml's `done` event,
             `stage` and `file` are `null` and `index`/`total` are 0.
           properties:
-            stage: { type: [string, "null"], description: "`read`, `scrub`, `analyze`, `write_raw` or `write_pages`." }
+            stage:
+              type: [string, "null"]
+              description: "`read`, `scrub`, `analyze`, `write_raw`, `write_pages`, `write_viewer` (with `html`) or `check` (the scrubbing guard)."
             file: { type: [string, "null"] }
             index: { type: integer, description: 1-based file number in the stage. }
             total: { type: integer, description: Files in the stage. }
             elapsed: { type: number, description: Seconds since fm-saxml's build started. }
+            done:
+              type: integer
+              description: >-
+                Only while the stage counts units (`write_pages`, `write_viewer`, `check`): units
+                finished so far; the final count after the stage ends. Removed at the next stage's
+                start and at the end of the build.
+            units:
+              type: integer
+              description: Same stages. The units the stage expects (`done` may end a little above or below it).
+            unit: { type: string, enum: [pages, files], description: Same stages. What `done` and `units` count. }
+            stage_elapsed: { type: number, description: Same stages. Seconds since the stage started. }
             files:
               type: array
               description: Every finished file, per stage.

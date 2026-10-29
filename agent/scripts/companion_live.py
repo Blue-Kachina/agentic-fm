@@ -3,7 +3,8 @@
 While FileMaker exports a solution (POST /progress) and fm-saxml converts it (POST /convert),
 the companion can draw one panel at the bottom of its terminal: the step (export, then convert
 and its stage), the file N of M, the time of each finished file, the total elapsed and an
-estimate of the time left. Log lines print above it.
+estimate of the time left. A stage that counts units (pages, files) also shows "done of units"
+and estimates from the unit rate. Log lines print above it.
 
 Rich is optional. It is imported only when the panel is drawn, so this module and the companion
 import and run on the standard library alone. The panel is drawn only when stdout is a terminal,
@@ -39,6 +40,8 @@ DEFAULT_STAGE_LABELS = {
     "analyze": "Analyzing",
     "write_raw": "Writing raw XML",
     "write_pages": "Writing pages",
+    "write_viewer": "Writing HTML viewer",
+    "check": "Checking redactions",
 }
 
 
@@ -87,6 +90,10 @@ def format_seconds(seconds) -> str:
     return f"{hours}h {minutes:02d}m"
 
 
+def _is_number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
 def _estimate_left(finished_seconds: list, total: int) -> "float | None":
     """Average seconds per finished file × files not finished yet; None before the first file."""
     times = [s for s in finished_seconds if isinstance(s, (int, float)) and not isinstance(s, bool)]
@@ -94,6 +101,13 @@ def _estimate_left(finished_seconds: list, total: int) -> "float | None":
         return None
     remaining = max(0, total - len(finished_seconds))
     return sum(times) / len(times) * remaining
+
+
+def _estimate_units_left(done, units, stage_elapsed) -> "float | None":
+    """Seconds per unit so far × units not done yet; None before the first unit."""
+    if not (_is_number(done) and _is_number(stage_elapsed)) or done <= 0:
+        return None
+    return stage_elapsed / done * max(0, units - done)
 
 
 def _utc_elapsed(started_at: str, utc_now: datetime) -> "float | None":
@@ -140,7 +154,7 @@ def build_rows(export_states, convert_jobs, now: "float | None" = None,
         files = [f for f in progress.get("files") or [] if f.get("stage") == stage]
         total = progress.get("total") or 0
         elapsed = _utc_elapsed(job.get("started_at") or "", utc_now)
-        rows.append({
+        row = {
             "step": "convert", "solution": job.get("solution_name", ""),
             "stage": labels.get(stage, stage.replace("_", " ").capitalize()) if stage else "",
             "state": job.get("state") or "queued", "index": progress.get("index") or 0, "total": total,
@@ -148,7 +162,13 @@ def build_rows(export_states, convert_jobs, now: "float | None" = None,
             "finished": [(f.get("file"), f.get("seconds")) for f in files],
             "elapsed": elapsed if elapsed is not None else progress.get("elapsed"),
             "left": _estimate_left([f.get("seconds") for f in files], total),
-        })
+        }
+        units = progress.get("units")
+        if _is_number(units) and units > 0 and _is_number(progress.get("done")):
+            # A stage with units (write_pages, write_viewer, check): count and estimate by unit
+            row.update(units=int(units), done_units=int(progress["done"]), unit=progress.get("unit") or "",
+                       left=_estimate_units_left(progress["done"], units, progress.get("stage_elapsed")))
+        rows.append(row)
     return rows
 
 
@@ -156,6 +176,8 @@ def _position_text(row: dict) -> str:
     if row["state"] == "queued":
         return "queued"
     parts = [f"{row['stage']}:"] if row["stage"] else []
+    if row.get("units"):
+        parts.append(f"{row['done_units']:,} of {row['units']:,} {row['unit']}".rstrip() + ",")
     if row["total"] and row["index"]:
         parts.append(f"file {row['index']} of {row['total']}")
     elif row["total"]:
@@ -164,7 +186,7 @@ def _position_text(row: dict) -> str:
         parts.append("starting")
     if row["file"]:
         parts.append(str(row["file"]))
-    return " ".join(parts)
+    return " ".join(parts).rstrip(",")
 
 
 def _timing_text(row: dict) -> str:
@@ -196,7 +218,10 @@ def render_panel(rows: list):
     table.add_column(ratio=1, no_wrap=True, overflow="ellipsis")  # details
     for row in rows:
         done = len(row["finished"])
-        bar = ProgressBar(total=row["total"] or 1, completed=min(done, row["total"] or 0), width=20)
+        if row.get("units"):
+            bar = ProgressBar(total=row["units"], completed=min(row["done_units"], row["units"]), width=20)
+        else:
+            bar = ProgressBar(total=row["total"] or 1, completed=min(done, row["total"] or 0), width=20)
         timing = Table.grid(padding=(0, 2))
         timing.add_row(bar, Text(_timing_text(row), no_wrap=True, overflow="ellipsis"))
         lines = [Text(_position_text(row), no_wrap=True, overflow="ellipsis"), timing]

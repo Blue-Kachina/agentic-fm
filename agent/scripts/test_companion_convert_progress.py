@@ -335,3 +335,201 @@ def test_post_convert_is_still_logged_at_info(server, export, tmp_path, fake, ca
         job_id = _start(server, export, tmp_path)
     _wait(server, job_id)
     assert any('"POST /convert ' in r.getMessage() and r.levelno == logging.INFO for r in caplog.records)
+
+
+# -- stages with units (stage_progress) ----------------------------------------------
+
+FAKE_UNITS = r'''
+import json, os, sys, time
+
+docs_root, solution, gate = sys.argv[1:4]
+
+def emit(event, stage, file, index, total, elapsed, **extra):
+    sys.stdout.write(json.dumps(dict(event=event, stage=stage, file=file, index=index, total=total,
+                                     elapsed=elapsed, **extra)) + "\n")
+    sys.stdout.flush()
+
+emit("stage_start", "write_pages", None, 0, 1, 0.5)
+emit("file_start", "write_pages", "FileA", 1, 1, 0.5)
+emit("stage_progress", "write_pages", "FileA", 1, 1, 1.5, done=10, units=20, unit="pages")
+emit("file_done", "write_pages", "FileA", 1, 1, 2.5, seconds=2.0)
+emit("stage_done", "write_pages", None, 1, 1, 2.5, seconds=2.0, done=21, unit="pages")
+emit("stage_start", "write_viewer", None, 0, 1, 2.5)
+emit("file_start", "write_viewer", "Synapse", 1, 1, 2.5)
+emit("stage_progress", "write_viewer", "Synapse", 1, 1, 47.5, done=5300, units=21193, unit="pages")
+deadline = time.monotonic() + 20
+while not os.path.exists(gate) and time.monotonic() < deadline:
+    time.sleep(0.05)
+emit("file_done", "write_viewer", "Synapse", 1, 1, 110.8, seconds=108.3)
+emit("stage_done", "write_viewer", None, 1, 1, 110.8, seconds=108.3, done=21193, unit="pages")
+emit("stage_start", "check", None, 0, 1, 110.8)
+emit("file_start", "check", "Synapse", 1, 1, 110.8)
+emit("file_done", "check", "Synapse", 1, 1, 145.4, seconds=34.6)
+emit("stage_done", "check", None, 1, 1, 145.4, seconds=34.6, done=900, unit="files")
+emit("done", None, None, 0, 0, 147.0)
+
+out = os.path.join(docs_root, solution)
+os.makedirs(out, exist_ok=True)
+with open(os.path.join(out, "docs.json"), "w", encoding="utf-8") as f:
+    json.dump({"solution": solution, "kind": "batch", "files": []}, f)
+'''
+
+
+@pytest.fixture
+def fake_units(tmp_path, monkeypatch):
+    """A fake fm-saxml with unit stages; it waits mid write_viewer until the returned gate file exists."""
+    script = tmp_path / "fake_units.py"
+    script.write_text(FAKE_UNITS, encoding="utf-8")
+    gate = tmp_path / "gate_units"
+    monkeypatch.setattr(cs, "_convert_command", lambda export_path, docs_root, solution_name, **kwargs:
+                        [sys.executable, str(script), docs_root, solution_name, str(gate)])
+    return gate
+
+
+def _job_with(events: list) -> dict:
+    """Record events into a fresh job and return its progress block."""
+    with cs._convert_lock:
+        cs._convert_jobs["unitjob"] = {"job_id": "unitjob", "done": False, "progress": {}}
+    for event in events:
+        cs._record_progress("unitjob", event)
+    return cs._get_convert_job("unitjob")["progress"]
+
+
+def _ev(event, stage, elapsed, file=None, index=1, total=1, **extra):
+    return {"event": event, "stage": stage, "file": file, "index": index, "total": total,
+            "elapsed": elapsed, **extra}
+
+
+def test_stage_progress_updates_the_block():
+    progress = _job_with([
+        _ev("stage_start", "write_viewer", 16.0, index=0),
+        _ev("file_start", "write_viewer", 16.0, file="Synapse"),
+        _ev("stage_progress", "write_viewer", 61.0, file="Synapse", done=5300, units=21193, unit="pages"),
+    ])
+    assert progress == {"stage": "write_viewer", "file": "Synapse", "index": 1, "total": 1, "elapsed": 61.0,
+                        "done": 5300, "units": 21193, "unit": "pages", "stage_elapsed": 45.0, "files": []}
+
+
+def test_stage_start_removes_the_unit_fields():
+    events = [_ev("stage_start", "write_pages", 1.0, index=0),
+              _ev("stage_progress", "write_pages", 3.0, file="A", done=4, units=8, unit="pages"),
+              _ev("stage_done", "write_pages", 4.0, seconds=3.0, done=9, unit="pages")]
+    progress = _job_with(events)
+    assert (progress["done"], progress["units"], progress["unit"], progress["stage_elapsed"]) == (9, 8, "pages", 3.0)
+    progress = _job_with(events + [_ev("stage_start", "write_raw", 4.0, index=0)])
+    assert not set(cs.CONVERT_UNIT_KEYS) & set(progress)
+    progress = _job_with(events + [_ev("done", None, 5.0, index=0, total=0)])
+    assert not set(cs.CONVERT_UNIT_KEYS) & set(progress)
+
+
+def test_stage_done_without_a_stage_progress_keeps_its_count():
+    progress = _job_with([_ev("stage_start", "check", 10.0, index=0),
+                          _ev("stage_done", "check", 44.6, seconds=34.6, done=900, unit="files")])
+    assert (progress["done"], progress["units"], progress["unit"], progress["stage_elapsed"]) == \
+           (900, 900, "files", 34.6)
+
+
+# Real lines from fm-saxml (a 3-file --html --webmcp scrubbed build, file name replaced), as sent by saxml-stages.
+REAL_UNIT_LINES = """\
+{"event": "stage_start", "stage": "write_viewer", "file": null, "index": 0, "total": 1, "elapsed": 38.4}
+{"event": "file_start", "stage": "write_viewer", "file": "Solution", "index": 1, "total": 1, "elapsed": 38.4}
+{"event": "stage_progress", "stage": "write_viewer", "file": "Solution", "index": 1, "total": 1, "elapsed": 39.4, "done": 150, "units": 21193, "unit": "pages"}
+{"event": "stage_done", "stage": "write_viewer", "file": null, "index": 1, "total": 1, "elapsed": 150.2, "seconds": 111.8, "done": 21193, "unit": "pages"}
+{"event": "stage_start", "stage": "check", "file": null, "index": 0, "total": 1, "elapsed": 151.7}
+{"event": "stage_progress", "stage": "check", "file": "Solution", "index": 1, "total": 1, "elapsed": 152.7, "done": 305, "units": 42481, "unit": "files"}
+{"event": "stage_done", "stage": "check", "file": null, "index": 1, "total": 1, "elapsed": 184.0, "seconds": 32.4, "done": 42481, "unit": "files"}
+"""
+
+
+def test_real_fm_saxml_unit_lines():
+    events = [cs._parse_progress_line(line + "\n") for line in REAL_UNIT_LINES.splitlines()]
+    assert all(events)
+    progress = _job_with(events[:3])
+    assert {k: progress[k] for k in cs.CONVERT_UNIT_KEYS} == \
+           {"done": 150, "units": 21193, "unit": "pages", "stage_elapsed": 1.0}
+    progress = _job_with(events[:4])
+    assert {k: progress[k] for k in cs.CONVERT_UNIT_KEYS} == \
+           {"done": 21193, "units": 21193, "unit": "pages", "stage_elapsed": 111.8}
+    assert cs._progress_message(events[3]) == "Writing HTML viewer done: 21193 pages (111.8s)"
+    progress = _job_with(events[:5])
+    assert progress["stage"] == "check" and not set(cs.CONVERT_UNIT_KEYS) & set(progress)
+    progress = _job_with(events)
+    assert {k: progress[k] for k in cs.CONVERT_UNIT_KEYS} == \
+           {"done": 42481, "units": 42481, "unit": "files", "stage_elapsed": 32.3}
+    assert cs._progress_message(events[6]) == "Checking redactions done: 42481 files (32.4s)"
+
+
+def test_check_with_nothing_to_scan_has_zero_units():
+    # Nothing redacted: check runs with no stage_progress and a stage_done of 0.
+    progress = _job_with([_ev("stage_start", "check", 151.7, index=0),
+                          _ev("stage_done", "check", 151.8, seconds=0.1, done=0, unit="files")])
+    assert (progress["done"], progress["units"], progress["unit"]) == (0, 0, "files")
+
+
+@pytest.mark.parametrize("event, message", [
+    (_ev("stage_progress", "write_viewer", 61.3, file="Synapse", done=5300, units=21193, unit="pages"),
+     "Writing HTML viewer: 5300/21193 pages"),
+    (_ev("stage_done", "write_viewer", 124.3, seconds=108.3, done=21193, unit="pages"),
+     "Writing HTML viewer done: 21193 pages (108.3s)"),
+    (_ev("stage_done", "check", 160.0, seconds=34.6, done=900, unit="files"),
+     "Checking redactions done: 900 files (34.6s)"),
+    (_ev("stage_start", "check", 125.0, index=0), "Checking redactions: 1 file(s)"),
+])
+def test_unit_stage_messages(event, message):
+    assert cs._progress_message(event) == message
+
+
+def test_unit_stages_end_to_end(server, export, tmp_path, fake_units, caplog):
+    with caplog.at_level(logging.DEBUG, logger="companion_server"):
+        job_id = _start(server, export, tmp_path)
+        job = _wait(server, job_id, until=lambda j: j["progress"].get("done") == 5300)
+        assert {k: job["progress"][k] for k in cs.CONVERT_UNIT_KEYS} == \
+               {"done": 5300, "units": 21193, "unit": "pages", "stage_elapsed": 45.0}
+        fake_units.write_text("go", encoding="utf-8")
+        job = _wait(server, job_id)
+    assert job["state"] == "succeeded", job
+    assert not set(cs.CONVERT_UNIT_KEYS) & set(job["progress"])
+    info = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
+    debug = [r.getMessage() for r in caplog.records if r.levelno == logging.DEBUG]
+    assert f"convert {job_id}: Writing HTML viewer done: 21193 pages (108.3s)" in info
+    assert f"convert {job_id}: Checking redactions done: 900 files (34.6s)" in info
+    assert not any("/21193 pages" in m or "10/20 pages" in m for m in info)    # stage_progress: debug only
+    assert f"convert {job_id}: Writing HTML viewer: 5300/21193 pages" in debug
+
+
+# -- one line per file while the live panel is on ------------------------------------
+
+@pytest.mark.parametrize("panel_on", [False, True])
+def test_convert_file_start_lines_follow_the_panel(server, export, tmp_path, fake, caplog, monkeypatch, panel_on):
+    monkeypatch.setattr(cs, "_live_panel_on", panel_on)
+    with caplog.at_level(logging.DEBUG, logger="companion_server"):
+        job_id = _start(server, export, tmp_path)
+        assert _wait(server, job_id)["state"] == "succeeded"
+    levels = {r.getMessage(): r.levelno for r in caplog.records}
+    start_level = logging.DEBUG if panel_on else logging.INFO
+    assert levels[f"convert {job_id}: Analyzing 1/2 FileA"] == start_level
+    assert levels[f"convert {job_id}: Analyzing 2/2 FileB"] == start_level
+    for line in ("Analyzing: 2 file(s)", "Analyzing 1/2 FileA (3.1s)", "Analyzing done (3.6s)",
+                 "fm-saxml done (3.8s)"):
+        assert levels[f"convert {job_id}: {line}"] == logging.INFO
+
+
+def test_start_live_panel_sets_the_switch_and_stop_clears_it(monkeypatch):
+    import companion_live
+
+    class View:
+        stopped = False
+
+        def stop(self):
+            View.stopped = True
+
+    monkeypatch.setattr(cs, "_live_panel_on", False)
+    monkeypatch.setattr(companion_live, "start_live", lambda *a, **k: (View(), "Live progress panel: on"))
+    live = cs._start_live_panel(False)
+    assert cs._live_panel_on is True
+    cs._stop_live_panel(live)
+    assert cs._live_panel_on is False and View.stopped
+
+    monkeypatch.setattr(companion_live, "start_live", lambda *a, **k: (None, "Live progress panel: off"))
+    assert cs._start_live_panel(False) is None and cs._live_panel_on is False
+    cs._stop_live_panel(None)

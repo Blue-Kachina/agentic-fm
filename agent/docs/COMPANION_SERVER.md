@@ -80,7 +80,9 @@ While FileMaker exports a solution ([`POST /progress`](#post-progress)) and fm-s
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-It shows the step (export, then convert with its fm-saxml stage), the file N of M, the time of each finished file, the total elapsed time and an estimate of the time left (the average time of the files finished so far in that step or stage, times the files still to do; "estimating" until the first file is done). Log lines print above it. The panel is there only while an export or a conversion is in progress: when nothing runs, the terminal shows the log alone, and the end of each run is in the log (`Export done`, `convert ... succeeded`). An export with no event for 30 minutes is taken as abandoned and leaves the panel.
+It shows the step (export, then convert with its fm-saxml stage), the file N of M, the time of each finished file, the total elapsed time and an estimate of the time left (the average time of the files finished so far in that step or stage, times the files still to do; "estimating" until the first file is done). A stage that counts units (`write_pages`, `write_viewer`, `check`) shows them next to the file, e.g. `Writing HTML viewer: 5,300 of 21,193 pages, file 1 of 1 Synapse`, and estimates from the unit rate instead (the stage's time so far per unit done, times the units left; "estimating" until the first unit). Log lines print above it.
+
+While the panel is on, the lines for a file starting (`convert ...: Reading 1/3 idiClients`, `export ...: Exporting 1/3 Synapse.fmp12`) are logged at debug, since the panel shows the file in progress: the log keeps one line per file, when it is done. Stage starts and ends and the `done` lines stay. With the panel off, the start lines stay in the log: they are the only sign of life during a long file. The panel is there only while an export or a conversion is in progress: when nothing runs, the terminal shows the log alone, and the end of each run is in the log (`Export done`, `convert ... succeeded`). An export with no event for 30 minutes is taken as abandoned and leaves the panel.
 
 The panel needs [Rich](https://github.com/Textualize/rich), which the DIS harness `.venv` has through fm-saxml, and a terminal (the VS Code task terminal counts). Otherwise the companion prints the plain log lines and no control codes:
 
@@ -313,13 +315,14 @@ The job's state. `state` is `queued`, `running`, `succeeded` or `failed`; `done`
 
 - `html` and `webmcp` are the switches the job ran with (`webmcp` turns on `html`).
 - `progress` is where the build is, read from fm-saxml's `--progress json` output. It is `{}` until the first progress event, and stays `{}` with an fm-saxml that has no `--progress` (the companion then runs the build again without the option, once, and remembers that until it restarts). It is there while the job runs and after it finishes:
-  - `stage`: the stage under way: `read`, `scrub`, `analyze`, `write_raw` or `write_pages` (`null` after the last event, at the end of a successful build).
+  - `stage`: the stage under way: `read`, `scrub`, `analyze`, `write_raw`, `write_pages`, then with `html`/`webmcp` `write_viewer` (Writing HTML viewer), then while scrubbing is on `check` (Checking redactions, the scrubbing guard scanning every written file). `null` after the last event, at the end of a successful build. `write_viewer` and `check` have one "file", the solution.
   - `file`: the FileMaker file being worked on, or `null` at the start and end of a stage.
   - `index` and `total`: that file's number in the stage (1-based) and the number of files in it. `index` is `0` at the start of a stage and equals `total` at its end.
   - `elapsed`: seconds since the build started.
+  - `done`, `units`, `unit` and `stage_elapsed`, only while the stage counts units (`write_pages`, `write_viewer` and `check`, with an fm-saxml that sends `stage_progress`): `done` of `units` `unit` (`pages` or `files`) are finished, and `stage_elapsed` is the seconds since the stage started. fm-saxml updates them at most once a second; at the end of the stage `done` is the final count, which may be a little above or below `units` (the page count of `write_pages` is an estimate). The next stage's start, or the end of the build, removes them, so a stage without units has none.
   - `files`: one entry per finished file and stage, in order, with `seconds` for how long that file took in that stage.
 
-  While a job runs, show it as for example `Analyzing 3/12 Invoices` with `JSONGetElement ( $response ; "progress.index" )` and its neighbours. The companion's log has one readable line per event, such as `convert 3f9c0a1b2c4d: Analyzing 3/12 Invoices (4.2s)`.
+  While a job runs, show it as for example `Analyzing 3/12 Invoices` with `JSONGetElement ( $response ; "progress.index" )` and its neighbours, or for a stage with units `Writing HTML viewer: 5300 of 21193 pages` from `progress.done` and `progress.units`. A time-left estimate for that stage is `stage_elapsed / done * ( units - done )`. The companion's log has one readable line per event (but not per `stage_progress`), such as `convert 3f9c0a1b2c4d: Analyzing 3/12 Invoices (4.2s)` or `convert 3f9c0a1b2c4d: Writing HTML viewer done: 21193 pages (108.3s)`.
 - `counts`, `files`, `kind`, `viewer_path`, `warning_count` and `warnings` appear once the job has succeeded. `viewer_path` is the viewer's `index.html`, or `""` when the job was run without `html`. Counts come from each file's `entities.json`; warnings come from each file's `Reports/warnings.md` (messages there are cut at 80 characters, and at most 200 warnings are listed — `warning_count` is always the full number).
 - A failed job has `exit_code` (fm-saxml's exit code, or `null` if it never started), `error`, and `log_tail` — the last 4000 characters of fm-saxml's output.
 - An unknown job ID gives `404`. The companion keeps the last 50 finished jobs; restarting it forgets them.
@@ -366,7 +369,7 @@ FileMaker's export script calls this before and after each Save a Copy as XML, a
 2026-10-29T14:06:53 INFO export Invoices: Export done: 12 file(s) in 101.2s
 ```
 
-The time on `file_done` is measured by the companion from the `file_start` with the same `index` and `file`; without one, the line says the time is unknown. A `file_start` with `index` 1, or any file event after a `done`, starts a new run of that solution and clears its earlier files. Restarting the companion forgets every run.
+The `Exporting` line is logged at debug while the [live progress panel](#live-progress-panel) is on. The time on `file_done` is measured by the companion from the `file_start` with the same `index` and `file`; without one, the line says the time is unknown. A `file_start` with `index` 1, or any file event after a `done`, starts a new run of that solution and clears its earlier files. Restarting the companion forgets every run.
 
 ---
 
@@ -765,4 +768,4 @@ When the server is running in the foreground (or writing to a log file), each re
 
 The `stdout` and `stderr` fields in the response body contain the full output of `fmparse.sh`, which is the first place to look when the exit code is non-zero.
 
-A `/convert` job logs the fm-saxml command, one line per progress event (`convert 3f9c0a1b2c4d: Analyzing 3/12 Invoices (4.2s)`) and fm-saxml's other output as it comes. FileMaker's `GET /convert/<job id>` polls are logged at debug, so they don't show at the default level; every other request is still logged.
+A `/convert` job logs the fm-saxml command, one line per progress event (`convert 3f9c0a1b2c4d: Analyzing 3/12 Invoices (4.2s)`; `stage_progress` updates are debug only, and so are file starts while the live panel is on) and fm-saxml's other output as it comes. FileMaker's `GET /convert/<job id>` polls are logged at debug, so they don't show at the default level; every other request is still logged.
