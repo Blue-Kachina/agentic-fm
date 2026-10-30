@@ -68,6 +68,8 @@ def clean_state(monkeypatch, tmp_path):
     monkeypatch.delenv(cs.DOCS_ROOT_ENV, raising=False)
     monkeypatch.setattr(cs, "AFM_ROOT", str(tmp_path / "standalone" / "agentic-fm"))
     monkeypatch.setattr(cs, "_convert_progress_supported", True)
+    # Job records (P3-23) go to a test state folder, never the real per-user one
+    monkeypatch.setenv("COMPANION_STATE_DIR", str(tmp_path / "state"))
     with cs._convert_lock:
         cs._convert_jobs.clear()
 
@@ -305,7 +307,9 @@ def test_convert_polls_are_logged_at_debug_only(server, export, tmp_path, fake, 
         assert _request(f"{server}/nowhere")[0] == 404
     access = [r.getMessage() for r in caplog.records if "HTTP/1." in r.getMessage()]
     assert not any("GET /convert/" in m for m in access), access
-    assert any('"GET /health ' in m for m in access) and any('"GET /nowhere ' in m for m in access)
+    # /health is polled too (monitors, `status`, `attach`): debug as well (P3-21)
+    assert not any('"GET /health ' in m for m in access), access
+    assert any('"GET /nowhere ' in m for m in access)
 
     caplog.clear()
     with caplog.at_level(logging.DEBUG, logger="companion_server"):
@@ -320,7 +324,8 @@ def test_convert_polls_are_logged_at_debug_only(server, export, tmp_path, fake, 
     ("POST", "/progress", "200", logging.DEBUG),     # P3-12 logs its own line per event
     ("POST", "/progress", "400", logging.INFO),
     ("POST", "/convert", "202", logging.INFO),
-    ("GET", "/health", "200", logging.INFO),
+    ("GET", "/health", "200", logging.DEBUG),
+    ("GET", "/healthz", "404", logging.INFO),
 ])
 def test_access_log_level(command, path, code, level, caplog):
     handler = cs.CompanionHandler.__new__(cs.CompanionHandler)

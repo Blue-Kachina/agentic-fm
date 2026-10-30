@@ -49,19 +49,49 @@ def test_reuse_address_only_off_on_windows():
     assert cs.ThreadingHTTPServer.allow_reuse_address is (sys.platform != "win32")
 
 
-def test_main_explains_a_port_in_use(server, monkeypatch, caplog):
-    port = server.server_address[1]
-    monkeypatch.setattr(sys, "argv", ["companion_server.py", "--port", str(port), "--no-live"])
+@pytest.fixture
+def isolated(monkeypatch, tmp_path):
+    """main() with no companion.json, the default bind host and a test state folder."""
     monkeypatch.setattr(cs, "_load_companion_config", lambda: {})
     monkeypatch.delenv("COMPANION_BIND_HOST", raising=False)
+    monkeypatch.setenv("COMPANION_STATE_DIR", str(tmp_path / "state"))
+    monkeypatch.setattr(cs, "_check_for_updates", lambda: None)
+
+
+def test_main_hands_a_port_in_use_to_the_clash_check(server, monkeypatch, isolated):
+    port = server.server_address[1]
+    calls = []
+
+    def clash(host, port_, **kwargs):
+        calls.append((host, port_, kwargs))
+        return 1
 
     def bound_anyway(self, *args, **kwargs):     # fail fast instead of serving forever
         raise AssertionError("a second companion bound the port that is in use")
 
+    monkeypatch.setattr(cs.companion_control, "handle_port_clash", clash)
     monkeypatch.setattr(cs.ThreadingHTTPServer, "serve_forever", bound_anyway)
     with pytest.raises(SystemExit) as exit_info:
-        cs.main()
+        cs.main(["--port", str(port), "--no-live", "--no-attach"])
     assert exit_info.value.code == 1
-    message = caplog.text
-    assert f"Port {port} on 127.0.0.1 is already in use" in message
-    assert ("findstr" if sys.platform == "win32" else "lsof") in message
+    assert calls == [("127.0.0.1", port, {"replace": False, "no_attach": True})]
+
+
+def test_main_binds_again_when_the_clash_check_freed_the_port(server, monkeypatch, isolated):
+    port = server.server_address[1]
+    served = []
+
+    def replace(host, port_, **kwargs):          # what --replace does: stop the other companion
+        assert kwargs["replace"] is True
+        server.shutdown()
+        server.server_close()
+        return None
+
+    def serve(self, *args, **kwargs):
+        served.append(self.server_address[1])
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cs.companion_control, "handle_port_clash", replace)
+    monkeypatch.setattr(cs.ThreadingHTTPServer, "serve_forever", serve)
+    cs.main(["--port", str(port), "--no-live", "--replace", "--no-log-file"])
+    assert served == [port]

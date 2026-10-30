@@ -268,32 +268,46 @@ If none exists, the launcher stops and lists where it looked. The Python needs `
 | To | Run |
 |---|---|
 | Start in this window (Ctrl-C stops it) | `agent\scripts\launchers\start_companion.cmd` |
-| Start hidden, in the background | `agent\scripts\launchers\start_companion.cmd -Background` (log: `%LOCALAPPDATA%\agentic-fm\companion.log`) |
-| Check it | `agent\scripts\launchers\start_companion.cmd -Status` |
+| Start hidden, in the background | `agent\scripts\launchers\start_companion.cmd -Background` |
+| See who is running (PID, start time, folder, log file, conversion) | `agent\scripts\launchers\start_companion.cmd -Status` |
+| Watch it (follow its log) | `agent\scripts\launchers\start_companion.cmd -Attach` |
 | Stop it | `agent\scripts\launchers\start_companion.cmd -Stop` |
 | Start it at every logon (optional) | `agent\scripts\launchers\start_companion.cmd -InstallLogonTask` — adds a Task Scheduler task named *agentic-fm companion server* |
 | Stop starting it at logon | `agent\scripts\launchers\start_companion.cmd -RemoveLogonTask` |
 
 `start_companion.cmd` runs `start_companion.ps1` (same options) with `-ExecutionPolicy Bypass`, so it works even where PowerShell scripts are blocked. Options for the server go after `--`, e.g. `start_companion.cmd -- --port 9000`.
 
-**macOS** (Terminal, from the agentic-fm folder):
+**macOS** (Terminal, from the agentic-fm folder; Linux too, without launchd):
 
 | To | Run |
 |---|---|
 | Start in this window (Ctrl-C stops it) | `bash agent/scripts/launchers/start_companion.sh` |
-| Start in the background | `bash agent/scripts/launchers/start_companion.sh --background` (log: `~/Library/Logs/agentic-fm/companion.log`) |
-| Check it | `bash agent/scripts/launchers/start_companion.sh --status` |
+| Start in the background | `bash agent/scripts/launchers/start_companion.sh --background` |
+| See who is running (PID, start time, folder, log file, conversion) | `bash agent/scripts/launchers/start_companion.sh --status` |
+| Watch it (follow its log) | `bash agent/scripts/launchers/start_companion.sh --attach` |
 | Stop it | `bash agent/scripts/launchers/start_companion.sh --stop` |
 | Start it at every login (optional) | `bash agent/scripts/launchers/start_companion.sh --install-launchd` — installs `~/Library/LaunchAgents/com.agentic-fm.companion-server.plist` and starts it now |
 | Stop starting it at login | `bash agent/scripts/launchers/start_companion.sh --uninstall-launchd` |
 
-The launchd agent restarts the companion if it crashes, but not after a clean shutdown (`--idle-timeout`). While it is installed, use `--uninstall-launchd` rather than `--stop` to stop it for good.
+The launchd agent restarts the companion if it crashes, but not after a clean stop (`--stop`, `--idle-timeout`): it stays stopped until your next login. Use `--uninstall-launchd` to stop it for good. Reinstall an agent installed by an older launcher (`--install-launchd` again) to get the new log handling.
 
-**Checking it by hand:** `GET /health` answers whenever the companion is up, on any platform:
+### Finding, watching and stopping a companion that runs out of sight
+
+A companion started in the background, by the logon task or launchd, or from a closed IDE run keeps running where you can't see it. It is easy to find again:
+
+- **Its own log file.** The companion writes `companion-server.log` itself, however it was started: in `%LOCALAPPDATA%\agentic-fm\` on Windows, `~/Library/Logs/agentic-fm/` on macOS, `~/.local/state/agentic-fm/` on Linux (rotated at 5 MB, five old files kept; `--log-file` or `--no-log-file` to change it). The launchers no longer redirect its output.
+- **Its own commands.** The launchers' status, attach and stop options call `companion_server.py status`, `attach` and `stop`, which you can also run directly with the venv's Python, from any terminal. `stop` asks the companion to shut down cleanly and refuses while a conversion runs (add `-- --force` to the launcher, or `--force` directly, to stop it anyway); only if it doesn't stop does it terminate the process, after checking it is still a companion. `restart` stops it and starts it again in this terminal.
+- **A second start finds the first.** Starting a companion while one already runs on the port shows the running one and follows its log; Ctrl-C then asks whether to detach (it keeps running) or stop it. `--replace` stops it and starts here instead; `--no-attach` just prints its details. If another program holds the port, the message names it and its PID.
+- **Its terminal title** reads `agentic-fm companion :8765 (PID 1234)` while it runs in a terminal.
+- **Conversion records.** Each finished conversion is kept in `jobs/` in that same folder (`<job id>.json` and fm-saxml's whole output in `<job id>.log`), so you can see what happened after the companion stopped.
+
+Details, the state file and `POST /shutdown`: [Finding, watching and stopping the companion](agent/docs/COMPANION_SERVER.md#finding-watching-and-stopping-the-companion).
+
+**Checking it by hand:** `GET /health` answers whenever the companion is up, on any platform, and says who it is:
 
 ```bash
 curl http://127.0.0.1:8765/health
-# {"status": "ok", "version": "1.0.0", "plugin": {...}}
+# {"status": "ok", "version": "1.0.0", "plugin": {...}, "pid": 1234, "started_at": "...", "log_file": "...", "launched_by": "background", "conversion": null, ...}
 ```
 
 On Windows PowerShell: `Invoke-RestMethod http://127.0.0.1:8765/health`. Use your port instead of 8765 if you changed it in `agent/config/companion.json`. Full endpoint reference: [agent/docs/COMPANION_SERVER.md](agent/docs/COMPANION_SERVER.md).

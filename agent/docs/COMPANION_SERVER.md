@@ -10,9 +10,9 @@ The companion server is a lightweight local HTTP server that runs host-side tool
 
 ## Starting the server
 
-The easiest way is a launcher from `agent/scripts/launchers/`: `start_companion.cmd` (or `.ps1`) on Windows, `start_companion.sh` on macOS. They find the right virtual environment, start the server in the foreground or the background, check `/health`, stop it, and optionally start it at logon (Task Scheduler on Windows, launchd on macOS). See [Starting, stopping and checking the companion](../../README.md#starting-stopping-and-checking-the-companion) in the README.
+The easiest way is a launcher from `agent/scripts/launchers/`: `start_companion.cmd` (or `.ps1`) on Windows, `start_companion.sh` on macOS. They find the right virtual environment, start the server in the foreground or the background, and optionally start it at logon (Task Scheduler on Windows, launchd on macOS); their status, attach and stop options call the server's own commands below. See [Starting, stopping and checking the companion](../../README.md#starting-stopping-and-checking-the-companion) in the README.
 
-The server itself is a single Python file that needs only the standard library, except for `POST /convert`, which runs fm-saxml with the server's own Python, so that Python needs `fm-saxml-converter` installed. To run it directly:
+The server itself is a single Python file that needs only the standard library (`companion_state.py` and `companion_control.py` next to it are stdlib too), except for `POST /convert`, which runs fm-saxml with the server's own Python, so that Python needs `fm-saxml-converter` installed. To run it directly:
 
 ```bash
 # Default port 8765
@@ -23,7 +23,15 @@ python3 agent/scripts/companion_server.py --port 9000
 
 # Auto-shut down after 45 minutes (2700s) with no requests
 python3 agent/scripts/companion_server.py --idle-timeout 2700
+
+# From another terminal: who is running, follow its log, stop it, restart it here
+python3 agent/scripts/companion_server.py status
+python3 agent/scripts/companion_server.py attach
+python3 agent/scripts/companion_server.py stop
+python3 agent/scripts/companion_server.py restart
 ```
+
+`companion_server.py [start|status|stop|restart|attach] [options]`; no command means `start`. See [Finding, watching and stopping the companion](#finding-watching-and-stopping-the-companion).
 
 ### Configuration — `agent/config/companion.json`
 
@@ -37,7 +45,8 @@ The file is optional: absent or malformed, the server falls back to built-in def
     "bind_host": "127.0.0.1",        // interface the server binds on
     "port": 8765,                    // server port (single source of truth)
     "advertise_host": "local.hub",   // host clients dial to reach it (may differ from bind_host)
-    "idle_timeout_seconds": 0        // 0 = never auto-shutdown
+    "idle_timeout_seconds": 0,       // 0 = never auto-shutdown
+    "log_file": ""                   // optional: the log file's path, or "off"; see Log file below
   }
 }
 ```
@@ -49,22 +58,39 @@ Resolution precedence, highest wins:
 
 - **Server bind** — CLI flag (`--port`) / env var (`COMPANION_BIND_HOST`, `COMPANION_PORT`) → `companion.json` → defaults (`127.0.0.1:8765`).
 - **Client reach** — `COMPANION_URL` env → `companion.json` `advertise_host` + `port` → legacy `automation.json` `companion_url` (deprecation window) → default.
+- **Log file** — `--no-log-file` → `--log-file` → `COMPANION_LOG_FILE` env → `companion.json` `log_file` → `companion-server.log` in the state folder. See [Log file](#log-file).
 
 The plug-in's Application Support path is deliberately **not** configurable here — it is a fixed macOS platform location with one correct value, resolved against the macOS user running the companion (which must be the same user running FileMaker and the plug-in). A relocated or cross-user path is a deployment error to document, not a config knob.
 
 ### Idle auto-shutdown
 
-By default the server runs until you stop it (`Ctrl-C`, `launchctl unload`, etc.). Pass `--idle-timeout <seconds>` (or set the `COMPANION_IDLE_TIMEOUT` environment variable) to have it wind down on its own after a stretch with no requests. This is handy when the server is started per work session — a launchd job at login, or a Claude Code `SessionStart` hook — and you'd rather it not sit resident overnight.
+By default the server runs until you stop it (`Ctrl-C`, `companion_server.py stop`, `launchctl unload`, etc.). Pass `--idle-timeout <seconds>` (or set the `COMPANION_IDLE_TIMEOUT` environment variable) to have it wind down on its own after a stretch with no requests. This is handy when the server is started per work session — a launchd job at login, or a Claude Code `SessionStart` hook — and you'd rather it not sit resident overnight.
 
 A value of `0` (the default) disables auto-shutdown, so existing always-on setups are unaffected. Any incoming request resets the timer, so the server never stops mid-task.
 
 Startup log output:
 
 ```
-2026-03-09T14:22:01 INFO companion_server v1.0 listening on 127.0.0.1:8765
-2026-03-09T14:22:01 INFO Endpoints: GET /health  ...  GET /convert/<job id>  ...  POST /convert  POST /explode (deprecated alias of /convert)  ...
-2026-03-09T14:22:01 INFO Press Ctrl-C to stop.
+2026-03-09T14:22:01 INFO companion_server v1.0 listening on 127.0.0.1:8765 (PID 41872)
+2026-03-09T14:22:01 INFO Log file: C:\Users\me\AppData\Local\agentic-fm\companion-server.log (debug lines; default)
+2026-03-09T14:22:01 INFO Endpoints: GET /health  ...  GET /convert/<job id>  ...  POST /shutdown  POST /convert  POST /explode (deprecated alias of /convert)  ...
+2026-03-09T14:22:01 INFO Press Ctrl-C to stop (or run `companion_server.py stop` from another terminal).
 ```
+
+### Log file
+
+The companion writes its own log file, however it was started (a terminal, an IDE task, a launcher, the Windows logon task or launchd), so you can read what it did afterwards and follow it from another terminal (`companion_server.py attach`).
+
+- **Where:** `companion-server.log` in the per-user [state folder](#the-state-folder): `%LOCALAPPDATA%\agentic-fm\` on Windows, `~/Library/Logs/agentic-fm/` on macOS, `${XDG_STATE_HOME:-~/.local/state}/agentic-fm/` on Linux and WSL. The startup log names it.
+- **Elsewhere, or none:** `--log-file PATH`, the `COMPANION_LOG_FILE` environment variable, or `log_file` in `companion.json`, in that order (as for the port). `--no-log-file` turns it off; so does an empty value or `off` in the environment variable or `companion.json`.
+- **Rotation:** by size, 5 MB per file, keeping five old files (`companion-server.log.1` to `.5`). UTF-8.
+- **Level:** the file gets debug lines too (stage progress, FileMaker's `GET /convert/<job id>` polls, `GET /health` requests, successful `POST /progress` calls, file starts while the live panel is on, the state file's path); the console stays at info. File lines look like `2026-10-30 11:45:29,123 INFO companion_server: ...`.
+- **Can't open it:** the companion warns and logs to the console only. The startup line says which: `Log file: <path> (debug lines; default)` (or `from --log-file`, `from $COMPANION_LOG_FILE`, `from companion.json log_file`), or `Log file: off (<why>)`.
+- **Live panel:** the file keeps receiving every line while the [live progress panel](#live-progress-panel) is drawn.
+
+Two companions with the same log file (two ports, one state folder) write into one file; give one of them `--log-file` if you run both. On Windows, a program holding the file open (an editor) can delay a rotation; the companion then keeps writing to the current file and tries again a minute later.
+
+The launchers' background starts no longer redirect the console into a log: the companion's own file has everything. Python errors before the companion opens its file (a missing module, a syntax error) go to `companion.err.log` in the same folder.
 
 ### Live progress panel
 
@@ -94,21 +120,21 @@ The startup log says which applies, for example `Live progress panel: off, stdou
 
 ### Background process (Mac)
 
-To run the server in the background without blocking the terminal:
+To run the server in the background without blocking the terminal, use the launcher (`bash agent/scripts/launchers/start_companion.sh --background`), or by hand:
 
 ```bash
-python3 agent/scripts/companion_server.py &
+python3 agent/scripts/companion_server.py --launched-by background --no-attach > /dev/null 2>&1 &
 ```
 
-stdout logging will mix with your shell session. Redirect to a log file if that is disruptive:
-
-```bash
-python3 agent/scripts/companion_server.py > /tmp/companion_server.log 2>&1 &
-```
+The companion writes its own [log file](#log-file), so there is no need to redirect its output into one. Watch it with `companion_server.py attach`, stop it with `companion_server.py stop`.
 
 ### Auto-start with launchd (Mac)
 
-`bash agent/scripts/launchers/start_companion.sh --install-launchd` writes and loads a plist like the one below for you (it runs the launcher, so the venv is looked up at each start, logs to `~/Library/Logs/agentic-fm/`, and restarts the server only if it crashes); `--uninstall-launchd` removes it. To write it by hand instead, replace the paths with your actual username and repo location:
+`bash agent/scripts/launchers/start_companion.sh --install-launchd` writes and loads a plist like the one below for you; `--uninstall-launchd` removes it. The agent runs the launcher with `--launchd`, so the venv is looked up at each start and the companion says `launched_by: launchd`; if a companion is already running then, the launcher leaves it alone and exits 0. The companion logs to its own [log file](#log-file); launchd's stderr file, `companion.err.log`, only gets Python's errors from before it opens it.
+
+`KeepAlive` with `SuccessfulExit` false restarts the server only after a failed exit (a crash, or death by `SIGKILL`), not after a clean stop: `companion_server.py stop`, the idle timeout and `SIGTERM` (handled like Ctrl-C) all exit 0, so it stays stopped until your next login. A plist installed by an older launcher (stdout into `companion.log`, no `--launchd`) keeps working; install it again to get the new log handling and `launched_by`.
+
+To write it by hand instead, replace the paths with your actual username and repo location:
 
 **`~/Library/LaunchAgents/com.agentic-fm.companion-server.plist`**
 
@@ -125,22 +151,28 @@ python3 agent/scripts/companion_server.py > /tmp/companion_server.log 2>&1 &
     <array>
         <string>/Users/yourname/agentic-fm/.venv/bin/python</string>
         <string>/Users/yourname/agentic-fm/agent/scripts/companion_server.py</string>
+        <string>--launched-by</string>
+        <string>launchd</string>
+        <string>--no-attach</string>
     </array>
 
     <key>WorkingDirectory</key>
     <string>/Users/yourname/agentic-fm</string>
 
     <key>StandardOutPath</key>
-    <string>/tmp/companion_server.log</string>
+    <string>/dev/null</string>
 
     <key>StandardErrorPath</key>
-    <string>/tmp/companion_server.log</string>
+    <string>/Users/yourname/Library/Logs/agentic-fm/companion.err.log</string>
 
     <key>RunAtLoad</key>
     <true/>
 
     <key>KeepAlive</key>
-    <true/>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
 </dict>
 </plist>
 ```
@@ -155,7 +187,7 @@ Verify it is running:
 
 ```bash
 launchctl list | grep agentic-fm
-curl http://localhost:8765/health
+python3 agent/scripts/companion_server.py status
 ```
 
 To unload (stop and disable auto-start):
@@ -166,13 +198,96 @@ launchctl unload ~/Library/LaunchAgents/com.agentic-fm.companion-server.plist
 
 ---
 
+## Finding, watching and stopping the companion
+
+A companion started in the background, by the logon task or launchd, or from an IDE run that was closed keeps running out of sight. The companion therefore says who it is, keeps a state file, and has commands to check, follow and stop it from any terminal, on Windows, macOS and Linux.
+
+### The state folder
+
+One per-user folder holds the [log file](#log-file), the state file and the [conversion records](#conversion-records):
+
+| Platform | Folder |
+|---|---|
+| Windows | `%LOCALAPPDATA%\agentic-fm\` |
+| macOS | `~/Library/Logs/agentic-fm/` |
+| Linux, WSL | `${XDG_STATE_HOME:-~/.local/state}/agentic-fm/` |
+
+The `COMPANION_STATE_DIR` environment variable moves it (mainly for tests; set it for the server and for every `status`/`stop`/`attach` call alike). On macOS and Linux the companion creates it readable only by you (mode 700); on Windows your profile folder's permissions already do that.
+
+### The state file
+
+Once its port is bound, the companion writes `companion.state.json` in the state folder: the same fields as [`GET /health`](#get-health) (`pid`, `started_at`, `host`, `port`, `afm_root`, `python`, `log_file`, `launched_by`) plus a random `token`. It is written atomically, readable only by you (mode 600 on POSIX), and removed when the companion exits cleanly (Ctrl-C, `stop`, `POST /shutdown`, the idle timeout). A companion only ever removes its own file, never a newer one's.
+
+A file left behind by a companion that was killed is *stale*: its PID is gone, or the PID now belongs to another program (its command line doesn't run `companion_server.py`). `status`, `stop`, `attach` and a second start say so, and `stop` and a second start remove it. The PID check never uses `os.kill(pid, 0)` on Windows (it would kill the process): it uses `OpenProcess`/`GetExitCodeProcess` there, and reads command lines with `NtQueryInformationProcess` (PowerShell CIM as a fallback); on macOS and Linux it uses `os.kill(pid, 0)`, `/proc` and `ps`.
+
+The token guards [`POST /shutdown`](#post-shutdown): only a process that can read your state file can stop the companion. `GET /health` never returns it.
+
+### Commands
+
+`companion_server.py` takes a command first; no command means `start`. Every command accepts the same options, and `status`, `stop`, `attach` and `restart` look for the companion on the port `start` would use (`--port`, `COMPANION_PORT`, `companion.json`), at `127.0.0.1` when `bind_host` is `0.0.0.0` (`::1` for `::`). The old options (`--port`, `--idle-timeout`, `--no-live`) work before or after the command.
+
+| Command | What it does | Exit code |
+|---|---|---|
+| `start` | Runs the companion in this terminal. If one already holds the port, see [A second start](#a-second-start). | the server's |
+| `status` | Prints who is running on the port, from `GET /health` and the state file: PID, start time and uptime, address, folder, log file, how it was launched, Python, version, running conversion. Says when the state file is stale or names another companion, and when the companion is alive but doesn't answer HTTP. | 0 running (answering or not), 1 not |
+| `attach` | Prints the same details, then the last 40 lines of its log file, and follows the file (across rotation and truncation; it waits for a file that isn't there yet). Ctrl-C asks `[d]etach (the companion keeps running) or [s]top it?`; Enter, `d`, a second Ctrl-C or end of input detach. When the companion stops, `attach` ends too. | 0, or 1 when nothing runs or it writes no log file |
+| `stop` | Sends `POST /shutdown` with the state file's token, waits up to `--timeout` seconds (default 15) for it to exit, then terminates the PID from `/health` or the state file, but only after checking it is still a companion (on macOS and Linux `SIGTERM`, which the companion handles like Ctrl-C (clean shutdown, state file removed, exit 0), then `SIGKILL` if it is still there; on Windows `TerminateProcess`, which can't be caught, so the state file stays behind until the next `status` or `stop` removes it as stale. Ctrl-Break in the companion's window is handled like Ctrl-C). A companion that doesn't answer HTTP is terminated the same way, and so is one whose state file token is missing (unless `/health` shows a conversion and `--force` isn't given). A stale state file is removed ("Removed the stale state file ..."). Prints each step. While a conversion runs it refuses and prints the job; `--force` stops it anyway (the conversion is recorded as failed, "stopped by /shutdown"). | 0 stopped or nothing running, 1 failed, 2 refused (conversion running) |
+| `restart` | `stop` (with `--timeout`, `--force`), then `start` in this terminal. It starts only when `stop` exits 0 (stopped, or nothing was running); otherwise it exits with `stop`'s code. | 1 stop failed, 2 refused (conversion running), else the server's |
+
+Options for `start`:
+
+| Option | Meaning |
+|---|---|
+| `--log-file PATH`, `--no-log-file` | See [Log file](#log-file). |
+| `--replace` | If a companion already runs on the port, stop it and start here instead. |
+| `--no-attach` | If a companion already runs on the port, print its details and exit 1. |
+| `--launched-by WHO` | Shown by `/health` and `status`: `terminal` (default), `background`, `logon task`, `launchd` or `ide`. Also `COMPANION_LAUNCHED_BY`. The launchers and the harness's IDE tasks set it. |
+
+While it runs in a terminal, the companion sets the terminal's title to `agentic-fm companion :<port> (PID <pid>)` (`SetConsoleTitleW` on Windows, the OSC 0 escape elsewhere), so you can find its window or tab.
+
+### A second start
+
+When the port is taken at start, the companion asks `GET /health` on it and reads the state file:
+
+- **A companion answers:** it prints its PID, start time, folder, log file and running conversion, then attaches to it by default, as `attach` does. `--replace` stops it as `stop` does (so it refuses with exit 2 while a conversion runs) and starts here instead; `--no-attach` prints the details and exits 1. Without a terminal (stdin or stdout not a terminal: a launcher's background start, launchd, a pipe) it never attaches: it prints the details and exits 1, unless `--replace` is given.
+- **A companion holds the port but doesn't answer:** it says so with the state file's details; `--replace` terminates it and starts here, otherwise it exits 1.
+- **Another program holds the port:** it names it, with its PID (`GetExtendedTcpTable` on Windows, `lsof` or `ss` elsewhere), and exits 1 (`--replace` never stops other programs). Stop that program, or start on another `--port`.
+- **The state file and the port disagree:** a stale state file, a state file naming a companion on another port, or a companion started from another agentic-fm folder: it says so (and removes a stale file).
+
+### Find, watch and stop it, per platform
+
+From the agentic-fm folder, with the virtual environment's Python (the launchers find it for you):
+
+| | Windows | macOS, Linux |
+|---|---|---|
+| Who is running | `agent\scripts\launchers\start_companion.cmd -Status` | `bash agent/scripts/launchers/start_companion.sh --status` |
+| Follow its log | `start_companion.cmd -Attach` | `start_companion.sh --attach` |
+| Stop it | `start_companion.cmd -Stop` (add `-- --force` during a conversion) | `start_companion.sh --stop` (add `-- --force`) |
+| Directly | `.venv\Scripts\python.exe agent\scripts\companion_server.py status` (`attach`, `stop`) | `.venv/bin/python agent/scripts/companion_server.py status` (`attach`, `stop`) |
+| Read the log | `Get-Content -Wait -Tail 40 $env:LOCALAPPDATA\agentic-fm\companion-server.log` | `tail -f ~/Library/Logs/agentic-fm/companion-server.log` |
+
+In the DIS harness, the VS Code tasks and JetBrains run configurations *agentic-fm: companion status*, *attach* and *stop* do the same. While the launchd agent is installed, `stop` stops the companion until your next login; `--uninstall-launchd` stops it for good. The Windows logon task likewise starts it again at your next logon.
+
+### Conversion records
+
+When a conversion finishes (succeeded, failed, or ended by a crash or a shutdown), the companion writes to `jobs/` in the state folder:
+
+- `<job id>.json`: the job as `GET /convert/<job id>` returns it (without `success`), plus `command` (the fm-saxml arguments, as a list; the last run when it retried without `--progress`) and `log_file` (the path of the `.log` next to it);
+- `<job id>.log`: fm-saxml's whole stdout and stderr in the order they came, `--progress` JSON lines included, and the Python traceback when the runner crashed (the job itself keeps only the last 4000 characters in `log_tail`);
+- `last_job.json`: a copy of the latest record.
+
+It keeps the newest 50 records (`CONVERT_MAX_JOBS`, by modification time; `last_job.json` stays). A record that can't be written is a warning in the log and never changes the job. When the conversion has an output folder (a conversion that succeeded), the same record is also written there as `_companion_job.json`. A conversion ended by a shutdown is recorded as failed: "stopped by /shutdown" (`stop --force`), or "stopped: the companion shut down" (Ctrl-C, the idle timeout). So you can see what happened after the companion has stopped or restarted.
+
+---
+
 ## Endpoints
 
 Every route, with its request and response schemas, is in [`companion_openapi.yaml`](companion_openapi.yaml) (OpenAPI 3.1).
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/health` | Liveness check and plug-in status |
+| GET | `/health` | Liveness check, who this companion is, and plug-in status |
+| POST | `/shutdown` | Stop the companion (needs the state file's token) |
 | POST | `/convert` | Queue an fm-saxml conversion |
 | GET | `/convert/<job id>` | A conversion's state and results |
 | POST | `/progress` | Report the export step's progress (FileMaker's export script) |
@@ -191,7 +306,7 @@ Every route, with its request and response schemas, is in [`companion_openapi.ya
 
 Rules that apply to every route:
 
-- Paths are matched exactly, query string included: `GET /health?x=1` is a `404`. Only `GET /convert/<job id>` ignores a query string.
+- Paths are matched exactly, query string included: `GET /health?x=1` is a `404`. Only `GET /convert/<job id>` ignores a query string, and `POST /shutdown` reads `force` and `wait` from it.
 - An unknown path answers `404` with `{"error": "Not found"}`. Only `GET` and `POST` are handled; there is no CORS support.
 - Request bodies are JSON with a `Content-Length` header (Insert from URL sends one). A body without it is read as empty.
 - Every request except `GET /health` counts as activity for the [idle auto-shutdown](#idle-auto-shutdown).
@@ -214,11 +329,59 @@ No request body. No required headers.
 {
   "status": "ok",
   "version": "1.0",
-  "plugin": { "installed": false, "usable": false, "server": {}, "license": {}, "solutions": [] }
+  "plugin": { "installed": false, "usable": false, "server": {}, "license": {}, "solutions": [] },
+  "pid": 41872,
+  "started_at": "2026-10-30T14:22:01Z",
+  "uptime_seconds": 3605.2,
+  "host": "127.0.0.1",
+  "port": 8765,
+  "afm_root": "C:\\Dev\\agentic-fm",
+  "python": "C:\\Dev\\harness\\.venv\\Scripts\\python.exe",
+  "log_file": "C:\\Users\\me\\AppData\\Local\\agentic-fm\\companion-server.log",
+  "launched_by": "background",
+  "conversion": null
 }
 ```
 
-`version` comes from `version.txt`. `plugin` describes the agentic-fm FileMaker plug-in, cached for about 60 seconds: whether it is installed and `usable` (installed, reachable and licensed), its server address and token, license details, indexed solutions and, when the plug-in is reachable, its live endpoint catalog in `discover`. See [PLUGIN_INTEGRATION.md](PLUGIN_INTEGRATION.md).
+| Field | Meaning |
+|---|---|
+| `pid` | The companion's process ID. |
+| `started_at`, `uptime_seconds` | When it started (UTC), and how long it has been running. |
+| `host`, `port` | The address it is bound to. |
+| `afm_root` | The agentic-fm folder it runs from. |
+| `python` | The Python it runs under (`POST /convert` runs fm-saxml with it). |
+| `log_file` | Its [log file](#log-file), or `null` when it writes none. |
+| `launched_by` | `terminal`, `background`, `logon task`, `launchd` or `ide` (`--launched-by`). |
+| `conversion` | The running conversion (else the oldest queued one), as `GET /convert/<job id>` returns it without `success`, or `null`. |
+
+The [state file](#the-state-file) has the same fields (except `status`, `version`, `plugin`, `uptime_seconds` and `conversion`) plus the token, which `/health` never returns. `version` comes from `version.txt`. `plugin` describes the agentic-fm FileMaker plug-in, cached for about 60 seconds: whether it is installed and `usable` (installed, reachable and licensed), its server address and token, license details, indexed solutions and, when the plug-in is reachable, its live endpoint catalog in `discover`. See [PLUGIN_INTEGRATION.md](PLUGIN_INTEGRATION.md).
+
+---
+
+### POST /shutdown
+
+Stops the companion through the same path as Ctrl-C: the server stops serving, a running conversion is ended (with `force`), the webviewer is stopped, the state file is removed, and the process exits 0. `companion_server.py stop` is the usual way to call it.
+
+**Request:**
+
+```
+POST http://localhost:8765/shutdown
+X-Companion-Token: <token from companion.state.json>
+Content-Type: application/json
+
+{"force": false, "wait": false}
+```
+
+The `X-Companion-Token` header must hold the `token` from the [state file](#the-state-file), so a web page can't stop the companion with a blind request to localhost. The body is optional; `force` and `wait` can also be sent as a query string (`/shutdown?force=1`, `?wait=1`).
+
+| Response | When |
+|---|---|
+| `202` `{"status": "stopping"}` | Nothing is converting, or `force` is set (the running conversion is stopped and recorded as failed, "stopped by /shutdown"). |
+| `202` `{"status": "stopping after job", "job": {...}}` | A conversion is running and `wait` is set: the companion stops once no conversion is queued or running. |
+| `403` `{"error": "..."}` | The token header is missing or wrong. |
+| `409` `{"error": "conversion running", "job": {...}}` | A conversion is queued or running, and neither `force` nor `wait` is set. |
+
+A missing or wrong token gets `403`, an invalid JSON body `400`. Once a shutdown is accepted, new `POST /convert` and `POST /explode` requests get `503` (`{"success": false, "error": "The companion is stopping ..."}`). At shutdown the webviewer dev server is stopped too (Windows: `taskkill /T`; macOS, Linux: `SIGTERM` to its process group).
 
 ---
 
@@ -655,7 +818,7 @@ When the plug-in is not usable (not installed, unreachable or unlicensed) or the
 
 **This project is designed exclusively for local development.** It assumes you are working on your own machine, behind a firewall, on a private network. It is not hardened for production use, multi-user environments, or any network-accessible deployment. Do not use it on a public network or expose any part of it to the internet.
 
-The server binds exclusively to `127.0.0.1` (localhost) by default. It is not reachable from other machines on the network — only processes running on the same machine can connect. No authentication is implemented, which is acceptable because the attack surface is limited to local processes already running under the same user account.
+The server binds exclusively to `127.0.0.1` (localhost) by default. It is not reachable from other machines on the network — only processes running on the same machine can connect. No authentication is implemented, which is acceptable because the attack surface is limited to local processes already running under the same user account. The one exception is `POST /shutdown`, which needs the token from the user-only state file, so that a web page in a browser can't stop the companion with a blind request to localhost.
 
 Do not set `bind_host` (`companion.json`) or `COMPANION_BIND_HOST` to `0.0.0.0`, or expose the server through a reverse proxy. Endpoints such as `/convert`, `/trigger` (which accepts arbitrary AppleScript) and `/webviewer/start` run programs, and `/context`, `/debug`, `/webviewer/push` and `/preview` write files, all with the permissions of the user who started the server.
 
@@ -695,24 +858,25 @@ If Insert from URL itself fails (e.g. the server is not running), FileMaker disp
 
 ### Port already in use
 
+When the port is taken at start, the companion finds out what holds it (see [A second start](#a-second-start)):
+
 ```
-ERROR Port 8765 on 127.0.0.1 is already in use, probably by another companion server. Stop it (...), or start this one with --port.
+Port 8765 on 127.0.0.1 is already in use by a companion server:
+  PID         41872
+  Started     2026-10-30T14:22:01Z (up 1h 0m)
+  Address     127.0.0.1:8765
+  Folder      C:\Dev\agentic-fm
+  Log file    C:\Users\me\AppData\Local\agentic-fm\companion-server.log
+  Launched by background
 ```
 
-Another process — possibly a previous instance of the companion server — is already bound to port 8765, and the companion exits. Find and stop it:
+That is your own companion, started earlier and forgotten. In a terminal the new start attaches to it and follows its log; Ctrl-C then asks whether to detach or stop it. `companion_server.py stop` stops it, and `--replace` stops it and starts the new one in its place.
 
-```bash
-lsof -i :8765
-kill <PID>
+```
+Port 8765 on 127.0.0.1 is already in use by java.exe (PID 5120), not a companion server. Stop that program, or start this one with --port.
 ```
 
-On Windows (PowerShell):
-
-```powershell
-netstat -ano | findstr :8765
-Get-CimInstance Win32_Process -Filter "ProcessId=<PID>" | Select ProcessId, CreationDate, CommandLine
-Stop-Process -Id <PID>
-```
+Another program holds the port: stop it, or run the companion on another port. When the PID can't be found, the message gives the `netstat -ano | findstr :8765` (Windows) or `lsof -i :8765` (macOS, Linux) command to find it.
 
 On Windows the companion takes its port exclusively (`SO_EXCLUSIVEADDRUSE`, and no `SO_REUSEADDR`). Before, a second companion could listen on the same port without any error, and FileMaker's requests then reached either one: one terminal showed nothing while the other did the work. A companion from before this change can still share a port with another one from before it, so stop any old one that `netstat` shows.
 
@@ -726,7 +890,7 @@ python3 agent/scripts/companion_server.py --port 9000
 
 If the server is not running when FileMaker executes Insert from URL, FileMaker displays a dialog: *"The URL could not be found."* or a similar network error. This is not a script logic failure — it means the companion server is not listening.
 
-Start the server and retry, or check whether the launchd plist is loaded if auto-start is configured.
+Start the server and retry, or check whether the launchd plist is loaded if auto-start is configured. `companion_server.py status` says whether a companion runs and on which port; a companion started with another `--port` than the one FileMaker calls doesn't count.
 
 ### fmparse.sh not found
 
@@ -758,7 +922,7 @@ If the binary is in a non-standard location and not on `PATH`, supply its full p
 
 ### Diagnosing failures from the server log
 
-When the server is running in the foreground (or writing to a log file), each request produces timestamped output:
+Each request produces timestamped output, in the terminal (when there is one) and in the companion's [log file](#log-file), which also has the debug lines. `companion_server.py attach` follows the log of a companion running elsewhere; for a conversion that has finished, even before the companion was restarted, read its [record](#conversion-records) in `jobs/`.
 
 ```
 2026-03-09T14:25:10 INFO 127.0.0.1 - "POST /explode HTTP/1.1" 200 -
@@ -768,4 +932,4 @@ When the server is running in the foreground (or writing to a log file), each re
 
 The `stdout` and `stderr` fields in the response body contain the full output of `fmparse.sh`, which is the first place to look when the exit code is non-zero.
 
-A `/convert` job logs the fm-saxml command, one line per progress event (`convert 3f9c0a1b2c4d: Analyzing 3/12 Invoices (4.2s)`; `stage_progress` updates are debug only, and so are file starts while the live panel is on) and fm-saxml's other output as it comes. FileMaker's `GET /convert/<job id>` polls are logged at debug, so they don't show at the default level; every other request is still logged.
+A `/convert` job logs the fm-saxml command, one line per progress event (`convert 3f9c0a1b2c4d: Analyzing 3/12 Invoices (4.2s)`; `stage_progress` updates are debug only, and so are file starts while the live panel is on) and fm-saxml's other output as it comes. FileMaker's `GET /convert/<job id>` polls and `GET /health` requests (which `attach` makes every few seconds) are logged at debug, so they show only in the log file; every other request is still logged in both.

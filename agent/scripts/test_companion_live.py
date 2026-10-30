@@ -14,6 +14,7 @@ import os
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.request
@@ -215,7 +216,9 @@ def test_live_view_routes_logging_through_rich_and_restores_it():
                        console=Console(file=out, force_terminal=True, width=100), refresh_per_second=20)
     view.start()
     try:
-        assert [type(h) for h in root.handlers] == [RichHandler]
+        # The panel's handler replaces the console handlers; file handlers (pytest's own here) stay
+        assert type(root.handlers[0]) is RichHandler
+        assert not [h for h in root.handlers[1:] if cl.is_console_handler(h)]
         logging.getLogger("companion_server").warning("a log line above the panel")
         time.sleep(0.2)
     finally:
@@ -223,6 +226,44 @@ def test_live_view_routes_logging_through_rich_and_restores_it():
     assert root.handlers == before
     printed = out.getvalue()
     assert "a log line above the panel" in printed and "file 3 of 12" in printed
+
+
+def test_live_view_keeps_the_log_file_and_holds_the_console_at_info(tmp_path):
+    from rich.console import Console
+
+    root, logger = logging.getLogger(), logging.getLogger("companion_server")
+    path = tmp_path / "companion-server.log"
+    file_handler = logging.FileHandler(path, encoding="utf-8")
+    file_handler.setLevel(logging.DEBUG)
+    root.addHandler(file_handler)
+    old_level = logger.level
+    logger.setLevel(logging.DEBUG)
+    out = io.StringIO()
+    view = cl.LiveView(lambda: {}, list, console=Console(file=out, force_terminal=True, width=100),
+                       refresh_per_second=20)
+    try:
+        view.start()
+        try:
+            assert file_handler in root.handlers
+            logger.info("an info line while the panel is drawn")
+            logger.debug("a debug line while the panel is drawn")
+            time.sleep(0.1)
+        finally:
+            view.stop()
+        assert file_handler in root.handlers
+    finally:
+        root.removeHandler(file_handler)
+        file_handler.close()
+        logger.setLevel(old_level)
+    written = path.read_text(encoding="utf-8")
+    assert "an info line while" in written and "a debug line while" in written
+    printed = out.getvalue()
+    assert "an info line while" in printed and "a debug line while" not in printed
+
+
+def test_is_console_handler():
+    assert cl.is_console_handler(logging.StreamHandler(io.StringIO()))
+    assert not cl.is_console_handler(logging.NullHandler())
 
 
 def test_renderable_survives_a_bad_state():
@@ -251,7 +292,9 @@ def _run_companion(prelude: str, port: int, events: list) -> str:
     """Start the companion with stdout piped, wait for it, POST events, stop it; return its output."""
     code = (f"import runpy, sys\n{prelude}\nsys.argv = ['companion_server.py', '--port', '{port}']\n"
             f"runpy.run_path({SERVER!r}, run_name='__main__')\n")
-    env = {**os.environ, "COMPANION_IDLE_TIMEOUT": "0"}
+    # Its log file and state file go to a test folder, never the real per-user one
+    state_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+    env = {**os.environ, "COMPANION_IDLE_TIMEOUT": "0", "COMPANION_STATE_DIR": state_dir.name}
     env.pop(cl.NO_LIVE_ENV, None)
     proc = subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             env=env, cwd=SCRIPTS)
@@ -283,6 +326,7 @@ def _run_companion(prelude: str, port: int, events: list) -> str:
         proc.terminate()
         proc.wait(10)
         reader.join(5)
+        state_dir.cleanup()
     return b"".join(lines).decode("utf-8", "replace")
 
 

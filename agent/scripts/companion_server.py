@@ -12,6 +12,13 @@ Usage:
     Start on custom port:
         python agent/scripts/companion_server.py --port 9000
 
+    Find, follow and stop a running companion (from any terminal):
+        python agent/scripts/companion_server.py status|attach|stop|restart
+
+    A start while a companion already runs on the port shows it and follows its log
+    (--no-attach: show it and exit 1; --replace: stop it and start here). The companion
+    logs to companion-server.log in the per-user state folder (--log-file, --no-log-file).
+
     FileMaker calls it via Insert from URL, e.g. to convert a Save a Copy as XML
     export with fm-saxml:
         POST http://localhost:8765/convert
@@ -55,6 +62,7 @@ Windows, start_companion.sh on macOS.
 
 import argparse
 import errno
+import hmac
 import json
 import logging
 import os
@@ -66,12 +74,19 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
+
+# Siblings in agent/scripts, stdlib only: the state folder, log file and state file (companion_state),
+# and the client side of status/stop/attach and the port clash (companion_control).
+import companion_control
+import companion_state
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -440,11 +455,79 @@ def _file_start_level() -> int:
     return logging.DEBUG if _live_panel_on else logging.INFO
 
 
-def _stream_pipe(pipe, level, prefix, output_buffer, state, on_line=None):
+# ---------------------------------------------------------------------------
+# Log file (roadmap P3-18)
+# ---------------------------------------------------------------------------
+#
+# The companion writes companion-server.log in the per-user state folder (companion_state),
+# whatever started it. The file gets debug lines (stage progress, GET /convert polls); the
+# console stays at info. The handler sits on the root logger, and companion_live keeps file
+# handlers when it swaps the root handlers for the live panel's.
+
+LOG_FILE_ENV = "COMPANION_LOG_FILE"
+LAUNCHED_BY_ENV = "COMPANION_LAUNCHED_BY"
+LAUNCHED_BY_CHOICES = ("terminal", "background", "logon task", "launchd", "ide")
+_file_handler: "logging.Handler | None" = None
+
+
+def _resolve_log_file(cli_value: "str | None", no_log_file: bool, comp: dict, environ=None) -> tuple:
+    """(log file path or "" for none, where it came from).
+
+    Order: --no-log-file, --log-file, $COMPANION_LOG_FILE, companion.json log_file, the state
+    folder's companion-server.log. An empty value or "off" in any of them turns the file off.
+    """
+    environ = os.environ if environ is None else environ
+    if no_log_file:
+        return "", "--no-log-file"
+    for value, source in ((cli_value, "--log-file"), (environ.get(LOG_FILE_ENV), f"${LOG_FILE_ENV}"),
+                          (comp.get("log_file"), "companion.json log_file")):
+        if value is None:
+            continue
+        text = str(value).strip()
+        if not text or text.lower() == "off":
+            return "", source
+        return os.path.abspath(os.path.expanduser(text)), source
+    return companion_state.default_log_file(), "default"
+
+
+def _setup_file_logging(path: str) -> "logging.Handler | None":
+    """Keep the console at info and, when path is set, add the rotating debug log file."""
+    global _file_handler
+    root = logging.getLogger()
+    for handler in root.handlers:
+        if not isinstance(handler, logging.FileHandler):
+            handler.setLevel(max(handler.level, logging.INFO))
+    if not path:
+        return None
+    try:
+        handler = companion_state.make_file_handler(path)
+    except OSError as exc:
+        log.warning("Could not open the log file %s (%s); logging to the console only.", path, exc)
+        return None
+    root.addHandler(handler)
+    log.setLevel(logging.DEBUG)
+    _file_handler = handler
+    return handler
+
+
+def _teardown_file_logging() -> None:
+    """Close the log file from _setup_file_logging (the end of main, and tests)."""
+    global _file_handler
+    if _file_handler is None:
+        return
+    logging.getLogger().removeHandler(_file_handler)
+    # companion_live may still hold it in a swapped handler list; closing is enough there
+    _file_handler.close()
+    _file_handler = None
+    log.setLevel(logging.NOTSET)
+
+
+def _stream_pipe(pipe, level, prefix, output_buffer, state, on_line=None, transcript=None):
     """Copy a subprocess pipe to the logger in real time while buffering it.
 
     on_line, when set, sees each line first; a line it returns True for is handled
     (logged its own way) and is neither logged here nor buffered.
+    transcript, when set, gets every line as it arrives, handled or not (the job's .log).
     """
     try:
         for line in iter(pipe.readline, ""):
@@ -452,6 +535,8 @@ def _stream_pipe(pipe, level, prefix, output_buffer, state, on_line=None):
                 break
             with state["lock"]:
                 state["last_output_at"] = time.monotonic()
+            if transcript is not None:
+                transcript.append(line)
             if on_line is not None and on_line(line):
                 continue
             output_buffer.append(line)
@@ -460,10 +545,12 @@ def _stream_pipe(pipe, level, prefix, output_buffer, state, on_line=None):
         pipe.close()
 
 
-def _run_command_streaming(cmd, *, cwd, env, label, on_stdout_line=None):
+def _run_command_streaming(cmd, *, cwd, env, label, on_stdout_line=None, on_process=None, transcript=None):
     """Run a command, stream its output to the server log, and capture it.
 
     on_stdout_line: optional per-line hook for stdout (see _stream_pipe).
+    on_process: optional, called with the Popen once started (so shutdown can stop it).
+    transcript: optional list that gets every stdout and stderr line in arrival order.
     """
     process = subprocess.Popen(
         cmd,
@@ -477,6 +564,8 @@ def _run_command_streaming(cmd, *, cwd, env, label, on_stdout_line=None):
         errors="replace",
         bufsize=1,
     )
+    if on_process is not None:
+        on_process(process)
 
     stdout_chunks: list[str] = []
     stderr_chunks: list[str] = []
@@ -484,12 +573,12 @@ def _run_command_streaming(cmd, *, cwd, env, label, on_stdout_line=None):
 
     stdout_thread = threading.Thread(
         target=_stream_pipe,
-        args=(process.stdout, log.info, f"[{label} stdout] ", stdout_chunks, state, on_stdout_line),
+        args=(process.stdout, log.info, f"[{label} stdout] ", stdout_chunks, state, on_stdout_line, transcript),
         daemon=True,
     )
     stderr_thread = threading.Thread(
         target=_stream_pipe,
-        args=(process.stderr, log.warning, f"[{label} stderr] ", stderr_chunks, state),
+        args=(process.stderr, log.warning, f"[{label} stderr] ", stderr_chunks, state, None, transcript),
         daemon=True,
     )
 
@@ -576,6 +665,13 @@ _convert_slot = threading.Semaphore(1)   # one conversion at a time; the rest st
 # Whether the installed fm-saxml takes --progress json. Set to False the first time a build
 # rejects it (an fm-saxml before P3-10), so later builds don't pay the retry; a restart resets it.
 _convert_progress_supported = True
+# For the job records on disk (P3-23): the command and fm-saxml's whole output per job, kept
+# until _persist_job writes them; and the running fm-saxml process, so shutdown can stop it.
+_convert_commands: dict = {}    # job id → the last command run
+_convert_outputs: dict = {}     # job id → full stdout and stderr
+_convert_processes: dict = {}   # job id → Popen while fm-saxml runs
+JOB_RECORD_LAST = "last_job.json"
+JOB_RECORD_IN_OUTPUT = "_companion_job.json"
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 _WARNING_TOTAL_RE = re.compile(r"_(\d+) warning\(s\) total_")
@@ -874,16 +970,32 @@ def _run_convert_job(job_id: str) -> None:
         log.log(level, "convert %s: %s", job_id, _progress_message(event))
         return True
 
+    def on_process(process) -> None:
+        with _convert_lock:
+            _convert_processes[job_id] = process
+
+    transcript: list = []
+
     def run(progress: bool) -> dict:
         extra = {} if progress else {"progress": False}
         cmd = _convert_command(job["export_path"], job["docs_root"], job["solution_name"],
                                html=job["html"], webmcp=job["webmcp"], **extra)
         log.info("convert %s: %s", job_id, " ".join(cmd))
-        return _run_command_streaming(cmd, cwd=None, env=_convert_env(), label=f"fm-saxml {job_id}",
-                                      on_stdout_line=on_line)
+        with _convert_lock:
+            _convert_commands[job_id] = list(cmd)
+        start = len(transcript)
+        result = _run_command_streaming(cmd, cwd=None, env=_convert_env(), label=f"fm-saxml {job_id}",
+                                        on_stdout_line=on_line, on_process=on_process, transcript=transcript)
+        if len(transcript) == start:     # a runner that doesn't fill the transcript (tests)
+            transcript.append(result["stdout"] + result["stderr"])
+        with _convert_lock:
+            _convert_outputs[job_id] = "".join(transcript)
+        return result
 
     try:
         with _convert_slot:
+            if _job_done(job_id):    # ended by a shutdown while it was queued
+                return
             _update_job(job_id, state="running", started_at=_utc_now())
             with_progress = _convert_progress_supported
             result = run(with_progress)
@@ -892,6 +1004,8 @@ def _run_convert_job(job_id: str) -> None:
                 log.info("convert %s: this fm-saxml has no --progress; running it again without", job_id)
                 _update_job(job_id, progress={})
                 result = run(False)
+        if _job_done(job_id):        # ended by a shutdown (_end_active_jobs): keep that outcome
+            return
         output = result["stdout"] + result["stderr"]
         if result["returncode"] != 0:
             _update_job(job_id, state="failed", done=True, finished_at=_utc_now(),
@@ -915,11 +1029,87 @@ def _run_convert_job(job_id: str) -> None:
                  job_id, output_path, summary["counts"]["files"], summary["warning_count"])
     except Exception as exc:    # a crash in the runner must not take the server down
         log.exception("convert %s crashed: %s", job_id, exc)
-        _update_job(job_id, state="failed", done=True, finished_at=_utc_now(),
-                    error=f"Conversion crashed: {exc}")
+        with _convert_lock:     # the traceback goes into the job's .log
+            _convert_outputs[job_id] = _convert_outputs.get(job_id, "") + traceback.format_exc()
+        if not _job_done(job_id):
+            _update_job(job_id, state="failed", done=True, finished_at=_utc_now(),
+                        error=f"Conversion crashed: {exc}")
     finally:
         with _convert_lock:
             _convert_stage_starts.pop(job_id, None)
+            _convert_processes.pop(job_id, None)
+        _persist_job(job_id)
+
+
+def _job_done(job_id: str) -> bool:
+    with _convert_lock:
+        job = _convert_jobs.get(job_id)
+        return job is None or bool(job.get("done"))
+
+
+def _write_text_atomic(path: str, text: str) -> None:
+    tmp = f"{path}.{os.getpid()}.tmp"
+    with open(tmp, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+    os.replace(tmp, path)
+
+
+def _prune_job_records(folder: str, keep: "int | None" = None) -> None:
+    """Keep the newest `keep` (default CONVERT_MAX_JOBS) job records (<job id>.json and .log) in folder."""
+    keep = CONVERT_MAX_JOBS if keep is None else keep
+    records = []
+    for name in os.listdir(folder):
+        if name.endswith(".json") and name != JOB_RECORD_LAST:
+            path = os.path.join(folder, name)
+            try:
+                records.append((os.path.getmtime(path), name))
+            except OSError:
+                continue
+    records.sort(reverse=True)
+    for _, name in records[keep:]:
+        stem = name[: -len(".json")]
+        for old in (name, stem + ".log"):
+            try:
+                os.remove(os.path.join(folder, old))
+            except FileNotFoundError:
+                pass
+
+
+def _persist_job(job_id: str) -> None:
+    """Write a finished job's record to the state folder's jobs/ (roadmap P3-23). Never raises.
+
+    jobs/<job id>.json is the job as GET /convert/<job id> returns it plus "command" and
+    "log_file"; jobs/<job id>.log is fm-saxml's whole output; jobs/last_job.json is the
+    latest record. Also writes _companion_job.json into the output folder when there is one.
+    A failed write is logged; the job itself is unaffected.
+    """
+    with _convert_lock:
+        job = _convert_jobs.get(job_id)
+        job = json.loads(json.dumps(job)) if job is not None else None
+        command = _convert_commands.pop(job_id, None)
+        output = _convert_outputs.pop(job_id, "")
+    if job is None:
+        return
+    try:
+        folder = companion_state.jobs_dir()
+        log_path = os.path.join(folder, f"{job_id}.log")
+        record = {**job, "command": command, "log_file": log_path}
+        text = json.dumps(record, ensure_ascii=False, indent=2) + "\n"
+        _write_text_atomic(log_path, output)
+        _write_text_atomic(os.path.join(folder, f"{job_id}.json"), text)
+        _write_text_atomic(os.path.join(folder, JOB_RECORD_LAST), text)
+        _prune_job_records(folder)
+        log.debug("convert %s: record written to %s", job_id, folder)
+    except Exception as exc:
+        log.warning("convert %s: could not write its record to the jobs folder: %s", job_id, exc)
+        return
+    output_path = job.get("output_path") or ""
+    if output_path and os.path.isdir(output_path):
+        try:
+            _write_text_atomic(os.path.join(output_path, JOB_RECORD_IN_OUTPUT), text)
+        except Exception as exc:
+            log.warning("convert %s: could not write %s in %s: %s",
+                        job_id, JOB_RECORD_IN_OUTPUT, output_path, exc)
 
 
 def _start_convert_job(solution_name: str, export_path: str, docs_root: str, *,
@@ -1105,6 +1295,15 @@ def _convert_job_active() -> bool:
         return any(not job["done"] for job in _convert_jobs.values())
 
 
+def _active_convert_job() -> "dict | None":
+    """The running conversion, else the oldest queued one, as GET /convert returns it; None when idle."""
+    with _convert_lock:
+        active = [job for job in _convert_jobs.values() if not job["done"]]
+        running = [job for job in active if job["state"] == "running"]
+        job = (running or active or [None])[0]
+        return json.loads(json.dumps(job)) if job is not None else None
+
+
 def _idle_shutdown_due(idle_timeout: int) -> bool:
     """True once idle_timeout seconds have passed with no requests and no conversion queued or running.
 
@@ -1148,11 +1347,159 @@ class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
         super().server_bind()
 
 
-def _port_in_use_message(host: str, port: int) -> str:
-    stop = ("netstat -ano | findstr :%d, then Stop-Process -Id <PID>" % port if sys.platform == "win32"
-            else "lsof -i :%d, then kill <PID>" % port)
-    return (f"Port {port} on {host} is already in use, probably by another companion server. "
-            f"Stop it (find it with {stop}), or start this one with --port.")
+def _bind_server(host: str, port: int) -> "ThreadingHTTPServer | None":
+    """The server bound to host:port, or None when the port is in use."""
+    try:
+        return ThreadingHTTPServer((host, port), CompanionHandler)
+    except OSError as exc:
+        # EADDRINUSE; on Windows WSAEADDRINUSE (10048), or WSAEACCES (10013) against an exclusive bind
+        if exc.errno == errno.EADDRINUSE or getattr(exc, "winerror", None) in (10048, 10013):
+            return None
+        raise
+
+
+def _client_host(bind_host: str) -> str:
+    """Where a client on this machine reaches a server bound to bind_host."""
+    if bind_host in ("", "0.0.0.0"):
+        return "127.0.0.1"
+    if bind_host == "::":
+        return "::1"
+    return bind_host
+
+
+# ---------------------------------------------------------------------------
+# Who this companion is (GET /health, the state file; roadmap P3-19) and stopping it (P3-20)
+# ---------------------------------------------------------------------------
+
+_started_monotonic = time.monotonic()
+# Filled by _init_server_info in main(); /health falls back to these for a server started otherwise (tests).
+_server_info: dict = {
+    "pid": os.getpid(),
+    "started_at": _utc_now(),
+    "host": DEFAULT_BIND_HOST,
+    "port": None,
+    "afm_root": AFM_ROOT,
+    "python": sys.executable,
+    "log_file": None,
+    "launched_by": "terminal",
+}
+_state_token = ""           # the state file's token; POST /shutdown must send it. "" refuses every request.
+_stopping = False           # set by POST /shutdown: new conversions are refused
+_shutdown_reason = ""       # what ended the active conversions, for their records
+
+
+def _init_server_info(host: str, port: int, log_file: str, launched_by: str) -> dict:
+    global _started_monotonic
+    _started_monotonic = time.monotonic()
+    _server_info.update(pid=os.getpid(), started_at=_utc_now(), host=host, port=port,
+                        afm_root=AFM_ROOT, python=sys.executable, log_file=log_file or None,
+                        launched_by=launched_by)
+    return dict(_server_info)
+
+
+def _health(server_address: "tuple | None" = None) -> dict:
+    """GET /health: status, version, plug-in, and who this companion is (never the token)."""
+    info = dict(_server_info)
+    if info.get("port") is None and server_address:
+        info["host"], info["port"] = server_address[0], server_address[1]
+    return {
+        "status": "ok", "version": VERSION, "plugin": _check_plugin(),
+        **info,
+        "uptime_seconds": round(time.monotonic() - _started_monotonic, 1),
+        "conversion": _active_convert_job(),
+    }
+
+
+def _write_state_file() -> "str | None":
+    """Write companion.state.json with a new token. Returns its path, or None when it could not."""
+    global _state_token
+    _state_token = companion_state.new_token()
+    try:
+        return companion_state.write_state({**_server_info, "token": _state_token})
+    except OSError as exc:
+        log.warning("Could not write the state file (%s): `companion_server.py stop` and `status` "
+                    "won't find this companion.", exc)
+        return None
+
+
+def _launched_by(cli_value: "str | None", environ=None) -> str:
+    environ = os.environ if environ is None else environ
+    value = (cli_value or environ.get(LAUNCHED_BY_ENV) or "terminal").strip()
+    if value not in LAUNCHED_BY_CHOICES:
+        log.warning("Unknown launched_by %r (expected one of %s); kept as given.",
+                    value, ", ".join(LAUNCHED_BY_CHOICES))
+    return value
+
+
+def _shutdown_when_idle(server, poll: float = 0.5) -> None:
+    """POST /shutdown with wait: stop the server once no conversion is queued or running."""
+    while _convert_job_active():
+        time.sleep(poll)
+    log.info("Conversion finished; stopping as asked by POST /shutdown.")
+    server.shutdown()
+
+
+STOP_SIGNALS = ("SIGTERM", "SIGBREAK")     # SIGBREAK exists on Windows only (Ctrl-Break)
+
+
+def _stop_signal_handler(server):
+    """A signal handler that stops the server like Ctrl-C: serve_forever returns into main()'s finally.
+
+    shutdown() runs on its own thread: called on the thread running serve_forever, it would wait forever.
+    """
+    def handler(signum, frame):
+        try:
+            name = signal.Signals(signum).name
+        except ValueError:
+            name = str(signum)
+        log.info("Got %s; shutting down.", name)
+        threading.Thread(target=server.shutdown, daemon=True, name="shutdown").start()
+    return handler
+
+
+def _install_stop_signals(server) -> dict:
+    """Stop cleanly (state file removed, exit 0) on SIGTERM, and on SIGBREAK on Windows.
+
+    `stop` falls back to SIGTERM, and launchd's KeepAlive restarts a companion killed by a signal.
+    Returns the previous handlers for _restore_signals. Only the main thread can set handlers.
+    """
+    if threading.current_thread() is not threading.main_thread():
+        return {}
+    handler, previous = _stop_signal_handler(server), {}
+    for name in STOP_SIGNALS:
+        signum = getattr(signal, name, None)
+        if signum is None:
+            continue
+        try:
+            previous[signum] = signal.signal(signum, handler)
+        except (OSError, ValueError) as exc:
+            log.debug("Could not handle %s: %s", name, exc)
+    return previous
+
+
+def _restore_signals(previous: dict) -> None:
+    for signum, old in previous.items():
+        try:
+            signal.signal(signum, old if old is not None else signal.SIG_DFL)
+        except (OSError, ValueError, TypeError):
+            pass
+
+
+def _end_active_jobs(reason: str) -> None:
+    """At shutdown: stop fm-saxml, mark unfinished conversions failed and write their records."""
+    with _convert_lock:
+        active = [jid for jid, job in _convert_jobs.items() if not job["done"]]
+        processes = [_convert_processes.get(jid) for jid in active]
+        for jid in active:
+            _convert_jobs[jid].update(state="failed", done=True, finished_at=_utc_now(), error=reason)
+    for jid, process in zip(active, processes):
+        if process is not None and process.poll() is None:
+            try:
+                process.terminate()
+            except OSError as exc:
+                log.warning("convert %s: could not stop fm-saxml (pid %d): %s", jid, process.pid, exc)
+        log.warning("convert %s: %s", jid, reason)
+        _persist_job(jid)
 
 
 # ---------------------------------------------------------------------------
@@ -1166,13 +1513,14 @@ class CompanionHandler(BaseHTTPRequestHandler):
 
         GET /convert/<job id> goes at debug: FileMaker polls it every second or so, and at
         info those lines would bury the conversion's own progress lines. So does a successful
-        POST /progress, which already logs its own readable line per event.
+        POST /progress, which already logs its own readable line per event. So does GET /health,
+        which monitors, `status` and `attach` (every few seconds) poll.
         """
         command = getattr(self, "command", None)
         path = str(getattr(self, "path", ""))
         # log_request passes (request line, status code, size); errors come through other formats.
         succeeded = len(args) == 3 and str(args[1]).startswith("2")
-        quiet = ((command == "GET" and path.startswith("/convert/"))
+        quiet = ((command == "GET" and (path.startswith("/convert/") or path == "/health"))
                  or (command == "POST" and path == "/progress" and succeeded))
         (log.debug if quiet else log.info)("%s - %s", self.address_string(), fmt % args)
 
@@ -1207,7 +1555,10 @@ class CompanionHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         _touch_activity()
-        if self.path == "/convert":
+        route, _, query = self.path.partition("?")
+        if route == "/shutdown":
+            self._handle_shutdown(query)
+        elif self.path == "/convert":
             self._handle_convert()
         elif self.path == "/explode":
             self._handle_explode_alias()
@@ -1244,7 +1595,58 @@ class CompanionHandler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------------
 
     def _handle_health(self):
-        self._send_json({"status": "ok", "version": VERSION, "plugin": _check_plugin()})
+        self._send_json(_health(getattr(self.server, "server_address", None)))
+
+    def _handle_shutdown(self, query: str = ""):
+        """POST /shutdown — stop the companion through the same path as Ctrl-C (roadmap P3-20).
+
+        Needs the state file's token in X-Companion-Token, so a web page can't stop the companion
+        with a blind localhost request. Body {"force": bool, "wait": bool}, or ?force=1&wait=1.
+        """
+        global _stopping, _shutdown_reason
+        sent = self.headers.get(companion_state.TOKEN_HEADER) or ""
+        if not _state_token or not hmac.compare_digest(sent.encode("utf-8", "replace"),
+                                                       _state_token.encode("utf-8")):
+            log.warning("POST /shutdown from %s refused: missing or wrong %s.",
+                        self.address_string(), companion_state.TOKEN_HEADER)
+            self._send_json({"error": f"Missing or wrong {companion_state.TOKEN_HEADER} header: send the "
+                                      "token from the companion's state file (`companion_server.py stop` "
+                                      "does this)."}, status=403)
+            return
+        try:
+            payload = json.loads(self._read_body() or b"{}")
+        except (ValueError, OSError) as exc:
+            self._send_json({"error": f"Invalid request: {exc}"}, status=400)
+            return
+        payload = payload if isinstance(payload, dict) else {}
+        params = urllib.parse.parse_qs(query, keep_blank_values=True)
+
+        def flag(name: str) -> bool:
+            values = params.get(name) or []
+            from_query = bool(values) and values[-1].strip().lower() in ("1", "true", "yes", "on", "")
+            return bool(payload.get(name)) or from_query
+
+        force, wait = flag("force"), flag("wait")
+        job = _active_convert_job()
+        server = self.server
+        if job is not None and not force and not wait:
+            self._send_json({"error": "conversion running", "job": job}, status=409)
+            return
+        _stopping = True
+        if job is not None and not force:
+            log.info("POST /shutdown from %s: stopping after conversion %s.",
+                     self.address_string(), job["job_id"])
+            self._send_json({"status": "stopping after job", "job": job}, status=202)
+            threading.Thread(target=_shutdown_when_idle, args=(server,), daemon=True,
+                             name="shutdown-after-job").start()
+            return
+        if job is not None:
+            _shutdown_reason = "stopped by /shutdown"
+        log.info("POST /shutdown from %s: stopping%s.", self.address_string(),
+                 " (forced: the running conversion is stopped)" if job is not None else "")
+        self._send_json({"status": "stopping"}, status=202)
+        # serve_forever runs in main(); shutdown() from here makes it return into main()'s finally
+        threading.Thread(target=server.shutdown, daemon=True, name="shutdown").start()
 
     def _handle_plugin_proxy(self, method: str, subpath: str):
         """Thin pass-through to the plug-in's HTTP server, bearer token injected.
@@ -1307,6 +1709,10 @@ class CompanionHandler(BaseHTTPRequestHandler):
                 self._send_json({"success": False, "error": f"Invalid request: {exc}"}, status=400)
                 return
         extra = extra or {}
+        if _stopping:
+            self._send_json({"success": False, "error": "The companion is stopping (POST /shutdown); "
+                                                        "start it again and resend.", **extra}, status=503)
+            return
         if not isinstance(payload, dict):
             self._send_json({"success": False, "error": "Request body must be a JSON object", **extra},
                             status=400)
@@ -1855,10 +2261,9 @@ class CompanionHandler(BaseHTTPRequestHandler):
                 return
 
             try:
-                pgid = os.getpgid(_webviewer_proc.pid)
-                os.killpg(pgid, signal.SIGTERM)
+                what = _stop_process_tree(_webviewer_proc)
                 _webviewer_proc = None
-                log.info("Stopped webviewer (process group %d)", pgid)
+                log.info("Stopped webviewer (%s)", what)
                 self._send_json({"success": True, "status": "stopped"})
             except Exception as exc:
                 log.exception("Failed to stop webviewer: %s", exc)
@@ -2114,11 +2519,30 @@ def _load_companion_config() -> dict:
     return comp if isinstance(comp, dict) else {}
 
 
-def parse_args():
+COMMANDS = ("start", "status", "stop", "restart", "attach")
+DEFAULT_STOP_TIMEOUT = 15.0
+# cmd_stop exit codes after which restart goes on to start here: 0 = stopped, or nothing was running
+# (1 = could not stop it, 2 = refused because a conversion runs: restart exits with that code)
+RESTART_STOP_OK = (0,)
+
+
+def parse_args(argv: "list | None" = None):
     parser = argparse.ArgumentParser(
         description="agentic-fm companion server — runs fm-saxml and other local tools over HTTP for FileMaker.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
+    )
+    parser.add_argument(
+        "command",
+        nargs="?",
+        choices=COMMANDS,
+        default="start",
+        help=(
+            "start (the default): run the companion in this terminal; if one already runs on the "
+            "port, show it and follow its log. status: say whether one runs (exit 0) or not (exit 1). "
+            "stop: stop it cleanly. restart: stop, then start here. attach: follow a running "
+            "companion's log; Ctrl-C asks whether to detach or stop it."
+        ),
     )
     # Defaults are None so an unset flag falls through to env/companion.json/default
     # in main()'s resolution; passing the flag pins the value at the top of the chain.
@@ -2149,7 +2573,69 @@ def parse_args():
             "(same as COMPANION_NO_LIVE=1). The panel needs a terminal and Rich."
         ),
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--log-file",
+        default=None,
+        metavar="PATH",
+        help=(
+            f"Log file (debug lines, rotated by size). Overrides {LOG_FILE_ENV} and companion.json "
+            "log_file (default: companion-server.log in the per-user state folder)."
+        ),
+    )
+    parser.add_argument("--no-log-file", action="store_true", help="Write no log file (console only).")
+    parser.add_argument(
+        "--replace",
+        action="store_true",
+        help="start: if a companion already runs on the port, stop it and start here instead.",
+    )
+    parser.add_argument(
+        "--no-attach",
+        action="store_true",
+        help="start: if a companion already runs on the port, print its details and exit 1.",
+    )
+    parser.add_argument(
+        "--launched-by",
+        default=None,
+        metavar="WHO",
+        help=(
+            f"Who started the companion, shown by /health and status: {', '.join(LAUNCHED_BY_CHOICES)} "
+            f"(default: ${LAUNCHED_BY_ENV}, else terminal)."
+        ),
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=DEFAULT_STOP_TIMEOUT,
+        metavar="SECONDS",
+        help=f"stop, restart: seconds to wait for the companion to exit (default: {DEFAULT_STOP_TIMEOUT:g}).",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="stop, restart: stop even while a conversion runs (the conversion is recorded as failed).",
+    )
+    return parser.parse_args(argv)
+
+
+def _stop_process_tree(proc) -> str:
+    """Stop a process started in its own session/group, with its children. Returns what was done.
+
+    POSIX: SIGTERM to its process group. Windows has no process groups to signal (no os.getpgid or
+    os.killpg): taskkill /T stops the tree, and terminate() is the fallback.
+    """
+    if sys.platform == "win32":
+        try:
+            done = subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                                  capture_output=True, timeout=15)
+            if done.returncode == 0:
+                return f"process tree {proc.pid}"
+        except (OSError, subprocess.SubprocessError):
+            pass
+        proc.terminate()
+        return f"process {proc.pid}"
+    pgid = os.getpgid(proc.pid)
+    os.killpg(pgid, signal.SIGTERM)
+    return f"process group {pgid}"
 
 
 def _shutdown_cleanup(server):
@@ -2157,9 +2643,7 @@ def _shutdown_cleanup(server):
     with _webviewer_lock:
         if _webviewer_proc is not None and _webviewer_proc.poll() is None:
             try:
-                pgid = os.getpgid(_webviewer_proc.pid)
-                os.killpg(pgid, signal.SIGTERM)
-                log.info("Stopped webviewer (process group %d)", pgid)
+                log.info("Stopped webviewer (%s)", _stop_process_tree(_webviewer_proc))
             except Exception as exc:
                 log.warning("Failed to stop webviewer on shutdown: %s", exc)
 
@@ -2200,8 +2684,9 @@ def _stop_live_panel(live) -> None:
         live.stop()
 
 
-def main():
-    args = parse_args()
+def main(argv: "list | None" = None):
+    global _stopping, _shutdown_reason
+    args = parse_args(argv)
     comp = _load_companion_config()
 
     # Server-bind resolution (highest wins): CLI flag / env var → companion.json → default.
@@ -2218,36 +2703,80 @@ def main():
         comp.get("idle_timeout_seconds"), DEFAULT_IDLE_TIMEOUT,
     )
     advertise_host = comp.get("advertise_host") or DEFAULT_ADVERTISE_HOST
+    client_host = _client_host(bind_host)
 
-    try:
-        server = ThreadingHTTPServer((bind_host, port), CompanionHandler)
-    except OSError as exc:
-        # EADDRINUSE; on Windows WSAEADDRINUSE (10048), or WSAEACCES (10013) against an exclusive bind
-        if exc.errno == errno.EADDRINUSE or getattr(exc, "winerror", None) in (10048, 10013):
-            log.error(_port_in_use_message(bind_host, port))
+    # status, stop and attach talk to the running companion (companion_control); restart stops it first
+    if args.command == "status":
+        sys.exit(companion_control.cmd_status(client_host, port))
+    if args.command == "stop":
+        sys.exit(companion_control.cmd_stop(client_host, port, timeout=args.timeout, force=args.force))
+    if args.command == "attach":
+        sys.exit(companion_control.cmd_attach(client_host, port))
+    if args.command == "restart":
+        code = companion_control.cmd_stop(client_host, port, timeout=args.timeout, force=args.force)
+        if code not in RESTART_STOP_OK:
+            sys.exit(code)
+
+    server = _bind_server(bind_host, port)
+    if server is None:
+        # P3-21: show (and by default follow) the companion already there, or name what holds the port
+        code = companion_control.handle_port_clash(client_host, port, replace=args.replace,
+                                                   no_attach=args.no_attach)
+        if code is not None:
+            sys.exit(code)
+        server = _bind_server(bind_host, port)    # --replace stopped the other one
+        if server is None:
+            log.error("Port %d on %s is still in use after stopping the companion there; "
+                      "try again, or start this one with --port.", port, bind_host)
             sys.exit(1)
-        raise
+    port = server.server_address[1]     # the real port when --port 0 asked for any free one
 
-    log.info("companion_server v%s listening on %s:%d", VERSION, bind_host, port)
+    _stopping, _shutdown_reason = False, ""
+    log_file, log_source = _resolve_log_file(args.log_file, args.no_log_file, comp)
+    if not _setup_file_logging(log_file):
+        log_file = ""
+    _init_server_info(bind_host, port, log_file, _launched_by(args.launched_by))
+    state_path = _write_state_file()
+    companion_state.set_terminal_title(f"agentic-fm companion :{port} (PID {os.getpid()})")
+
+    log.info("companion_server v%s listening on %s:%d (PID %d)", VERSION, bind_host, port, os.getpid())
     log.info("Clients reach it at http://%s:%d (advertise_host).", advertise_host, port)
+    if log_file:
+        log.info("Log file: %s (debug lines; %s)", log_file,
+                 "default" if log_source == "default" else f"from {log_source}")
+    else:
+        log.info("Log file: off (%s)", log_source or "could not open it")
+    if state_path:
+        log.debug("State file: %s", state_path)
     threading.Thread(target=_check_for_updates, daemon=True).start()
     if idle_timeout > 0:
         log.info("Idle auto-shutdown: %ds with no requests.", idle_timeout)
         threading.Thread(target=_idle_watchdog, args=(server, idle_timeout), daemon=True).start()
     else:
         log.info("Idle auto-shutdown: disabled (always-on).")
-    log.info("Endpoints: GET /health  GET /clipboard  GET /webviewer/status  GET /preview/<name>  GET /convert/<job id>  GET|POST /plugin/<path>  POST /convert  POST /explode (deprecated alias of /convert)  POST /progress  POST /context  POST /clipboard  POST /trigger  POST /debug  POST /webviewer/start  POST /webviewer/stop  POST /webviewer/push  POST /preview/<name>")
+    log.info("Endpoints: GET /health  GET /clipboard  GET /webviewer/status  GET /preview/<name>  GET /convert/<job id>  GET|POST /plugin/<path>  POST /shutdown  POST /convert  POST /explode (deprecated alias of /convert)  POST /progress  POST /context  POST /clipboard  POST /trigger  POST /debug  POST /webviewer/start  POST /webviewer/stop  POST /webviewer/push  POST /preview/<name>")
     log.info(_docs_root_startup_message())
-    live = _start_live_panel(args.no_live)
-    log.info("Press Ctrl-C to stop.")
-
+    live = None
+    previous_signals = _install_stop_signals(server)
     try:
+        live = _start_live_panel(args.no_live)
+        log.info("Press Ctrl-C to stop (or run `companion_server.py stop` from another terminal).")
         server.serve_forever()
     except KeyboardInterrupt:
         log.info("Shutting down.")
     finally:
+        # Ctrl-C, POST /shutdown and the idle watchdog all end here
         _stop_live_panel(live)
+        if _convert_job_active():
+            _end_active_jobs(_shutdown_reason or "stopped: the companion shut down")
         _shutdown_cleanup(server)
+        try:
+            companion_state.remove_state(pid=os.getpid())
+        except OSError as exc:
+            log.warning("Could not remove the state file: %s", exc)
+        _restore_signals(previous_signals)
+        log.info("Stopped.")
+        _teardown_file_logging()
 
 
 if __name__ == "__main__":

@@ -51,6 +51,8 @@ def no_default_docs_root(monkeypatch, tmp_path):
     monkeypatch.setattr(cs, "AFM_ROOT", str(tmp_path / "standalone" / "agentic-fm"))
     # An fm-saxml without --progress makes the companion remember that (P3-11); start each test fresh.
     monkeypatch.setattr(cs, "_convert_progress_supported", True)
+    # Job records (P3-23) go to a test state folder, never the real per-user one
+    monkeypatch.setenv("COMPANION_STATE_DIR", str(tmp_path / "state"))
 
 
 def _make_afm(base, git_file: bool = True, parent: str = "tools", gitmodules: bool = True) -> str:

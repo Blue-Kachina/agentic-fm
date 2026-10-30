@@ -234,6 +234,14 @@ def render_panel(rows: list):
     return Panel(table, title="agentic-fm progress", title_align="left", border_style="blue")
 
 
+def is_console_handler(handler: logging.Handler) -> bool:
+    """True for a handler that writes to a stream (the console); the panel's handler replaces those.
+
+    Anything else, such as the companion's log file (a FileHandler is a StreamHandler too), is kept.
+    """
+    return isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler)
+
+
 class LiveView:
     """The live panel and the Rich log handler that prints log lines above it.
 
@@ -270,9 +278,10 @@ class LiveView:
         handler = RichHandler(console=self._console, show_path=False, markup=False,
                               omit_repeated_times=False, log_time_format=LOG_TIME_FORMAT)
         handler.setFormatter(logging.Formatter("%(message)s"))
+        handler.setLevel(logging.INFO)      # the console stays at info; the log file takes debug
         root = logging.getLogger()
         self._saved_handlers = root.handlers[:]
-        root.handlers = [handler]
+        root.handlers = [handler] + [h for h in self._saved_handlers if not is_console_handler(h)]
         self._live = Live(console=self._console, get_renderable=self.renderable, transient=True,
                           refresh_per_second=self._refresh)
         self._live.start()

@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Start, stop or check the agentic-fm companion server on Windows.
+    Start, stop, watch or check the agentic-fm companion server on Windows.
 
 .DESCRIPTION
     Runs agent/scripts/companion_server.py with a virtual environment's Python, never
@@ -14,11 +14,18 @@
 
     That Python needs fm-saxml-converter installed for POST /convert to work.
 
+    -Status, -Attach and -Stop call the companion's own status, attach and stop commands:
+    they find the running companion from its state file and GET /health, and -Stop never
+    kills a conversion halfway unless you add -- --force. The companion writes its own log,
+    %LOCALAPPDATA%\agentic-fm\companion-server.log, however it was started.
+
 .EXAMPLE
     .\start_companion.ps1                      # run in this window (Ctrl-C stops it)
-    .\start_companion.ps1 -Background          # run hidden; logs in %LOCALAPPDATA%\agentic-fm
-    .\start_companion.ps1 -Status              # GET /health
-    .\start_companion.ps1 -Stop                # stop a running companion
+    .\start_companion.ps1 -Background          # run hidden (it still writes its own log)
+    .\start_companion.ps1 -Status              # who is running: PID, start time, folder, log file
+    .\start_companion.ps1 -Attach              # show and follow its log; Ctrl-C detaches or stops it
+    .\start_companion.ps1 -Stop                # stop it cleanly
+    .\start_companion.ps1 -Stop -- --force     # stop it even while a conversion is running
     .\start_companion.ps1 -InstallLogonTask    # start it at every logon (Task Scheduler)
     .\start_companion.ps1 -RemoveLogonTask     # undo -InstallLogonTask
     .\start_companion.ps1 -- --port 9000       # anything after -- goes to companion_server.py
@@ -28,9 +35,12 @@ param(
     [switch]$Background,
     [switch]$Stop,
     [switch]$Status,
+    [switch]$Attach,
     [switch]$InstallLogonTask,
     [switch]$RemoveLogonTask,
     [switch]$PrintPython,
+    # Who started a -Background companion, shown by -Status and GET /health (the logon task passes "logon task")
+    [string]$LaunchedBy = 'background',
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$CompanionArgs
 )
@@ -45,9 +55,10 @@ function Exit-WithError([string]$Message) {
 $TaskName = 'agentic-fm companion server'
 $AfmRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 $Server = Join-Path $AfmRoot 'agent\scripts\companion_server.py'
-$LogDir = Join-Path $env:LOCALAPPDATA 'agentic-fm'
-$LogFile = Join-Path $LogDir 'companion.log'
-$ErrLogFile = Join-Path $LogDir 'companion.err.log'
+# The companion's state folder (log file, state file, conversion records); COMPANION_STATE_DIR moves it.
+$StateDir = if ($env:COMPANION_STATE_DIR) { $env:COMPANION_STATE_DIR } else { Join-Path $env:LOCALAPPDATA 'agentic-fm' }
+# Only Python's own errors before the companion opens its log file land here.
+$ErrLogFile = Join-Path $StateDir 'companion.err.log'
 
 function Find-CompanionPython {
     $candidates = @()
@@ -79,50 +90,6 @@ function Find-CompanionPython {
            "fm-saxml-converter), or set AGENTIC_FM_PYTHON to a python.exe.")
 }
 
-function Get-CompanionPort {
-    $config = Join-Path $AfmRoot 'agent\config\companion.json'
-    if ($env:COMPANION_PORT) { return [int]$env:COMPANION_PORT }
-    if (Test-Path -LiteralPath $config) {
-        try {
-            $json = Get-Content -LiteralPath $config -Raw | ConvertFrom-Json
-            if ($json.companion -and $json.companion.port) { return [int]$json.companion.port }
-        } catch {
-            Write-Warning "Could not read $config ($($_.Exception.Message)); using port 8765."
-        }
-    }
-    return 8765
-}
-
-function Get-CompanionProcesses {
-    Get-CimInstance Win32_Process -Filter "Name LIKE 'python%'" |
-        Where-Object { $_.CommandLine -and $_.CommandLine -like '*companion_server.py*' }
-}
-
-if ($Status) {
-    $url = "http://127.0.0.1:$(Get-CompanionPort)/health"
-    try {
-        $health = Invoke-RestMethod -Uri $url -TimeoutSec 5
-        Write-Output "Companion is running at $url (version $($health.version))."
-        exit 0
-    } catch {
-        Write-Output "Companion is not responding at $url."
-        exit 1
-    }
-}
-
-if ($Stop) {
-    $procs = @(Get-CompanionProcesses)
-    if ($procs.Count -eq 0) {
-        Write-Output 'No companion server is running.'
-        exit 0
-    }
-    foreach ($proc in $procs) {
-        Stop-Process -Id $proc.ProcessId -Force
-        Write-Output "Stopped companion server (PID $($proc.ProcessId))."
-    }
-    exit 0
-}
-
 if ($RemoveLogonTask) {
     if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
         Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
@@ -140,7 +107,21 @@ if ($PrintPython) {
     exit 0
 }
 
-$ErrorActionPreference = 'Continue'     # Windows PowerShell turns native stderr into errors
+$env:PYTHONUTF8 = '1'
+
+# Runs one of the companion's own commands (status, attach, stop) in this window and exits with its code.
+function Invoke-CompanionCommand([string]$Command) {
+    $ErrorActionPreference = 'Continue'     # Windows PowerShell turns native stderr into errors
+    Set-Location -LiteralPath $AfmRoot
+    & $python $Server $Command @CompanionArgs
+    exit $LASTEXITCODE
+}
+
+if ($Status) { Invoke-CompanionCommand 'status' }
+if ($Attach) { Invoke-CompanionCommand 'attach' }
+if ($Stop) { Invoke-CompanionCommand 'stop' }
+
+$ErrorActionPreference = 'Continue'
 & $python -c 'import fm_saxml' 2>$null
 $hasFmSaxml = ($LASTEXITCODE -eq 0)
 $ErrorActionPreference = 'Stop'
@@ -149,7 +130,7 @@ if (-not $hasFmSaxml) {
 }
 
 if ($InstallLogonTask) {
-    $argument = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`" -Background"
+    $argument = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`" -Background -LaunchedBy `"logon task`""
     $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $argument -WorkingDirectory $AfmRoot
     $trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
@@ -161,20 +142,26 @@ if ($InstallLogonTask) {
     exit 0
 }
 
-$env:PYTHONUTF8 = '1'
-
 if ($Background) {
-    if (@(Get-CompanionProcesses).Count -gt 0) {
-        Write-Output 'A companion server is already running (see -Status, -Stop).'
+    $ErrorActionPreference = 'Continue'
+    $statusOutput = & $python $Server status @CompanionArgs
+    $isRunning = ($LASTEXITCODE -eq 0)
+    $ErrorActionPreference = 'Stop'
+    if ($isRunning) {
+        $statusOutput | Write-Output
+        Write-Output 'A companion server is already running (see -Status, -Attach, -Stop).'
         exit 0
     }
-    New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
-    $argList = @("`"$Server`"")
+    New-Item -ItemType Directory -Force -Path $StateDir | Out-Null
+    # The hidden window is still a console: --no-attach and --no-live keep the companion from
+    # attaching to another one or drawing its panel there. Its log goes to companion-server.log.
+    $argList = @("`"$Server`"", '--launched-by', "`"$LaunchedBy`"", '--no-attach', '--no-live')
     if ($CompanionArgs) { $argList += @($CompanionArgs | ForEach-Object { "`"$_`"" }) }
-    $proc = Start-Process -FilePath $python -ArgumentList $argList -WorkingDirectory $AfmRoot `
-        -WindowStyle Hidden -RedirectStandardOutput $LogFile -RedirectStandardError $ErrLogFile -PassThru
-    Write-Output "Started the companion server (PID $($proc.Id)) with $python"
-    Write-Output "Logs: $LogFile"
+    # Start-Process sees the venv python.exe's PID, a launcher for the real interpreter: -Status shows the companion's.
+    Start-Process -FilePath $python -ArgumentList $argList -WorkingDirectory $AfmRoot `
+        -WindowStyle Hidden -RedirectStandardError $ErrLogFile | Out-Null
+    Write-Output "Started the companion server in the background with $python (see -Status)."
+    Write-Output "Log: $(Join-Path $StateDir 'companion-server.log') (watch it with -Attach, stop it with -Stop)"
     exit 0
 }
 

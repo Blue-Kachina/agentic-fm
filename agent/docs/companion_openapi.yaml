@@ -10,12 +10,14 @@ info:
     troubleshooting: `agent/docs/COMPANION_SERVER.md`.
 
     **Local development only.** The server binds to `127.0.0.1:8765` by default and has
-    no authentication. Several endpoints run programs or write files with the
+    no authentication, except `POST /shutdown`, which needs the token from the
+    user-only state file in the `X-Companion-Token` header. Several endpoints run programs or write files with the
     permissions of the user who started it. Never expose it beyond the local machine.
 
     **Routing rules (all endpoints):**
     - Paths are matched exactly, including any query string: `GET /health?x=1` is a 404.
-      Only `GET /convert/{job_id}` ignores a query string.
+      Only `GET /convert/{job_id}` ignores a query string, and `POST /shutdown` reads
+      `force` and `wait` from it.
     - An unknown path answers `404` with `{"error": "Not found"}`.
     - Only `GET` and `POST` are handled. There is no CORS support and no `OPTIONS`.
     - Request bodies are JSON (except the `/plugin/` proxy, which forwards bytes) and
@@ -53,11 +55,15 @@ paths:
     get:
       tags: [Status]
       operationId: getHealth
-      summary: Liveness check
+      summary: Liveness check, and who this companion is
       description: |
-        Confirms the server is up and reports the plug-in capability block (cached
-        for about 60 seconds). Does not count as activity for the idle auto-shutdown,
-        so monitors can poll it freely.
+        Confirms the server is up, says which companion it is (PID, start time, address,
+        folder, Python, log file, how it was launched, running conversion) and reports the
+        plug-in capability block (cached for about 60 seconds). Does not count as activity
+        for the idle auto-shutdown, so monitors can poll it freely. The companion's state
+        file (`companion.state.json` in the per-user state folder) has the same fields
+        except `status`, `version`, `plugin`, `uptime_seconds` and `conversion`, plus the
+        shutdown token, which `/health` never returns.
       responses:
         "200":
           description: Server is up.
@@ -68,6 +74,78 @@ paths:
                 status: ok
                 version: "1.0"
                 plugin: { installed: false, usable: false, server: {}, license: {}, solutions: [] }
+                pid: 41872
+                started_at: "2026-10-30T14:22:01Z"
+                uptime_seconds: 3605.2
+                host: 127.0.0.1
+                port: 8765
+                afm_root: "C:\\Dev\\agentic-fm"
+                python: "C:\\Dev\\harness\\.venv\\Scripts\\python.exe"
+                log_file: "C:\\Users\\me\\AppData\\Local\\agentic-fm\\companion-server.log"
+                launched_by: background
+                conversion: null
+
+  /shutdown:
+    post:
+      tags: [Status]
+      operationId: shutdown
+      summary: Stop the companion
+      description: |
+        Stops the server through the same path as Ctrl-C: it stops serving, ends a running
+        conversion (with `force`), stops the webviewer, removes the state file and exits 0.
+        `companion_server.py stop` calls it. Needs the state file's `token` in the
+        `X-Companion-Token` header, so a web page can't stop the companion with a blind
+        request to localhost. `force` and `wait` can come from the body or the query string
+        (`?force=1&wait=1`). Once a shutdown is accepted, `POST /convert` answers 503.
+      parameters:
+        - name: X-Companion-Token
+          in: header
+          required: true
+          description: The `token` from `companion.state.json`.
+          schema: { type: string }
+        - name: force
+          in: query
+          required: false
+          description: As `force` in the body (`1`, `true`, `yes`, `on` or empty).
+          schema: { type: string }
+        - name: wait
+          in: query
+          required: false
+          description: As `wait` in the body.
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ShutdownRequest" }
+            example: { force: false, wait: false }
+      responses:
+        "202":
+          description: |
+            Stopping: at once (`stopping`; with `force`, the running conversion is stopped
+            and recorded as failed, "stopped by /shutdown"), or once no conversion is queued
+            or running (`stopping after job`, with `wait`).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ShutdownAccepted" }
+              examples:
+                now: { value: { status: stopping } }
+                afterJob: { value: { status: stopping after job, job: { job_id: 3f9c0a1b2c4d, state: running, done: false } } }
+        "400":
+          description: Invalid JSON body.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorOnly" }
+        "403":
+          description: The `X-Companion-Token` header is missing or wrong.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorOnly" }
+        "409":
+          description: A conversion is queued or running, and neither `force` nor `wait` is set.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ShutdownConflict" }
 
   /convert:
     post:
@@ -110,6 +188,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ConvertConflict" }
+        "503":
+          description: The companion is stopping (a `POST /shutdown` was accepted); start it again and resend.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
 
   /convert/{job_id}:
     get:
@@ -119,7 +202,10 @@ paths:
       description: |
         `counts`, `files`, `kind`, `warning_count` and `warnings` appear once the job has
         succeeded; `log_tail` appears when it failed. The server keeps the last 50
-        finished jobs and forgets all of them when it restarts.
+        finished jobs in memory and forgets them when it restarts; each finished job is
+        also written to `jobs/<job id>.json` (plus `command` and `log_file`) and
+        `jobs/<job id>.log` (fm-saxml's whole output) in the companion's state folder,
+        newest 50 kept.
       parameters:
         - name: job_id
           in: path
@@ -234,6 +320,11 @@ paths:
                 allOf:
                   - $ref: "#/components/schemas/Failure"
                   - $ref: "#/components/schemas/DeprecationNotice"
+        "503":
+          description: As for `POST /convert` (the companion is stopping).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Failure" }
         "409":
           description: As for `POST /convert`.
           content:
@@ -782,6 +873,45 @@ components:
         status: { type: string, const: ok }
         version: { type: string, description: From the agentic-fm `version.txt`. }
         plugin: { $ref: "#/components/schemas/PluginBlock" }
+        pid: { type: integer, description: The companion's process ID. }
+        started_at: { type: string, format: date-time, description: When it started (UTC). }
+        uptime_seconds: { type: number }
+        host: { type: string, description: The bind host. }
+        port: { type: integer }
+        afm_root: { type: string, description: The agentic-fm folder it runs from. }
+        python: { type: string, description: The Python it runs under (`sys.executable`). }
+        log_file:
+          type: [string, "null"]
+          description: Its log file (companion-server.log in the state folder by default), or null when it writes none.
+        launched_by:
+          type: string
+          description: Who started it (`--launched-by` or `COMPANION_LAUNCHED_BY`).
+          examples: [terminal, background, logon task, launchd, ide]
+        conversion:
+          description: The running conversion (else the oldest queued one), as GET /convert/{job_id} returns it, or null.
+          oneOf:
+            - $ref: "#/components/schemas/ConvertJob"
+            - type: "null"
+
+    ShutdownRequest:
+      type: object
+      properties:
+        force: { type: boolean, default: false, description: Stop even while a conversion is queued or running. }
+        wait: { type: boolean, default: false, description: Stop once no conversion is queued or running. }
+
+    ShutdownAccepted:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [stopping, stopping after job] }
+        job: { $ref: "#/components/schemas/ConvertJob" }
+
+    ShutdownConflict:
+      type: object
+      required: [error, job]
+      properties:
+        error: { type: string, const: conversion running }
+        job: { $ref: "#/components/schemas/ConvertJob" }
 
     PluginBlock:
       type: object
