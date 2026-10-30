@@ -272,6 +272,15 @@ def test_shutdown_needs_the_token(server, monkeypatch, headers):
     assert not _stopped(thread, 0.7)
 
 
+def test_refused_shutdown_reads_the_body_so_the_403_arrives(server, monkeypatch):
+    # Unread body + close = a reset on Windows (WinError 10053) instead of the 403; send a big one
+    _, base, _ = server
+    monkeypatch.setattr(cs, "_state_token", "tok")
+    for _ in range(20):
+        status, body = _request(f"{base}/shutdown", {"pad": "x" * 200_000}, headers=_token("wrong"))
+        assert status == 403 and "X-Companion-Token" in body["error"]
+
+
 def test_shutdown_is_refused_when_there_is_no_token_at_all(server):
     _, base, _ = server
     assert _request(f"{base}/shutdown", {}, headers=_token(""))[0] == 403

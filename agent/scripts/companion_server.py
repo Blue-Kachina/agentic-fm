@@ -1604,6 +1604,13 @@ class CompanionHandler(BaseHTTPRequestHandler):
         with a blind localhost request. Body {"force": bool, "wait": bool}, or ?force=1&wait=1.
         """
         global _stopping, _shutdown_reason
+        # Read the body before any reply: closing with unread data makes Windows reset the
+        # connection, and the client then gets ConnectionAbortedError instead of the 403
+        try:
+            raw = self._read_body()
+        except OSError as exc:
+            self._send_json({"error": f"Invalid request: {exc}"}, status=400)
+            return
         sent = self.headers.get(companion_state.TOKEN_HEADER) or ""
         if not _state_token or not hmac.compare_digest(sent.encode("utf-8", "replace"),
                                                        _state_token.encode("utf-8")):
@@ -1614,8 +1621,8 @@ class CompanionHandler(BaseHTTPRequestHandler):
                                       "does this)."}, status=403)
             return
         try:
-            payload = json.loads(self._read_body() or b"{}")
-        except (ValueError, OSError) as exc:
+            payload = json.loads(raw or b"{}")
+        except ValueError as exc:
             self._send_json({"error": f"Invalid request: {exc}"}, status=400)
             return
         payload = payload if isinstance(payload, dict) else {}
