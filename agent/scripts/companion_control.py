@@ -166,6 +166,9 @@ def describe(health: "dict | None", state: "dict | None") -> str:
     row("Version", info.get("version"))
     if health is not None:
         row("Conversion", _job_text(health.get("conversion")))
+        for viewer in health.get("viewers") or []:
+            if isinstance(viewer, dict):
+                row("Viewer", "%s (%s)" % (viewer.get("url"), viewer.get("output_path")))
     return "\n".join(rows) if rows else "  (no details: it is an older companion)"
 
 

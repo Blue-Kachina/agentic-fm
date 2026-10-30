@@ -194,7 +194,7 @@ def test_an_unopenable_log_file_falls_back_to_the_console(tmp_path, caplog):
 # -- P3-19 /health and the state file --------------------------------------------------
 
 HEALTH_FIELDS = {"status", "version", "plugin", "pid", "started_at", "uptime_seconds", "host", "port",
-                 "afm_root", "python", "log_file", "launched_by", "conversion"}
+                 "afm_root", "python", "log_file", "launched_by", "conversion", "viewers"}
 
 
 def test_health_says_who_the_companion_is(server):

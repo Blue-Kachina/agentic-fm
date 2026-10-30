@@ -215,6 +215,13 @@ def test_describe_names_pid_start_folder_log_and_conversion():
         assert part in text
 
 
+def test_describe_lists_served_viewers():
+    text = cc.describe({"status": "ok", "viewers": [
+        {"output_path": "C:/docs/Invoices", "url": "http://127.0.0.1:8766/index.html"}]}, None)
+    assert "Viewer      http://127.0.0.1:8766/index.html (C:/docs/Invoices)" in text
+    assert "Viewer" not in cc.describe({"status": "ok", "viewers": []}, None)
+
+
 # ---------------------------------------------------------------------------
 # status (P3-20 AC3)
 # ---------------------------------------------------------------------------

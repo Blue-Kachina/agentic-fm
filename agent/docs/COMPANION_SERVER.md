@@ -339,7 +339,8 @@ No request body. No required headers.
   "python": "C:\\Dev\\harness\\.venv\\Scripts\\python.exe",
   "log_file": "C:\\Users\\me\\AppData\\Local\\agentic-fm\\companion-server.log",
   "launched_by": "background",
-  "conversion": null
+  "conversion": null,
+  "viewers": [{ "output_path": "C:\\Users\\me\\SaXML_docs\\Invoices", "url": "http://127.0.0.1:8766/index.html" }]
 }
 ```
 
@@ -353,8 +354,9 @@ No request body. No required headers.
 | `log_file` | Its [log file](#log-file), or `null` when it writes none. |
 | `launched_by` | `terminal`, `background`, `logon task`, `launchd` or `ide` (`--launched-by`). |
 | `conversion` | The running conversion (else the oldest queued one), as `GET /convert/<job id>` returns it without `success`, or `null`. |
+| `viewers` | The `webmcp` viewers it is serving (see [POST /convert](#post-convert)): each one's `output_path` and `url`. `[]` when none. |
 
-The [state file](#the-state-file) has the same fields (except `status`, `version`, `plugin`, `uptime_seconds` and `conversion`) plus the token, which `/health` never returns. `version` comes from `version.txt`. `plugin` describes the agentic-fm FileMaker plug-in, cached for about 60 seconds: whether it is installed and `usable` (installed, reachable and licensed), its server address and token, license details, indexed solutions and, when the plug-in is reachable, its live endpoint catalog in `discover`. See [PLUGIN_INTEGRATION.md](PLUGIN_INTEGRATION.md).
+The [state file](#the-state-file) has the same fields (except `status`, `version`, `plugin`, `uptime_seconds`, `conversion` and `viewers`) plus the token, which `/health` never returns. `version` comes from `version.txt`. `plugin` describes the agentic-fm FileMaker plug-in, cached for about 60 seconds: whether it is installed and `usable` (installed, reachable and licensed), its server address and token, license details, indexed solutions and, when the plug-in is reachable, its live endpoint catalog in `discover`. See [PLUGIN_INTEGRATION.md](PLUGIN_INTEGRATION.md).
 
 ---
 
@@ -412,7 +414,7 @@ The conversion runs `fm-saxml build` with the same Python the companion runs und
 
 `html` and `webmcp` must be JSON booleans; anything else (`"true"`, `1`, `null`) is refused with `400`. In FileMaker, send them with `JSONSetElement ( $body ; "webmcp" ; True ; JSONBoolean )`. They are the only fm-saxml switches a request can set: the companion always runs `fm-saxml build <export_path> --docs-root <docs root> --solution <solution_name> --force --yes`, plus `--html` / `--webmcp`.
 
-Browsers give the viewer its WebMCP tools only when it is served over `http://127.0.0.1`, not when `index.html` is opened from disk. To use them, serve the finished docs with `fm-saxml serve <output_path>` (the `.venv`'s `fm-saxml`). These switches need an fm-saxml that has them; an older one rejects the switch, and the job fails with fm-saxml's message in `log_tail`.
+Browsers give the viewer its WebMCP tools only when it is served over `http://127.0.0.1`, not when `index.html` is opened from disk. So when a `webmcp` job succeeds, the companion serves its docs folder with fm-saxml's server, on port 8766 (or a free port when that one is taken), without opening a browser. The job's `viewer_url` has the link, and the log shows it in a banner set off by `====` lines; `status` lists it as `Viewer`. It serves until the companion stops; a later `webmcp` build of the same solution reuses the server (it sends `no-store`, so reloading shows the new docs). If the server can't start (an fm-saxml without `serve`, or no port it can bind), the job still succeeds with `viewer_url` `""` and the log says why; serve the docs yourself with `fm-saxml serve <output_path>` (the `.venv`'s `fm-saxml`). These switches need an fm-saxml that has them; an older one rejects the switch, and the job fails with fm-saxml's message in `log_tail`.
 
 **Started (202):**
 
@@ -463,6 +465,7 @@ The job's state. `state` is `queued`, `running`, `succeeded` or `failed`; `done`
   },
   "kind": "batch",
   "viewer_path": "C:\\Users\\you\\SaXML_docs\\Invoices\\index.html",
+  "viewer_url": "http://127.0.0.1:8766/index.html",
   "counts": { "files": 2, "tables": 14, "fields": 220, "table_occurrences": 40, "relationships": 31,
               "layouts": 58, "scripts": 112, "custom_functions": 9, "value_lists": 12 },
   "files": [
@@ -486,7 +489,7 @@ The job's state. `state` is `queued`, `running`, `succeeded` or `failed`; `done`
   - `files`: one entry per finished file and stage, in order, with `seconds` for how long that file took in that stage.
 
   While a job runs, show it as for example `Analyzing 3/12 Invoices` with `JSONGetElement ( $response ; "progress.index" )` and its neighbours, or for a stage with units `Writing HTML viewer: 5300 of 21193 pages` from `progress.done` and `progress.units`. A time-left estimate for that stage is `stage_elapsed / done * ( units - done )`. The companion's log has one readable line per event (but not per `stage_progress`), such as `convert 3f9c0a1b2c4d: Analyzing 3/12 Invoices (4.2s)` or `convert 3f9c0a1b2c4d: Writing HTML viewer done: 21193 pages (108.3s)`.
-- `counts`, `files`, `kind`, `viewer_path`, `warning_count` and `warnings` appear once the job has succeeded. `viewer_path` is the viewer's `index.html`, or `""` when the job was run without `html`. Counts come from each file's `entities.json`; warnings come from each file's `Reports/warnings.md` (messages there are cut at 80 characters, and at most 200 warnings are listed — `warning_count` is always the full number).
+- `counts`, `files`, `kind`, `viewer_path`, `viewer_url`, `warning_count` and `warnings` appear once the job has succeeded. `viewer_path` is the viewer's `index.html`, or `""` when the job was run without `html`. `viewer_url` is where the companion serves that viewer, or `""` when the job was run without `webmcp` or the server could not start. A job record read back after a restart keeps its old `viewer_url`, which no longer answers. Counts come from each file's `entities.json`; warnings come from each file's `Reports/warnings.md` (messages there are cut at 80 characters, and at most 200 warnings are listed — `warning_count` is always the full number).
 - A failed job has `exit_code` (fm-saxml's exit code, or `null` if it never started), `error`, and `log_tail` — the last 4000 characters of fm-saxml's output.
 - An unknown job ID gives `404`. The companion keeps the last 50 finished jobs; restarting it forgets them.
 

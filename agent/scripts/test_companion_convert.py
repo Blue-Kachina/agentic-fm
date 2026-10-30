@@ -55,6 +55,13 @@ def no_default_docs_root(monkeypatch, tmp_path):
     monkeypatch.setenv("COMPANION_STATE_DIR", str(tmp_path / "state"))
 
 
+@pytest.fixture(autouse=True)
+def stop_viewers():
+    """Viewers served by a test (webmcp builds) stop when it ends."""
+    yield
+    cs._stop_viewer_servers()
+
+
 def _make_afm(base, git_file: bool = True, parent: str = "tools", gitmodules: bool = True) -> str:
     """An agentic-fm root at <base>/harness/<parent>/agentic-fm, laid out like a (non-)submodule."""
     harness = base / "harness"
@@ -270,16 +277,75 @@ def test_switches_must_be_booleans(server, export, tmp_path, field, value):
 
 
 @needs_fm_saxml
-def test_webmcp_build_reports_the_viewer(server, export, tmp_path):
+def test_webmcp_build_reports_the_viewer(server, export, tmp_path, caplog):
     status, body = _request(f"{server}/convert", {"solution_name": "MultiSol", "export_path": export,
                                                   "docs_root": str(tmp_path / "docs"), "webmcp": True})
     assert status == 202, body
-    job = _wait(server, body["job_id"])
+    with caplog.at_level(logging.INFO, logger="companion_server"):
+        job = _wait(server, body["job_id"])
     assert job["state"] == "succeeded", job
     assert job["html"] is True and job["webmcp"] is True
     assert job["viewer_path"] == os.path.join(job["output_path"], "index.html")
     assert os.path.isfile(job["viewer_path"])
     assert os.path.isdir(os.path.join(job["output_path"], "_viewer", "data"))
+    # served at once, without a browser, and announced in the log
+    assert job["viewer_url"].startswith("http://127.0.0.1:") and job["viewer_url"].endswith("/index.html")
+    with urllib.request.urlopen(job["viewer_url"], timeout=10) as resp:
+        assert resp.status == 200
+    assert any(job["viewer_url"] in r.getMessage() and "WebMCP viewer for MultiSol" in r.getMessage()
+               for r in caplog.records)
+    _, health = _request(f"{server}/health")
+    assert health["viewers"] == [{"output_path": job["output_path"], "url": job["viewer_url"]}]
+
+
+@needs_fm_saxml
+def test_html_build_is_not_served(server, export, tmp_path):
+    _, body = _request(f"{server}/convert", {"solution_name": "MultiSol", "export_path": export,
+                                             "docs_root": str(tmp_path / "docs"), "html": True})
+    job = _wait(server, body["job_id"])
+    assert job["state"] == "succeeded", job
+    assert job["viewer_path"] and job["viewer_url"] == ""
+    assert cs._served_viewers() == []
+
+
+# -- serving the viewer --------------------------------------------------------------
+
+def _webmcp_folder(base) -> str:
+    """A folder fm-saxml's has_webmcp accepts: index.html and the viewer's webmcp.js."""
+    from fm_saxml.render.html.viewer import VIEWER_DIR
+    (base / VIEWER_DIR).mkdir(parents=True)
+    (base / "index.html").write_text("<html></html>", encoding="utf-8")
+    (base / VIEWER_DIR / "webmcp.js").write_text("", encoding="utf-8")
+    return str(base)
+
+
+@needs_fm_saxml
+def test_viewer_server_is_reused_per_folder(tmp_path):
+    first, second = _webmcp_folder(tmp_path / "a"), _webmcp_folder(tmp_path / "b")
+    url = cs._serve_viewer(first)
+    assert url and cs._serve_viewer(first) == url      # a rebuild of the same folder
+    other = cs._serve_viewer(second)
+    assert other and other != url                       # the port was taken by the first
+    assert {v["url"] for v in cs._served_viewers()} == {url, other}
+    cs._stop_viewer_servers()
+    assert cs._served_viewers() == []
+    with pytest.raises(OSError):
+        urllib.request.urlopen(url, timeout=2)
+
+
+@needs_fm_saxml
+def test_folder_without_webmcp_is_not_served(tmp_path, caplog):
+    (tmp_path / "index.html").write_text("<html></html>", encoding="utf-8")
+    with caplog.at_level(logging.WARNING, logger="companion_server"):
+        assert cs._serve_viewer(str(tmp_path)) == ""
+    assert any("no viewer with WebMCP" in r.getMessage() for r in caplog.records)
+
+
+def test_fm_saxml_without_serve_is_a_warning(tmp_path, monkeypatch, caplog):
+    monkeypatch.setitem(sys.modules, "fm_saxml.serve", None)    # import fails
+    with caplog.at_level(logging.WARNING, logger="companion_server"):
+        assert cs._serve_viewer(str(tmp_path)) == ""
+    assert any("fm-saxml serve" in r.getMessage() for r in caplog.records)
 
 
 # -- /explode alias ------------------------------------------------------------------

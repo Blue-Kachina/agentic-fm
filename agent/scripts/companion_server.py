@@ -672,6 +672,11 @@ _convert_outputs: dict = {}     # job id → full stdout and stderr
 _convert_processes: dict = {}   # job id → Popen while fm-saxml runs
 JOB_RECORD_LAST = "last_job.json"
 JOB_RECORD_IN_OUTPUT = "_companion_job.json"
+# A --webmcp build's docs are served here once it succeeds (fm-saxml serve's default port;
+# a free one is used when it's taken). Output folder → (server, url, output_path).
+VIEWER_PORT = 8766
+_viewer_servers: dict = {}
+_viewer_lock = threading.Lock()
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 _WARNING_TOTAL_RE = re.compile(r"_(\d+) warning\(s\) total_")
@@ -952,6 +957,74 @@ def _progress_rejected(stderr: str) -> bool:
     return "No such option" in text and "--progress" in text
 
 
+def _serve_viewer(output_path: str) -> str:
+    """Serve a --webmcp build's docs at http://127.0.0.1 with fm-saxml's serve; the URL, or "". Never raises.
+
+    Browsers give the viewer WebMCP only on a served page, not one opened from disk. One
+    server per output folder, kept until the companion stops: a rebuild into the same folder
+    reuses it (fm-saxml's server sends no-store, so a reload shows the new docs).
+    """
+    key = os.path.normcase(os.path.abspath(output_path))
+    with _viewer_lock:
+        if key in _viewer_servers:
+            return _viewer_servers[key][1]
+        try:
+            from pathlib import Path
+            from fm_saxml.serve import has_webmcp, make_server, url_for
+        except ImportError as exc:
+            log.warning("Could not serve the viewer (this fm-saxml has no serve: %s). "
+                        "Run `fm-saxml serve %s` yourself.", exc, output_path)
+            return ""
+        try:
+            if not has_webmcp(Path(output_path)):
+                log.warning("Not serving %s: it has no viewer with WebMCP tools.", output_path)
+                return ""
+            # 0 (any free port) when taken: on Windows, http.server's SO_REUSEADDR would let
+            # make_server bind a port another server listens on, so its own fallback never runs
+            server = make_server(Path(output_path), 0 if _port_listening(VIEWER_PORT) else VIEWER_PORT)
+        except OSError as exc:
+            log.warning("Could not serve the viewer from %s: %s", output_path, exc)
+            return ""
+        port = server.server_address[1]
+        if port != VIEWER_PORT:
+            log.info("Port %d is in use; serving the viewer on %d.", VIEWER_PORT, port)
+        url = url_for(server)
+        threading.Thread(target=server.serve_forever, daemon=True, name=f"viewer-{port}").start()
+        _viewer_servers[key] = (server, url, output_path)
+        return url
+
+
+def _port_listening(port: int) -> bool:
+    """Whether something accepts connections on 127.0.0.1:port."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.5)
+        return sock.connect_ex(("127.0.0.1", port)) == 0
+
+
+def _served_viewers() -> list:
+    """[{"output_path", "url"}] of the viewers being served, for /health and status."""
+    with _viewer_lock:
+        return [{"output_path": path, "url": url} for _, url, path in _viewer_servers.values()]
+
+
+def _stop_viewer_servers() -> None:
+    with _viewer_lock:
+        servers = [server for server, _, _ in _viewer_servers.values()]
+        _viewer_servers.clear()
+    for server in servers:
+        try:
+            server.shutdown()
+            server.server_close()
+        except Exception as exc:
+            log.warning("Could not stop a viewer server: %s", exc)
+
+
+def _viewer_banner(solution_name: str, url: str) -> str:
+    """The served viewer's link, set off from the log lines around it."""
+    rule = "=" * 72
+    return f"\n{rule}\n  WebMCP viewer for {solution_name}:\n\n    {url}\n{rule}"
+
+
 def _run_convert_job(job_id: str) -> None:
     """Worker thread: run one conversion and record its outcome. Never raises."""
     global _convert_progress_supported
@@ -1023,10 +1096,14 @@ def _run_convert_job(job_id: str) -> None:
             log.warning("convert %s: no output folder found", job_id)
             return
         summary = _summarize_output(output_path)
+        # served before the job is done, so a poller that sees "succeeded" also sees the URL
+        viewer_url = _serve_viewer(output_path) if job["webmcp"] and summary["viewer_path"] else ""
         _update_job(job_id, state="succeeded", done=True, finished_at=_utc_now(), exit_code=0,
-                    output_path=output_path, **summary)
+                    output_path=output_path, viewer_url=viewer_url, **summary)
         log.info("convert %s succeeded: %s (%d file(s), %d warning(s))",
                  job_id, output_path, summary["counts"]["files"], summary["warning_count"])
+        if viewer_url:
+            log.info(_viewer_banner(job["solution_name"], viewer_url))
     except Exception as exc:    # a crash in the runner must not take the server down
         log.exception("convert %s crashed: %s", job_id, exc)
         with _convert_lock:     # the traceback goes into the job's .log
@@ -1407,6 +1484,7 @@ def _health(server_address: "tuple | None" = None) -> dict:
         **info,
         "uptime_seconds": round(time.monotonic() - _started_monotonic, 1),
         "conversion": _active_convert_job(),
+        "viewers": _served_viewers(),
     }
 
 
@@ -2647,6 +2725,7 @@ def _stop_process_tree(proc) -> str:
 
 def _shutdown_cleanup(server):
     server.server_close()
+    _stop_viewer_servers()
     with _webviewer_lock:
         if _webviewer_proc is not None and _webviewer_proc.poll() is None:
             try:
