@@ -979,8 +979,8 @@ def _serve_viewer(output_path: str) -> str:
             if not has_webmcp(Path(output_path)):
                 log.warning("Not serving %s: it has no viewer with WebMCP tools.", output_path)
                 return ""
-            # 0 (any free port) when taken: on Windows, http.server's SO_REUSEADDR would let
-            # make_server bind a port another server listens on, so its own fallback never runs
+            # 0 (any free port) when taken: on Windows, an fm-saxml without the SO_EXCLUSIVEADDRUSE
+            # fix binds a port another server listens on, so its own fallback never runs
             server = make_server(Path(output_path), 0 if _port_listening(VIEWER_PORT) else VIEWER_PORT)
         except OSError as exc:
             log.warning("Could not serve the viewer from %s: %s", output_path, exc)
