@@ -241,6 +241,8 @@ If FileMaker does not accept a paste, copy the same kind of object in FileMaker 
 
 Skills and the companion server's `/clipboard` endpoints call `clipboard.py`, which uses `clipboard_win.py` on Windows; call `clipboard_win.py` directly only for `detect`.
 
+[CLIPBOARD_ROUNDTRIP.md](CLIPBOARD_ROUNDTRIP.md) is the manual test that each object type survives copy, read, write and paste with real FileMaker, on Windows and on the Mac, with its results.
+
 ---
 
 ## Reference
