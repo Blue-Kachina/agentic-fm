@@ -209,13 +209,15 @@ FileMaker Pro on Windows registers the same four-letter class codes as custom Wi
 | `XMTH`      | `Mac-XMTH`          |
 | `ut16`      | `Mac-ut16`          |
 
-The data payload differs from macOS: FileMaker on Windows prepends a 4-byte little-endian `uint32` length field before the UTF-8 XML, and omits the XML declaration:
+The data payload differs from macOS: FileMaker on Windows prepends a 4-byte little-endian `uint32` length field before the UTF-8 XML. It omits the XML declaration, except in `Mac-XML2` (layout objects):
 
 ```
 [4 bytes LE uint32 = N]  [N bytes UTF-8 XML starting with <fmxmlsnippet>]
 ```
 
 On macOS the payload is plain UTF-8 XML with no prefix or length field.
+
+[CLIPBOARD_FORMATS.md](CLIPBOARD_FORMATS.md) is the full Windows spec: the formats FileMaker was seen to write (from FMCuttingBoard's captures), the read and write rules, the object types not yet captured (`Mac-XMTH`, `Mac-ut16` and `Mac-XMLO` above are unconfirmed), and how Proofkit's clipboard tools compare.
 
 ### clipboard_win.py
 
