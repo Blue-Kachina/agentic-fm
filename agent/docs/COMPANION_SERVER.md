@@ -436,6 +436,13 @@ fm-saxml writes each conversion to `<docs root>/<solution name>` (the name made 
 
 If none applies, `/convert` answers `400` with a message naming these three options. At startup the companion logs its default, for example `Docs root: D:\dis-harness\exports (harness exports/)`, or `Docs root: none set`. Every job reports the `docs_root` it used.
 
+The companion also writes two things in the docs root, for `agent/scripts/fmdocs.py` (`agent/docs/DOCS_SITE.md`):
+
+- Before a conversion replaces a solution's docs, it keeps their `docs.json` and each file's `entities.json` in `<docs root>/.previous/<solution folder>/` (one generation), so `fmdocs.py changes` can say what changed.
+- After a conversion succeeds, `<docs root>/.active.json` names that solution as the active one, the default for `fmdocs.py`.
+
+Neither stops a conversion when it can't be written; the log has a warning.
+
 ### GET /convert/&lt;job id&gt;
 
 The job's state. `state` is `queued`, `running`, `succeeded` or `failed`; `done` is `true` once it is `succeeded` or `failed`. A failed or crashed conversion is reported here — it never stops the companion.

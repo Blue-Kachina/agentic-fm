@@ -151,25 +151,36 @@ FileMaker uses UUIDs to identify objects. When pasting a `CustomMenu`, FileMaker
 
 ### Shortcut modifier values
 
-Modifier bits are additive: Shift=1, Ctrl=2, Cmd=4, Opt=8.
+Modifier bits are additive. One value is stored in the file, and each platform reads the bits as its own keys:
 
-| Modifier value | Keys |
-|---|---|
-| `4` | Cmd |
-| `5` | Cmd+Shift |
-| `6` | Cmd+Ctrl |
-| `7` | Cmd+Ctrl+Shift |
-| `12` | Cmd+Opt |
-| `13` | Cmd+Opt+Shift |
+| Bit | macOS | Windows |
+|---|---|---|
+| `1` | Shift | Shift |
+| `2` | Ctrl | Alt |
+| `4` | Cmd | Ctrl |
+| `8` | Opt | not observed |
+
+| Modifier value | macOS keys | Windows keys |
+|---|---|---|
+| `4` | Cmd | Ctrl |
+| `5` | Cmd+Shift | Ctrl+Shift |
+| `6` | Cmd+Ctrl | Ctrl+Alt |
+| `7` | Cmd+Ctrl+Shift | Ctrl+Alt+Shift |
+| `12` | Cmd+Opt | not observed |
+| `13` | Cmd+Opt+Shift | not observed |
+
+The Windows column comes from a menu made and copied in FileMaker Pro 26.0.3 on Windows 11 (2026-11-02): Ctrl+K was stored as `key="75" modifier="4"`, Ctrl+Shift+K as `5`, Ctrl+Alt+K as `6`, Ctrl+/ as `47`/`4` and Ctrl+Up Arrow as `57349`/`4`. Value `7` follows from the bits; `8` (Opt) did not come up on Windows. Whether the Windows Specify Shortcut dialog can set bit 8 at all is not confirmed.
 
 **Constraints:**
 - **Option-alone modifier (8) is not supported** in FileMaker custom menus. FM ignores it silently.
+- **Alt alone is refused on Windows**: the Specify Shortcut dialog in FileMaker Pro 26.0.3 does not accept Alt+K.
+- **Ctrl+Alt on Windows** (modifier `6`, Cmd+Ctrl on the Mac) is AltGr on many non-US keyboard layouts, where it types characters instead of firing the shortcut.
 - **Cmd+Opt combinations work**, but Cmd+Ctrl (modifier=6) is often used as a substitute for Monaco shortcuts that use Opt (e.g. Move Line Up/Down) to avoid conflicts.
 - **Some Cmd shortcuts conflict with built-in FM shortcuts** (e.g. Cmd+/ is reserved by FM). Use Cmd+Ctrl as a substitute modifier in these cases.
 
 ### Key code values
 
-Key codes in FileMaker custom menus are **ASCII character codes**, not Windows Virtual Key codes.
+Key codes in FileMaker custom menus are **ASCII character codes**, not Windows Virtual Key codes. They are the same on both platforms: FileMaker on Windows stored `/` as 47 and Up Arrow as 57349.
 
 | Key | Code | Notes |
 |---|---|---|
@@ -184,19 +195,19 @@ Key codes in FileMaker custom menus are **ASCII character codes**, not Windows V
 
 ### Format menu shortcut reference (agentic-fm)
 
-Confirmed working shortcuts from FileMaker export (`Format-fixed.xml`):
+Confirmed working shortcuts from FileMaker export (`Format-fixed.xml`), on the Mac. The Windows column is what the same stored values mean there, by the bit table above; it has not been tried in the agentic-fm web viewer on Windows.
 
-| Menu item | Monaco action ID | Key | Modifier | Keys |
-|---|---|---|---|---|
-| Toggle Line Comment | `editor.action.commentLine` | 47 (`/`) | 6 | Cmd+Ctrl+/ |
-| Toggle Block Comment | `editor.action.blockComment` | 65 (`A`) | 5 | Cmd+Shift+A |
-| Indent Lines | `editor.action.indentLines` | 93 (`]`) | 4 | Cmd+] |
-| Outdent Lines | `editor.action.outdentLines` | 91 (`[`) | 4 | Cmd+[ |
-| Move Line Up | `editor.action.moveLinesUpAction` | 57349 (↑) | 6 | Cmd+Ctrl+↑ |
-| Move Line Down | `editor.action.moveLinesDownAction` | 57351 (↓) | 6 | Cmd+Ctrl+↓ |
-| Copy Line Up | `editor.action.copyLinesUpAction` | 57349 (↑) | 7 | Cmd+Ctrl+Shift+↑ |
-| Copy Line Down | `editor.action.copyLinesDownAction` | 57351 (↓) | 7 | Cmd+Ctrl+Shift+↓ |
-| Delete Line | `editor.action.deleteLines` | 75 (`K`) | 5 | Cmd+Shift+K |
+| Menu item | Monaco action ID | Key | Modifier | macOS keys | Windows keys |
+|---|---|---|---|---|---|
+| Toggle Line Comment | `editor.action.commentLine` | 47 (`/`) | 6 | Cmd+Ctrl+/ | Ctrl+Alt+/ |
+| Toggle Block Comment | `editor.action.blockComment` | 65 (`A`) | 5 | Cmd+Shift+A | Ctrl+Shift+A |
+| Indent Lines | `editor.action.indentLines` | 93 (`]`) | 4 | Cmd+] | Ctrl+] |
+| Outdent Lines | `editor.action.outdentLines` | 91 (`[`) | 4 | Cmd+[ | Ctrl+[ |
+| Move Line Up | `editor.action.moveLinesUpAction` | 57349 (↑) | 6 | Cmd+Ctrl+↑ | Ctrl+Alt+↑ |
+| Move Line Down | `editor.action.moveLinesDownAction` | 57351 (↓) | 6 | Cmd+Ctrl+↓ | Ctrl+Alt+↓ |
+| Copy Line Up | `editor.action.copyLinesUpAction` | 57349 (↑) | 7 | Cmd+Ctrl+Shift+↑ | Ctrl+Alt+Shift+↑ |
+| Copy Line Down | `editor.action.copyLinesDownAction` | 57351 (↓) | 7 | Cmd+Ctrl+Shift+↓ | Ctrl+Alt+Shift+↓ |
+| Delete Line | `editor.action.deleteLines` | 75 (`K`) | 5 | Cmd+Shift+K | Ctrl+Shift+K |
 
 ### `<Override>` attribute rules
 

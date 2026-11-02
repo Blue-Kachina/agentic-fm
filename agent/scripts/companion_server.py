@@ -84,9 +84,11 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 
 # Siblings in agent/scripts, stdlib only: the state folder, log file and state file (companion_state),
-# and the client side of status/stop/attach and the port clash (companion_control).
+# and the client side of status/stop/attach and the port clash (companion_control); the previous
+# generation and active solution of converted docs (fmdocs).
 import companion_control
 import companion_state
+import fmdocs
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -1070,6 +1072,7 @@ def _run_convert_job(job_id: str) -> None:
             if _job_done(job_id):    # ended by a shutdown while it was queued
                 return
             _update_job(job_id, state="running", started_at=_utc_now())
+            _keep_previous_docs(job)
             with_progress = _convert_progress_supported
             result = run(with_progress)
             if with_progress and result["returncode"] == 2 and _progress_rejected(result["stderr"]):
@@ -1102,6 +1105,8 @@ def _run_convert_job(job_id: str) -> None:
                     output_path=output_path, viewer_url=viewer_url, **summary)
         log.info("convert %s succeeded: %s (%d file(s), %d warning(s))",
                  job_id, output_path, summary["counts"]["files"], summary["warning_count"])
+        if not fmdocs.set_active(job["docs_root"], job["solution_name"], output_path):
+            log.warning("convert %s: could not record %s as the active solution", job_id, job["solution_name"])
         if viewer_url:
             log.info(_viewer_banner(job["solution_name"], viewer_url))
     except Exception as exc:    # a crash in the runner must not take the server down
@@ -1150,6 +1155,13 @@ def _prune_job_records(folder: str, keep: "int | None" = None) -> None:
                 os.remove(os.path.join(folder, old))
             except FileNotFoundError:
                 pass
+
+
+def _keep_previous_docs(job: dict) -> None:
+    """Keep the docs a conversion is about to replace, for `fmdocs.py changes` (roadmap P5-18)."""
+    previous = _find_output_folder(job["docs_root"], job["solution_name"])
+    if previous and fmdocs.save_previous(previous) is None:
+        log.warning("convert %s: could not keep the previous docs of %s", job["job_id"], previous)
 
 
 def _persist_job(job_id: str) -> None:

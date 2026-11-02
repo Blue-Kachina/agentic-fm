@@ -73,9 +73,10 @@ Skip any step whose check passes. Resume from the first incomplete step.
 > Python 3 is required for clipboard operations, validation, and the companion server. All scripts use the standard library only — no virtual environment needed.
 >
 > **macOS**: Python 3 ships at `/usr/bin/python3`. For a newer version: `brew install python`
+> **Windows**: install from [python.org](https://www.python.org/downloads/windows/) (tick **Add python.exe to PATH**) or run `winget install Python.Python.3.13`. Run it as `python` (or `py`): `python3` is often the Microsoft Store stub, which opens the Store instead of running Python.
 > **Linux**: `sudo apt-get install python3` or your distro's equivalent.
 
-**Verify**: Run `python3 agent/scripts/clipboard.py --help` and confirm it prints usage info.
+**Verify**: Run `python3 agent/scripts/clipboard.py --help` (Windows: `python agent/scripts/clipboard.py --help`) and confirm it prints usage info.
 
 ---
 
@@ -96,8 +97,10 @@ Skip any step whose check passes. Resume from the first incomplete step.
 >    chmod +x ~/bin/fm-xml-export-exploder
 >    ```
 > 3. **macOS Gatekeeper**: On first run, macOS will block it. Right-click the binary in Finder, choose **Open**, then authorize in **System Settings > Privacy & Security**.
+>
+> **Windows**: download `fm-xml-export-exploder-x86_64-pc-windows-msvc.zip` (`aarch64` on Arm), extract `fm-xml-export-exploder.exe` into `%USERPROFILE%\bin`, and add that folder to your PATH. If SmartScreen blocks the first run, choose **More info > Run anyway**. The exploder is only used by `fmparse.sh`, a Bash script, so run that from Git Bash.
 
-**Verify**: Run `~/bin/fm-xml-export-exploder --version` and confirm output.
+**Verify**: Run `~/bin/fm-xml-export-exploder --version` (Windows: `%USERPROFILE%\bin\fm-xml-export-exploder.exe --version`) and confirm output.
 
 Ask the developer to confirm when done before proceeding.
 
@@ -112,9 +115,10 @@ Ask the developer to confirm when done before proceeding.
 > **xmllint** is required by `fmcontext.sh` to generate index files from exploded XML.
 >
 > - **macOS**: Ships with the OS (part of libxml2). Should already be available.
+> - **Windows**: Not included. `clipboard.py` works without it (it saves the XML unformatted), so install it only if you run `fmcontext.sh`: from [MSYS2](https://www.msys2.org/), `pacman -S libxml2`, then use `fmcontext.sh` from that shell.
 > - **Linux**: `sudo apt-get install libxml2-utils`
 
-This step usually passes automatically on macOS. Move on quickly if it does.
+This step usually passes automatically on macOS; move on quickly if it does. On Windows, skip it unless the developer runs `fmcontext.sh`.
 
 ---
 

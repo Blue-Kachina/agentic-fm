@@ -168,6 +168,19 @@ def test_success_reports_counts_and_lands_where_solution_context_looks(server, e
     ctx = sc.load_solution("MultiSol", docs_root=str(docs_root), file="FileB")
     assert ctx.name == "FileB"
 
+    # The conversion makes the solution active, and a second one keeps the first as the
+    # previous generation (fmdocs.py active / changes)
+    import fmdocs
+    from pathlib import Path
+    assert fmdocs.get_active(str(docs_root))["solution"] == "MultiSol"
+    assert not (docs_root / fmdocs.PREVIOUS_DIR).exists()
+    status, body = _request(f"{server}/convert", {"solution_name": "MultiSol", "export_path": export,
+                                                  "docs_root": str(docs_root)})
+    assert _wait(server, body["job_id"])["state"] == "succeeded"
+    assert (docs_root / fmdocs.PREVIOUS_DIR / "MultiSol" / "FileB" / "entities.json").is_file()
+    output = Path(job["output_path"])
+    assert fmdocs.compare(fmdocs.previous_dir(output), output) == []
+
 
 @needs_fm_saxml
 def test_docs_root_falls_back_to_env(server, export, tmp_path, monkeypatch):
