@@ -71,7 +71,7 @@ These object types have no FileMaker capture on Windows. Their format names and 
 | Custom menu sets | `Mac-ut16`, as custom menus | not supported | |
 | Legacy layout objects (`XMLO`) | `Mac-XMLO`, length-prefixed UTF-8 | not supported | FMCuttingBoard writes `Mac-XML` as its legacy alias instead. |
 
-To capture one: copy the object in FileMaker Pro on Windows, then list the clipboard's formats and save the raw bytes of each `Mac-` format. FMCuttingBoard's "Diagnostics: Dump Clipboard Formats" and "Save Raw Clipboard Capture" commands do both (VS Code or JetBrains); `clipboard_win.py detect` lists the names from WSL2.
+To capture one: copy the object in FileMaker Pro on Windows, then list the clipboard's formats and save the raw bytes of each `Mac-` format. FMCuttingBoard's "Diagnostics: Dump Clipboard Formats" and "Save Raw Clipboard Capture" commands do both (VS Code or JetBrains); `clipboard_win.py detect` lists the names and sizes.
 
 Also not covered by the captures: non-ASCII text (all captured payloads were ASCII, so UTF-8 is inferred, not observed), and differences between FileMaker Pro versions.
 

@@ -193,7 +193,7 @@ Note that `pb.clearContents()` is required before writing — without it, stale 
 
 ---
 
-## Windows clipboard (WSL2)
+## Windows clipboard
 
 FileMaker Pro on Windows registers the same four-letter class codes as custom Windows clipboard formats, prefixed with `Mac-` following Apple's Carbon cross-platform clipboard convention (used by FileMaker since FM7).
 
@@ -221,22 +221,25 @@ On macOS the payload is plain UTF-8 XML with no prefix or length field.
 
 ### clipboard_win.py
 
-`agent/scripts/clipboard_win.py` provides the same `read` / `write` / `detect` interface as `clipboard.py` but runs on WSL2. It delegates clipboard operations to `powershell.exe` via a temp `.ps1` file written to the Windows TEMP directory (so `powershell.exe` can read it — WSL2 paths are not directly accessible to Windows executables). The PowerShell script P/Invokes `user32.dll` / `kernel32.dll` to call `RegisterClipboardFormat`, `SetClipboardData`, and `GetClipboardData`.
+`agent/scripts/clipboard_win.py` provides the same `read` / `write` interface as `clipboard.py` on native Windows, plus `detect`. It calls the Win32 clipboard (`user32.dll` / `kernel32.dll`) through `ctypes`, standard library only, and retries while another process holds the clipboard. It writes the payloads [CLIPBOARD_FORMATS.md](CLIPBOARD_FORMATS.md) specifies and reads the first FileMaker format on the clipboard. It does not run under WSL.
 
 ```bash
 # Write XML to Windows clipboard (class auto-detected)
-python3 agent/scripts/clipboard_win.py write agent/sandbox/myscript.xml
+python agent/scripts/clipboard_win.py write agent/sandbox/myscript.xml
+
+# Override the class explicitly if needed
+python agent/scripts/clipboard_win.py write agent/sandbox/myscript.xml --class XMSC
 
 # Read FM objects from Windows clipboard
-python3 agent/scripts/clipboard_win.py read agent/sandbox/output.xml
+python agent/scripts/clipboard_win.py read agent/sandbox/output.xml
 
-# List all custom clipboard formats -- run after copying from FM to verify format names
-python3 agent/scripts/clipboard_win.py detect
+# List all custom clipboard formats with their sizes -- run after copying from FM
+python agent/scripts/clipboard_win.py detect
 ```
 
-If FileMaker does not accept the paste, run `detect` after copying a script step from FM Pro to see the exact format name registered on your installation. Pass the observed prefix via `--format-prefix` if it differs from `Mac-`.
+If FileMaker does not accept a paste, copy the same kind of object in FileMaker Pro and run `detect` to compare the format names and sizes. `read` pretty-prints with `xmllint` when it is installed and returns the XML unchanged otherwise.
 
-The companion server automatically uses `clipboard_win.py` on Linux (WSL2) and `clipboard.py` on macOS — no configuration needed.
+The companion server's `/clipboard` endpoints do not use `clipboard_win.py` on native Windows yet; run it directly.
 
 ---
 
