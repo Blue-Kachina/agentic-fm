@@ -1,6 +1,6 @@
 # Clipboard Interaction
 
-FileMaker does not use plain text for clipboard objects. When you copy scripts, steps, fields, custom functions, or other objects in FileMaker, they are placed on the macOS clipboard as proprietary binary descriptor classes — not as readable text. Converting between those classes and the fmxmlsnippet XML format that this project uses requires AppleScript.
+FileMaker does not use plain text for clipboard objects. When you copy scripts, steps, fields, custom functions, or other objects in FileMaker, they are placed on the clipboard as proprietary binary descriptor classes — not as readable text. On macOS, converting between those classes and the fmxmlsnippet XML format that this project uses requires AppleScript or NSPasteboard; on Windows they are custom clipboard formats (see [Windows clipboard](#windows-clipboard) and [CLIPBOARD_FORMATS.md](CLIPBOARD_FORMATS.md)).
 
 **Do not use `pbpaste` or `pbcopy` for FileMaker objects.** Both tools silently corrupt multi-byte UTF-8 characters (such as `≠`, `≤`, `≥`, `¶`) that are common in FileMaker calculations.
 
@@ -49,7 +49,7 @@ A Python helper script is provided at `agent/scripts/clipboard.py`. It handles b
 
 ### Read: FM objects on clipboard → XML file
 
-After copying objects in FileMaker (`⌘C`), run:
+After copying objects in FileMaker (`⌘C`, or `Ctrl+C` on Windows), run:
 
 ```bash
 # Print to stdout
@@ -61,7 +61,7 @@ python3 agent/scripts/clipboard.py read agent/sandbox/myscript.xml
 
 ### Write: XML file → FM objects on clipboard
 
-After generating or editing a snippet, send it to the clipboard so it can be pasted into FileMaker (`⌘V`):
+After generating or editing a snippet, send it to the clipboard so it can be pasted into FileMaker (`⌘V`, or `Ctrl+V` on Windows):
 
 ```bash
 # Class is auto-detected from the XML content

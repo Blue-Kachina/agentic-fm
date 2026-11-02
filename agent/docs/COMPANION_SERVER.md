@@ -330,6 +330,7 @@ No request body. No required headers.
   "status": "ok",
   "version": "1.0",
   "plugin": { "installed": false, "usable": false, "server": {}, "license": {}, "solutions": [] },
+  "platform": "windows",
   "pid": 41872,
   "started_at": "2026-10-30T14:22:01Z",
   "uptime_seconds": 3605.2,
@@ -346,6 +347,7 @@ No request body. No required headers.
 
 | Field | Meaning |
 |---|---|
+| `platform` | The OS the companion runs on: `macos`, `windows` or `linux`. FileMaker Pro runs beside it, so `deploy.py` reads this to offer auto-paste (Tier 2 and 3) on `macos` only. |
 | `pid` | The companion's process ID. |
 | `started_at`, `uptime_seconds` | When it started (UTC), and how long it has been running. |
 | `host`, `port` | The address it is bound to. |
@@ -356,7 +358,7 @@ No request body. No required headers.
 | `conversion` | The running conversion (else the oldest queued one), as `GET /convert/<job id>` returns it without `success`, or `null`. |
 | `viewers` | The `webmcp` viewers it is serving (see [POST /convert](#post-convert)): each one's `output_path` and `url`. `[]` when none. |
 
-The [state file](#the-state-file) has the same fields (except `status`, `version`, `plugin`, `uptime_seconds`, `conversion` and `viewers`) plus the token, which `/health` never returns. `version` comes from `version.txt`. `plugin` describes the agentic-fm FileMaker plug-in, cached for about 60 seconds: whether it is installed and `usable` (installed, reachable and licensed), its server address and token, license details, indexed solutions and, when the plug-in is reachable, its live endpoint catalog in `discover`. See [PLUGIN_INTEGRATION.md](PLUGIN_INTEGRATION.md).
+The [state file](#the-state-file) has the same fields (except `status`, `version`, `plugin`, `platform`, `uptime_seconds`, `conversion` and `viewers`) plus the token, which `/health` never returns. `version` comes from `version.txt`. `plugin` describes the agentic-fm FileMaker plug-in, cached for about 60 seconds: whether it is installed and `usable` (installed, reachable and licensed), its server address and token, license details, indexed solutions and, when the plug-in is reachable, its live endpoint catalog in `discover`. See [PLUGIN_INTEGRATION.md](PLUGIN_INTEGRATION.md).
 
 ---
 

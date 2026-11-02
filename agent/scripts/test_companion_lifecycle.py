@@ -193,8 +193,8 @@ def test_an_unopenable_log_file_falls_back_to_the_console(tmp_path, caplog):
 
 # -- P3-19 /health and the state file --------------------------------------------------
 
-HEALTH_FIELDS = {"status", "version", "plugin", "pid", "started_at", "uptime_seconds", "host", "port",
-                 "afm_root", "python", "log_file", "launched_by", "conversion", "viewers"}
+HEALTH_FIELDS = {"status", "version", "plugin", "platform", "pid", "started_at", "uptime_seconds", "host",
+                 "port", "afm_root", "python", "log_file", "launched_by", "conversion", "viewers"}
 
 
 def test_health_says_who_the_companion_is(server):
@@ -203,6 +203,7 @@ def test_health_says_who_the_companion_is(server):
     status, health = _request(f"{base}/health")
     assert status == 200 and set(health) == HEALTH_FIELDS
     assert health["status"] == "ok" and health["pid"] == os.getpid()
+    assert health["platform"] == {"darwin": "macos", "win32": "windows"}.get(sys.platform, "linux")
     assert health["port"] == httpd.server_address[1] and health["host"] == "127.0.0.1"
     assert health["afm_root"] == cs.AFM_ROOT and health["python"] == sys.executable
     assert health["log_file"] == "C:/logs/companion-server.log" and health["launched_by"] == "ide"

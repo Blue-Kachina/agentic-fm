@@ -42,9 +42,9 @@ Identify how many **new** placeholders are needed (exclude any scripts that alre
 
 ## Step 3: Instruct placeholder creation (Tier 1/2) or auto-create (Tier 3)
 
-Read `agent/config/automation.json` to determine the active deployment tier.
+Read `agent/config/automation.json` to determine the active deployment tier. Tier 3 creates the placeholders through AppleScript and Tier 2 pastes through it, which only exists on a Mac: when the companion's `GET {companion_url}/health` reports `platform` `windows`, use the Tier 1 steps whatever the configured tier.
 
-### Tier 1 or Tier 2
+### Tier 1 or Tier 2 (and Windows)
 
 Tell the developer:
 
@@ -64,7 +64,7 @@ Tell the developer:
 
 Wait for the developer to confirm Push Context has run.
 
-### Tier 3
+### Tier 3 (Mac only)
 
 Confirm with the developer before proceeding:
 
@@ -140,7 +140,7 @@ Deploy each script using `agent/scripts/deploy.py`, targeting its corresponding 
 ```bash
 python3 agent/scripts/deploy.py agent/sandbox/<Script Name>.xml "<Placeholder Name>"
 ```
-Present instructions in the standard format:
+Present instructions in the standard format (on Windows, **Ctrl+A** and **Ctrl+V**):
 
 > The script is on your clipboard. To install it:
 >
@@ -150,9 +150,11 @@ Present instructions in the standard format:
 
 Repeat for each script. Present all paste instructions up front so the developer can work through them in sequence without waiting.
 
-**Tier 2**: `deploy.py` auto-pastes into each placeholder. Confirm success for each before moving to the next.
+**Tier 2** (Mac only): `deploy.py` auto-pastes into each placeholder. Confirm success for each before moving to the next.
 
-**Tier 3**: `deploy.py` handles everything. Report result per script.
+**Tier 3** (Mac only): `deploy.py` handles everything. Report result per script.
+
+**Windows**: `deploy.py` serves Tier 2 and 3 as Tier 1 (`fallback_from`, with a `fallback_reason` saying auto-paste is Mac only). Present the Tier 1 instructions for each script.
 
 ---
 

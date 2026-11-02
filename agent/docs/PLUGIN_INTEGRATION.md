@@ -18,7 +18,7 @@ Where both can do a job, prefer the plug-in **only when it is `usable`** (see §
 |---|---|---|
 | **Understand the solution** | Explode a *Save As XML* export into `agent/xml_parsed/`; grep `agent/context/{solution}/*.index` + `agent/CONTEXT.json`. | Parses the same export into an indexed catalog with a cross-reference graph; runs indexed queries. |
 | **Generate scripts** | Hand-author `fmxmlsnippet` XML per the catalog rules. | LLM emits human-readable (HR) `fm` blocks; the plug-in converts HR→XML and verifies calcs against the live engine. |
-| **Deploy into FileMaker** | `clipboard.py` → `deploy.py` Tier 1/2/3 (manual ⌘V, or MBS/AppleScript) via the companion server (`:8765`). | Pastes directly into Script Workspace via the embedded HTTP server inside FileMaker. No keystrokes. |
+| **Deploy into FileMaker** | `clipboard.py` → `deploy.py` Tier 1/2/3 (manual ⌘V / Ctrl+V, or MBS/AppleScript on a Mac) via the companion server (`:8765`). | Pastes directly into Script Workspace via the embedded HTTP server inside FileMaker. No keystrokes. |
 | **Validate** | `python3 -m agent.fmlint` (static). | Static **plus** live-engine verification. |
 | **Resolve IDs / context** | Read `CONTEXT.json` + `*.index` (static, can go stale). | Resolved live via the FM engine. |
 
@@ -152,8 +152,8 @@ The plug-in endpoints named below are representative examples; always reconcile 
 | Solution-wide analysis | `solution-analysis` skill over exploded XML | `/api/discovery/query` (health/security/perf/duplicates/folder/spelling) | Indexed query vs. multi-MB grep |
 | Author a script | Hand-write `fmxmlsnippet` from step catalog | Emit HR `fm` block → `/api/hr-to-xml` | Agent writes what the developer reads; conversion + ID resolution is the plug-in's job |
 | Validate a script | `python3 -m agent.fmlint` | `/api/validate-hr` + `/api/eval` (live calc verify) | Catches errors against the developer's actual FM version |
-| Install / modify a script | `clipboard.py write` → `deploy.py` Tier 1/2/3 → (often) manual ⌘V | the advertised script-write suite — create new, insert steps, or read-then-`fmpatch` | Zero keystrokes, precise line targeting, no clipboard pollution |
-| Run / debug a script | `deploy.py` `/trigger` (AppleScript) | `/api/performscript` + `/api/eval` | Closed-loop over HTTP, single-flight, target-drift guarded |
+| Install / modify a script | `clipboard.py write` → `deploy.py` Tier 1/2/3 → (often) manual ⌘V / Ctrl+V (always on Windows) | the advertised script-write suite — create new, insert steps, or read-then-`fmpatch` | Zero keystrokes, precise line targeting, no clipboard pollution |
+| Run / debug a script | the companion's `/trigger` (an `fmp://` URL, or AppleScript on a Mac) | `/api/performscript` + `/api/eval` | Closed-loop over HTTP, single-flight, target-drift guarded |
 | Move objects via clipboard | `clipboard.py` (binary class detect) | `/api/clipboard/*` (snapshot store, suspend/resume gate) | Preserves the developer's own clipboard history |
 
 ### No-advantage exceptions — keep the OSS path even when the plug-in is present

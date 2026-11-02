@@ -216,10 +216,10 @@ After generating XML2:
    > The layout objects are on your clipboard. To install them:
    >
    > 1. Open **{Layout Name}** in Layout Mode
-   > 2. **⌘V** — paste the objects onto the layout
+   > 2. **⌘V** (Windows: **Ctrl+V**) — paste the objects onto the layout
    > 3. Adjust positions as needed — objects are placed at their designed coordinates
 
-   **Tier 2/3** — deploy via `agent/scripts/deploy.py` if layout paste automation is supported.
+   **Tier 2/3** (Mac only) — deploy via `agent/scripts/deploy.py` if layout paste automation is supported. With the companion on Windows, use the Tier 1 instructions.
 
 ### Web Viewer path
 

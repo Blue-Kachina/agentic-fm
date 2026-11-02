@@ -63,8 +63,8 @@ paths:
         plug-in capability block (cached for about 60 seconds). Does not count as activity
         for the idle auto-shutdown, so monitors can poll it freely. The companion's state
         file (`companion.state.json` in the per-user state folder) has the same fields
-        except `status`, `version`, `plugin`, `uptime_seconds` and `conversion`, plus the
-        shutdown token, which `/health` never returns.
+        except `status`, `version`, `plugin`, `platform`, `uptime_seconds` and `conversion`,
+        plus the shutdown token, which `/health` never returns.
       responses:
         "200":
           description: Server is up.
@@ -75,6 +75,7 @@ paths:
                 status: ok
                 version: "1.0"
                 plugin: { installed: false, usable: false, server: {}, license: {}, solutions: [] }
+                platform: windows
                 pid: 41872
                 started_at: "2026-10-30T14:22:01Z"
                 uptime_seconds: 3605.2
@@ -897,6 +898,10 @@ components:
         status: { type: string, const: ok }
         version: { type: string, description: From the agentic-fm `version.txt`. }
         plugin: { $ref: "#/components/schemas/PluginBlock" }
+        platform:
+          type: string
+          enum: [macos, windows, linux]
+          description: The OS the companion runs on. `deploy.py` offers auto-paste (Tier 2 and 3) on `macos` only.
         pid: { type: integer, description: The companion's process ID. }
         started_at: { type: string, format: date-time, description: When it started (UTC). }
         uptime_seconds: { type: number }

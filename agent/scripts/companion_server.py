@@ -1515,6 +1515,15 @@ def _init_server_info(host: str, port: int, log_file: str, launched_by: str) -> 
     return dict(_server_info)
 
 
+def _host_platform() -> str:
+    """The OS the companion (and so FileMaker Pro beside it) runs on: macos, windows or linux."""
+    if sys.platform == "darwin":
+        return "macos"
+    if sys.platform == "win32":
+        return "windows"
+    return "linux"
+
+
 def _health(server_address: "tuple | None" = None) -> dict:
     """GET /health: status, version, plug-in, and who this companion is (never the token)."""
     info = dict(_server_info)
@@ -1522,6 +1531,7 @@ def _health(server_address: "tuple | None" = None) -> dict:
         info["host"], info["port"] = server_address[0], server_address[1]
     return {
         "status": "ok", "version": VERSION, "plugin": _check_plugin(),
+        "platform": _host_platform(),
         **info,
         "uptime_seconds": round(time.monotonic() - _started_monotonic, 1),
         "conversion": _active_convert_job(),

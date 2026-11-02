@@ -1,7 +1,7 @@
 ---
 name: fm-debug
-description: Debug a FileMaker script by capturing runtime state. At Tier 1 the agent instruments the script and gives the developer run instructions. At Tier 3 the agent can autonomously look up the script source, generate a debug-instrumented copy, deploy it via AppleScript, trigger it via the companion, and read the results — no human intervention required. Triggers on phrases like "debug this", "script not working", "wrong output", "script error", or when a script produces unexpected behavior that cannot be diagnosed from source alone.
-compatibility: Tier 3 requires the companion server and macOS Accessibility permission for AppleScript deployment.
+description: Debug a FileMaker script by capturing runtime state. At Tier 1 the agent instruments the script and gives the developer run instructions. At Tier 3 on a Mac the agent can autonomously look up the script source, generate a debug-instrumented copy, deploy it via AppleScript, trigger it via the companion, and read the results — no human intervention required. On Windows the developer pastes the instrumented copy and the agent runs it through the companion. Triggers on phrases like "debug this", "script not working", "wrong output", "script error", or when a script produces unexpected behavior that cannot be diagnosed from source alone.
+compatibility: Tier 3 deployment uses AppleScript, so it needs the companion on macOS with Accessibility permission. On Windows the companion runs scripts through an fmp:// URL (fmurlscript privilege); pasting stays manual.
 ---
 
 # fm-debug
@@ -18,6 +18,8 @@ Read `agent/config/automation.json` and check `project_tier` (preferred) or `def
 - **Tier 3** — the agent can autonomously deploy and trigger scripts. The agent instruments, deploys, runs, and reads results without developer intervention.
 
 Tier 2 follows the Tier 3 workflow for running scripts (via `/trigger`) but cannot create new scripts autonomously.
+
+Then check the platform: `GET {companion_url}/health` returns `platform`. Tier 2 and 3 deploy through AppleScript, which only exists on a Mac. When `platform` is `windows`, use the **Windows** workflow in Step 4 whatever the configured tier: the developer pastes, and the agent runs the script and reads the results.
 
 ---
 
@@ -92,9 +94,9 @@ Validate the instrumented script with `validate_snippet.py` before proceeding.
 
 ## Step 4: Deploy and run
 
-### Tier 3 (autonomous)
+### Tier 3 (autonomous, Mac only)
 
-The agent has the full deploy → run → read loop available:
+On a Mac, the agent has the full deploy → run → read loop available:
 
 1. **Load clipboard** — `POST {companion_url}/clipboard` with the XML
 2. **Deploy via raw AppleScript** — `POST {companion_url}/trigger` with a `raw_applescript` payload that:
@@ -112,9 +114,20 @@ The agent has the full deploy → run → read loop available:
 
 **Important**: if deploying an instrumented copy of an existing script, use `--replace` mode (Cmd+A → Delete → Cmd+V) rather than creating a new script. After debugging, deploy the original script back to restore it.
 
+### Windows (Tier 2 or 3 configured)
+
+Auto-paste is Mac only, but the agent can still run the script and read the results:
+
+1. **Load clipboard** — `POST {companion_url}/clipboard` with the XML
+2. **Developer pastes** — give the Tier 1 instructions below with **Ctrl+A** and **Ctrl+V**, and wait for the developer to confirm.
+3. **Run the script** — `POST {companion_url}/trigger` with `{ "backend": "url", "script": "Script Name", "target_file": "File Name" }`. `target_file` is the open file's exact name. Add `parameter` if the script needs one; with the URL backend it arrives as `Get ( ScriptParameter )`.
+4. **Read the output** — as on the Mac. `success: true` only means FileMaker received the URL; if `agent/debug/output.json` does not appear, ask the developer what FileMaker showed.
+
+**Prerequisite:** the `fmurlscript` extended privilege (**Allow URLs to run FileMaker scripts**) on the account's privilege set. Without it, FileMaker shows "Your access privileges do not allow you to perform this action." and the script does not run.
+
 ### Tier 1 (developer-assisted)
 
-Give the developer clear instructions:
+Give the developer clear instructions (on Windows, **Ctrl+A** and **Ctrl+V**):
 
 > To debug this, I need runtime variable state. Please do the following:
 >
@@ -170,5 +183,5 @@ The developer retrieves the value from the Data Viewer (Tools > Data Viewer) and
 
 1. Explain the root cause clearly
 2. Propose and generate the fix
-3. **Restore the original script** — if the script was modified for debugging, deploy the original version back (Tier 3: autonomous restore; Tier 1: clipboard with paste instructions)
+3. **Restore the original script** — if the script was modified for debugging, deploy the original version back (Tier 3 on a Mac: autonomous restore; Tier 1 and Windows: clipboard with paste instructions)
 4. If the Agentic-fm Debug script doesn't exist yet, offer to help create it (see `agent/docs/AGENTIC_DEBUG.md`)

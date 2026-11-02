@@ -1,6 +1,6 @@
 ---
 name: script-test
-description: Generate a companion verification script that exercises a target script with known inputs and asserts expected outputs. Uses the fm-debug infrastructure to report pass/fail results back to the agent. At Tier 1 the developer runs the test script manually. At Tier 3 the agent deploys, runs, and reads results autonomously. Triggers on phrases like "test this script", "write a test", "verification script", "assert results", or "prove this works".
+description: Generate a companion verification script that exercises a target script with known inputs and asserts expected outputs. Uses the fm-debug infrastructure to report pass/fail results back to the agent. At Tier 1 the developer runs the test script manually. At Tier 3 on a Mac the agent deploys, runs, and reads results autonomously; on Windows the developer creates and pastes the test script, and the agent runs it and reads the results. Triggers on phrases like "test this script", "write a test", "verification script", "assert results", or "prove this works".
 ---
 
 # Script Test
@@ -15,6 +15,8 @@ Read `agent/config/automation.json` and check `project_tier` (preferred) or `def
 
 - **Tier 1** — test script goes to clipboard; the developer runs it manually and the agent reads `agent/debug/output.json`
 - **Tier 3** — the agent deploys the test script, runs it via the companion, and reads results autonomously
+
+Then check the platform: `GET {companion_url}/health` returns `platform`. Tier 3 creates the script through AppleScript, which only exists on a Mac. When `platform` is `windows`, use the **Windows** workflow in Step 5 whatever the configured tier.
 
 ---
 
@@ -157,15 +159,23 @@ python3 agent/scripts/validate_snippet.py agent/sandbox/Test_{ScriptName}.xml
 
 ## Step 5: Deploy and run
 
-### Tier 3 (autonomous)
+### Tier 3 (autonomous, Mac only)
 
 1. **Deploy the test script** — load clipboard via `POST {companion_url}/clipboard`, create the script via Tier 3 raw AppleScript (Cmd+N → Rename → Cmd+V → Cmd+S)
 2. **Run the test** — `POST {companion_url}/trigger` with `{ "fm_app_name": "...", "script": "Test_{ScriptName}", "target_file": "SolutionName" }`
 3. **Read results** — wait 2–3 seconds, then read `agent/debug/output.json`
 
+### Windows (Tier 2 or 3 configured)
+
+Creating and pasting the script is Mac only. The developer installs it; the agent runs it:
+
+1. **Load the clipboard** — `POST {companion_url}/clipboard`, then give the Tier 1 instructions below, steps 1–4, with **Ctrl+N**, **Ctrl+V** and **Ctrl+S**. Wait for the developer to confirm.
+2. **Run the test** — `POST {companion_url}/trigger` with `{ "backend": "url", "script": "Test_{ScriptName}", "target_file": "SolutionName" }` (`target_file` is the open file's exact name). This needs the `fmurlscript` extended privilege (**Allow URLs to run FileMaker scripts**).
+3. **Read results** — as on the Mac. `success: true` only means FileMaker received the URL; if no output appears, ask the developer what FileMaker showed.
+
 ### Tier 1 (developer-assisted)
 
-Present the test script on the clipboard:
+Present the test script on the clipboard (on Windows, **Ctrl+N**, **Ctrl+V** and **Ctrl+S**):
 
 > The test script is on your clipboard. To install and run it:
 >
@@ -227,8 +237,8 @@ JSON when Get(FoundCount) = 0.
 
 After testing is complete:
 
-- **Tier 3**: optionally delete the test script from Script Workspace (or leave it for future regression testing — ask the developer)
-- **Tier 1**: inform the developer they can delete the test script if no longer needed
+- **Tier 3 on a Mac**: optionally delete the test script from Script Workspace (or leave it for future regression testing — ask the developer)
+- **Tier 1, or Windows**: inform the developer they can delete the test script if no longer needed
 
 If a bug was found, suggest using `script-debug` or `script-refactor` to fix it.
 

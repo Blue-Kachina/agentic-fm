@@ -268,11 +268,11 @@ python3 agent/scripts/clipboard.py write agent/sandbox/{app-name}-data-loader.xm
 > The data loader script is on your clipboard. To install it:
 >
 > 1. Create a new script named **{Data Loader Script Name}** in Script Workspace
-> 2. **⌘V** — paste
+> 2. **⌘V** (Windows: **Ctrl+V**) — paste
 
 Repeat for the event handler script.
 
-**Tier 2/3:** Deploy via `agent/scripts/deploy.py`.
+**Tier 2/3** (Mac only): Deploy via `agent/scripts/deploy.py`. With the companion on Windows, `deploy.py` serves them as Tier 1: present the Tier 1 instructions.
 
 ### Install the Web Viewer
 

@@ -1,6 +1,6 @@
 ---
 name: script-refactor
-description: Analyse an existing FileMaker script and produce an improved version — better error handling, cleaner variable naming, consolidation of repeated logic — while preserving observable behaviour. At Tier 1 the refactored script is placed on the clipboard for manual paste. At Tier 3 the agent can autonomously deploy the replacement into Script Workspace. Triggers on phrases like "refactor", "improve this script", "clean up script", "modernise script", or "optimize script".
+description: Analyse an existing FileMaker script and produce an improved version — better error handling, cleaner variable naming, consolidation of repeated logic — while preserving observable behaviour. At Tier 1 the refactored script is placed on the clipboard for manual paste. At Tier 3 on a Mac the agent can autonomously deploy the replacement into Script Workspace; on Windows the developer pastes it. Triggers on phrases like "refactor", "improve this script", "clean up script", "modernise script", or "optimize script".
 ---
 
 # Script Refactor
@@ -15,6 +15,8 @@ Read `agent/config/automation.json` and check `project_tier` (preferred) or `def
 
 - **Tier 1** — refactored script goes to clipboard with paste instructions
 - **Tier 3** — agent can deploy the refactored script directly into Script Workspace, replacing the original
+
+Tier 2 and 3 paste through AppleScript, which only exists on a Mac. When the companion's `GET {companion_url}/health` reports `platform` `windows`, use Tier 1 whatever the configured tier (`deploy.py` does the same).
 
 ---
 
@@ -244,7 +246,7 @@ sys.stdout.write(payload)
 
 ## Step 8: Deploy
 
-### Tier 3 (autonomous)
+### Tier 3 (autonomous, Mac only)
 
 After developer approval:
 
@@ -254,9 +256,9 @@ After developer approval:
    - Alternatively: `POST {companion_url}/trigger` with raw AppleScript to open the script tab and paste
 3. Confirm deployment succeeded
 
-### Tier 1 (developer-assisted)
+### Tier 1 (developer-assisted, and Windows)
 
-Present paste instructions:
+Present paste instructions (on Windows, **Ctrl+A** and **Ctrl+V**):
 
 > The refactored script is on your clipboard. To install it:
 >

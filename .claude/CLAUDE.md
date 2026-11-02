@@ -209,7 +209,11 @@ The developer always works in **human-readable (HR) script format**. The agent's
 > 2. **⌘A** — select all existing steps and delete
 > 3. **⌘V** — paste
 
+On Windows, use **Ctrl+A** and **Ctrl+V** in those instructions.
+
 **Container and non-macOS environments**: `deploy.py` detects the runtime environment automatically. When running inside a Docker container or any non-macOS host, AppleScript execution is delegated to the companion server on the macOS host via `/trigger`. No special handling is needed — just call `deploy.py` the same way.
+
+**Windows**: auto-paste (Tier 2 and 3) is Mac only. When the companion runs on Windows (its `/health` reports `"platform": "windows"`), `deploy.py` serves a Tier 2 or 3 request as Tier 1: it loads the clipboard, returns paste instructions with `fallback_from` and a `fallback_reason` saying so, and never prompts. Present the Tier 1 instructions. To run a FileMaker script on Windows, use the companion's `/trigger`, which opens an `fmp://` URL (see `agent/docs/COMPANION_SERVER.md`).
 
 ## Lookup decision tree
 

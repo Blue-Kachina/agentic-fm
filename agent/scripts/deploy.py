@@ -9,6 +9,12 @@ Tier 1 (universal):  companion /clipboard → developer pastes manually
 Tier 2 (MBS):        companion /clipboard + /trigger → Agentic-fm Paste auto-pastes
 Tier 3 (MBS + AS):   companion /trigger creates placeholder → then Tier 2
 
+Tiers 2 and 3 drive Script Workspace through AppleScript, so they need the
+companion (and FileMaker Pro) on a Mac. When the companion's /health reports
+another platform (Windows), a Tier 2 or 3 request is served as Tier 1, with
+fallback_from and a fallback_reason saying auto-paste is Mac only. To run a
+FileMaker script on Windows, use the companion's /trigger (fmp:// URL).
+
 Usage (CLI):
     python3 agent/scripts/deploy.py <xml_path> [target_script] [--tier N]
 
@@ -154,6 +160,37 @@ def _post_json(url: str, payload: dict, timeout: int = 15) -> dict:
 # Plug-in capability detection (optional commercial plug-in)
 # ---------------------------------------------------------------------------
 
+def _companion_health(companion_url: str) -> dict:
+    """The companion's GET /health answer, or {} when it can't be reached. Never raises."""
+    try:
+        req = urllib.request.Request(f"{companion_url}/health", method="GET")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+AUTO_PASTE_PLATFORM_NAMES = {"windows": "Windows", "linux": "Linux"}
+
+
+def _auto_paste_unavailable(platform: str | None) -> str | None:
+    """Why Tiers 2 and 3 can't run where the companion runs, or None when they may.
+
+    `platform` is the companion's /health `platform`. Auto-paste needs macOS;
+    when the platform is unknown (an older companion, or none reachable), the
+    tiers are tried as before and fall back on their own errors.
+    """
+    if not platform or platform == "macos":
+        return None
+    where = AUTO_PASTE_PLATFORM_NAMES.get(platform, platform)
+    return (
+        f"Auto-paste (Tier 2 and 3) is Mac only: it drives Script Workspace through "
+        f"AppleScript, and the companion runs on {where}. The steps are on the "
+        f"clipboard; paste them yourself."
+    )
+
+
 def _check_plugin(companion_url: str) -> dict:
     """Return the plug-in capability block from the companion's /health.
 
@@ -170,13 +207,7 @@ def _check_plugin(companion_url: str) -> dict:
        "license": {"status": "trial", ...}, "solutions": [...]}
     or {} when the companion is unreachable or reports no plug-in.
     """
-    try:
-        req = urllib.request.Request(f"{companion_url}/health", method="GET")
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        return data.get("plugin", {}) or {}
-    except Exception:
-        return {}
+    return _companion_health(companion_url).get("plugin", {}) or {}
 
 
 # ---------------------------------------------------------------------------
@@ -245,8 +276,15 @@ def _tier1(
     companion_url: str,
     target_script: str | None,
     target_file: str | None = None,
+    platform: str | None = None,
+    create: bool = False,
 ) -> dict:
-    """Write XML to clipboard via companion, return paste instructions."""
+    """Write XML to clipboard via companion, return paste instructions.
+
+    `platform` is the companion's (FileMaker's) platform: the shortcuts read
+    Ctrl+A / Ctrl+V on Windows, ⌘A / ⌘V otherwise. `create` (a Tier 3 request
+    served as Tier 1) tells the developer to create the script first.
+    """
     result = _post_json(f"{companion_url}/clipboard", {"xml": xml})
     if not result.get("success"):
         return {
@@ -255,18 +293,26 @@ def _tier1(
             "error": result.get("error", "Clipboard write failed"),
         }
 
+    mod = "Ctrl+" if platform == "windows" else "⌘"
     file_hint = f" in **{target_file}**" if target_file else ""
-    if target_script:
+    if target_script and create:
+        instructions = (
+            f"Script loaded to clipboard.\n"
+            f"  1. In FM Pro create a script named '{target_script}'{file_hint} in Script Workspace\n"
+            f"  2. Select all steps ({mod}A)\n"
+            f"  3. Paste ({mod}V)"
+        )
+    elif target_script:
         instructions = (
             f"Script loaded to clipboard.\n"
             f"  1. In FM Pro open '{target_script}'{file_hint} in Script Workspace\n"
-            f"  2. Select all steps (⌘A)\n"
-            f"  3. Paste (⌘V)"
+            f"  2. Select all steps ({mod}A)\n"
+            f"  3. Paste ({mod}V)"
         )
     else:
         instructions = (
             f"Script loaded to clipboard.\n"
-            f"  Paste (⌘V) into the target script{file_hint} in Script Workspace."
+            f"  Paste ({mod}V) into the target script{file_hint} in Script Workspace."
         )
 
     return {"success": True, "tier_used": 1, "instructions": instructions}
@@ -447,6 +493,8 @@ def _is_local_macos() -> bool:
 
     When False, osascript is not available locally. All AppleScript execution
     is delegated to the companion server on the macOS host via /trigger.
+    Whether Tiers 2 and 3 run at all is decided earlier, from the companion's
+    platform (_auto_paste_unavailable): a companion on Windows never gets here.
     The Accessibility pre-flight check is skipped — the companion's terminal
     process (not the agent's container) must hold Accessibility permission.
     """
@@ -689,19 +737,23 @@ def deploy(
         Result dict — always contains 'success' and 'tier_used'.
         Tier 1 / fallback: also contains 'instructions' to show the developer.
         Tier 2/3 success: also contains 'message' for logging.
+        Tier 2/3 with the companion on Windows: served as Tier 1, with
+        'fallback_from' and a 'fallback_reason' saying auto-paste is Mac only.
     """
     config = _load_config()
     effective_tier = tier if tier is not None else config.get("default_tier", 1)
     effective_auto_save = auto_save if auto_save is not None else bool(config.get("auto_save", False))
     companion_url = _resolve_companion_url(config)
     fm_app_name = config.get("fm_app_name", "FileMaker Pro")
+    health = _companion_health(companion_url)
+    platform = health.get("platform")
 
     # Plug-in awareness (no hardcoded endpoints). When the plug-in is usable,
     # the zero-keystroke install path is for the agent to pick a script-write
     # endpoint from the plug-in's /api/discover suite (see PLUGIN_INTEGRATION.md
     # — e.g. create new, insert steps, or read-then-fmpatch). This CLI stays the
     # OSS clipboard fallback; surface the steer once and continue.
-    if _check_plugin(companion_url).get("usable"):
+    if (health.get("plugin") or {}).get("usable"):
         print(
             "(AgenticFM plug-in is usable — for a zero-keystroke install, choose a "
             "script-write endpoint from its /api/discover suite per "
@@ -719,12 +771,19 @@ def deploy(
     except OSError as exc:
         return {"success": False, "error": f"Cannot read {xml_path}: {exc}"}
 
+    if effective_tier in (2, 3):
+        reason = _auto_paste_unavailable(platform)
+        if reason:
+            result = _tier1(xml, companion_url, target_script, target_file, platform,
+                            create=effective_tier == 3)
+            return {**result, "fallback_from": effective_tier, "fallback_reason": reason}
+
     if effective_tier == 3:
         return _tier3(xml, companion_url, fm_app_name, target_script, effective_auto_save, target_file)
     elif effective_tier == 2:
         return _tier2(xml, companion_url, fm_app_name, target_script, effective_auto_save, select_all, target_file)
     else:
-        return _tier1(xml, companion_url, target_script, target_file)
+        return _tier1(xml, companion_url, target_script, target_file, platform)
 
 
 # ---------------------------------------------------------------------------
@@ -742,7 +801,8 @@ def main():
         "target_script", nargs="?", help="Script name to paste into (Tier 2/3)"
     )
     parser.add_argument(
-        "--tier", type=int, choices=[1, 2, 3], help="Override deployment tier"
+        "--tier", type=int, choices=[1, 2, 3],
+        help="Override deployment tier (2 and 3 auto-paste, Mac only; on Windows they run as 1)"
     )
     parser.add_argument(
         "--auto-save", action="store_true", default=None, dest="auto_save",
@@ -768,10 +828,13 @@ def main():
     args = parser.parse_args()
 
     # Tier 2 targeting an existing script is destructive — always confirm unless
-    # --replace or --append bypasses the prompt explicitly.
+    # --replace or --append bypasses the prompt explicitly. Not asked where
+    # auto-paste can't run (the companion on Windows): deploy serves Tier 1.
     select_all = True
-    effective_tier = args.tier or _load_config().get("default_tier", 1)
-    if effective_tier == 2 and args.target_script:
+    config = _load_config()
+    effective_tier = args.tier or config.get("default_tier", 1)
+    if (effective_tier == 2 and args.target_script
+            and not _auto_paste_unavailable(_companion_health(_resolve_companion_url(config)).get("platform"))):
         if args.append:
             select_all = False
         elif not args.replace:

@@ -272,7 +272,7 @@ python3 agent/scripts/clipboard.py write agent/sandbox/<input>_updated.xml
 Then instruct the developer:
 > The updated layout object is on your clipboard. In FileMaker Layout Mode:
 > 1. Delete the original button bar
-> 2. **Cmd+V** to paste the updated version
+> 2. **Cmd+V** (Windows: **Ctrl+V**) to paste the updated version
 
 **If the input came from a file**, inform the developer:
 > The updated XML is at `agent/sandbox/<input>_updated.xml`. You can load it to clipboard with:

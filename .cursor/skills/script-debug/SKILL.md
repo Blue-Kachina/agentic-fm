@@ -1,6 +1,6 @@
 ---
 name: script-debug
-description: Systematic debugging workflow for FileMaker scripts — reproduce the issue, isolate the failure point, form a hypothesis, verify with runtime data, and produce a fix. At Tier 1 the developer runs scripts manually and provides debug output. At Tier 3 the agent autonomously instruments the script, deploys the instrumented version, triggers it, reads debug output, and iterates until the root cause is found. Triggers on phrases like "debug this", "script not working", "wrong output", "script error", or when a script produces unexpected behavior.
+description: Systematic debugging workflow for FileMaker scripts — reproduce the issue, isolate the failure point, form a hypothesis, verify with runtime data, and produce a fix. At Tier 1 the developer runs scripts manually and provides debug output. At Tier 3 on a Mac the agent autonomously instruments the script, deploys the instrumented version, triggers it, reads debug output, and iterates until the root cause is found; on Windows the developer pastes and the agent runs the script and reads the output. Triggers on phrases like "debug this", "script not working", "wrong output", "script error", or when a script produces unexpected behavior.
 ---
 
 # Script Debug
@@ -15,6 +15,8 @@ Read `agent/config/automation.json` and check `project_tier` (preferred) or `def
 
 - **Tier 1** — the developer runs scripts manually; the agent provides instrumented scripts on the clipboard and reads `agent/debug/output.json` after the developer confirms execution.
 - **Tier 3** — the agent autonomously deploys instrumented scripts, triggers them via the companion, reads debug output, and iterates without developer intervention.
+
+Then check the platform: `GET {companion_url}/health` returns `platform`. Tier 3 deploys through AppleScript, which only exists on a Mac. When `platform` is `windows`, use the **Windows** workflow in Step 5 whatever the configured tier.
 
 ---
 
@@ -122,7 +124,7 @@ python3 agent/scripts/validate_snippet.py agent/sandbox/{ScriptName}.xml
 
 ## Step 5: Deploy and run
 
-### Tier 3 (autonomous)
+### Tier 3 (autonomous, Mac only)
 
 1. **Save the original** — before replacing the script, note its current state (the `scripts_sanitized/` version is the reference)
 2. **Deploy the instrumented version** — load clipboard via `POST {companion_url}/clipboard`, then replace the script content via:
@@ -131,9 +133,18 @@ python3 agent/scripts/validate_snippet.py agent/sandbox/{ScriptName}.xml
 4. **Wait and read** — allow 2–3 seconds, then read `agent/debug/output.json`
 5. **Iterate if needed** — if the first debug output doesn't reveal the root cause, adjust instrumentation and repeat from step 4
 
+### Windows (Tier 2 or 3 configured)
+
+Auto-paste is Mac only. The developer pastes; the agent runs and reads:
+
+1. **Load the clipboard** — `POST {companion_url}/clipboard`, then give the Tier 1 paste instructions below with **Ctrl+A** and **Ctrl+V**, and wait for the developer to confirm.
+2. **Run the script** — `POST {companion_url}/trigger` with `{ "backend": "url", "script": "ScriptName", "target_file": "SolutionName" }` (`target_file` is the open file's exact name; `parameter`, if given, arrives as `Get ( ScriptParameter )`). This needs the `fmurlscript` extended privilege (**Allow URLs to run FileMaker scripts**).
+3. **Wait and read** — as on the Mac. `success: true` only means FileMaker received the URL; if no output appears, ask the developer what FileMaker showed.
+4. **Iterate** — each new instrumented version needs another paste by the developer.
+
 ### Tier 1 (developer-assisted)
 
-1. Present the instrumented script on the clipboard with paste instructions:
+1. Present the instrumented script on the clipboard with paste instructions (on Windows, **Ctrl+A** and **Ctrl+V**):
 
    > The instrumented script is on your clipboard. To install it:
    >
@@ -177,12 +188,12 @@ Once the root cause is identified:
 2. **Generate the fixed script** as fmxmlsnippet in `agent/sandbox/` — remove all debug instrumentation and apply the fix
 3. **Validate**: `python3 agent/scripts/validate_snippet.py agent/sandbox/{ScriptName}.xml`
 4. **Deploy** per the current tier:
-   - **Tier 3**: deploy autonomously, replacing the instrumented version with the fixed version
-   - **Tier 1**: clipboard with paste instructions
+   - **Tier 3 on a Mac**: deploy autonomously, replacing the instrumented version with the fixed version
+   - **Tier 1, or Windows**: clipboard with paste instructions
 
 ### Restore safety
 
-If the fix doesn't work or the developer wants to revert, the original script is always available in the solution's fm-saxml docs (`python3 agent/scripts/saxmlpreview.py -s "{solution}" --script "{ScriptName}"` shows it). At Tier 3, the agent can convert and redeploy the original:
+If the fix doesn't work or the developer wants to revert, the original script is always available in the solution's fm-saxml docs (`python3 agent/scripts/saxmlpreview.py -s "{solution}" --script "{ScriptName}"` shows it). At Tier 3 on a Mac, the agent can convert and redeploy the original (on Windows, convert it the same way and give paste instructions):
 
 ```bash
 python3 agent/scripts/fm_xml_to_snippet.py -s "{solution}" --docs-root <folder> --script "{ScriptName}" -o "agent/sandbox/{ScriptName}.xml"

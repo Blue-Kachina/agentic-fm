@@ -286,11 +286,11 @@ When you detect you are in a limited sandbox:
 > - Validate output with FMLint
 > - Write files to `agent/sandbox/` for you to paste into FileMaker
 >
-> **To paste my output into FileMaker**, run this on your Mac:
+> **To paste my output into FileMaker**, run this on your Mac or Windows PC:
 > ```bash
 > python3 agent/scripts/clipboard.py write agent/sandbox/<filename>.xml
 > ```
-> Then switch to FileMaker's Script Workspace and press **Cmd+V**.
+> Then switch to FileMaker's Script Workspace and press **Cmd+V** (Windows: **Ctrl+V**).
 
 ---
 
@@ -314,15 +314,15 @@ The companion server (`agent/scripts/companion_server.py`) is the HTTP bridge be
 
 ## Platform-specific limitations
 
-### macOS-only components
+### Host-only components
 
-These components require macOS and cannot run on Linux:
+These components need the host where FileMaker Pro runs (macOS, or Windows where noted) and cannot run on Linux:
 
 | Component | macOS requirement | What it does |
 |-----------|-------------------|-------------|
-| `clipboard.py` | NSPasteboard (PyObjC) or osascript | Read/write FileMaker clipboard format |
-| `deploy.py` Tier 2/3 | osascript (AppleScript) | Automated paste into Script Workspace |
-| `/trigger` endpoint | osascript | Execute AppleScript commands remotely |
+| `clipboard.py` | NSPasteboard (PyObjC) or osascript on macOS; the Win32 clipboard on native Windows | Read/write FileMaker clipboard format |
+| `deploy.py` Tier 2/3 | osascript (AppleScript) on the companion's host | Automated paste into Script Workspace. With the companion on Windows, served as Tier 1 |
+| `/trigger` AppleScript backend | osascript | Execute AppleScript commands remotely (its `fmp://` URL backend also works on Windows) |
 | AX layout/script reading | Accessibility API (AXUIElement) | Read Script Workspace and layout objects |
 
 ### Cross-platform components
@@ -365,15 +365,15 @@ For Tier 1 deployment (all platforms), present paste instructions:
 
 > The script is ready at `agent/sandbox/<filename>.xml`. To install it:
 >
-> On the host Mac, run:
+> On the host (Mac or Windows PC), run:
 > ```bash
 > python3 agent/scripts/clipboard.py write agent/sandbox/<filename>.xml
 > ```
 >
 > Then in FileMaker:
 > 1. Open the target script in Script Workspace
-> 2. **Cmd+A** — select all existing steps
-> 3. **Cmd+V** — paste
+> 2. **Cmd+A** (Windows: **Ctrl+A**) — select all existing steps
+> 3. **Cmd+V** (Windows: **Ctrl+V**) — paste
 
 ---
 

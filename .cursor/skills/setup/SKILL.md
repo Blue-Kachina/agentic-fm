@@ -142,7 +142,7 @@ This step usually passes automatically on macOS. Move on quickly if it does.
 > python3 agent/scripts/clipboard.py write filemaker/context.xml
 > ```
 >
-> Then in FileMaker: **File > Manage > Custom Functions** — click in the function list and press **Cmd+V**.
+> Then in FileMaker: **File > Manage > Custom Functions** — click in the function list and press **Cmd+V** (Windows: **Ctrl+V**).
 
 Ask the developer to confirm when done.
 
@@ -163,7 +163,7 @@ Ask the developer to confirm when done.
 > 1. Open `filemaker/agentic-fm.fmp12` in FileMaker Pro
 > 2. Open its Script Workspace — you'll see an **agentic-fm** folder
 > 3. Copy the entire **agentic-fm** folder
-> 4. Switch to your solution's Script Workspace and paste (**Cmd+V**)
+> 4. Switch to your solution's Script Workspace and paste (**Cmd+V**, or **Ctrl+V** on Windows)
 >
 > **Option B — Install via clipboard**
 >
@@ -171,7 +171,7 @@ Ask the developer to confirm when done.
 > python3 agent/scripts/clipboard.py write filemaker/agentic-fm.xml
 > ```
 >
-> Switch to FileMaker, open **Scripts > Script Workspace**, click in the script list, and press **Cmd+V**. The **agentic-fm** folder with all companion scripts will appear.
+> Switch to FileMaker, open **Scripts > Script Workspace**, click in the script list, and press **Cmd+V** (Windows: **Ctrl+V**). The **agentic-fm** folder with all companion scripts will appear.
 
 Ask the developer to confirm when done.
 
@@ -286,7 +286,7 @@ Report what was found (layout name, table count) to confirm it worked.
 >    ```
 > 3. When you need to generate or modify scripts that reference fields/layouts, run **Push Context** first on the relevant layout in FileMaker
 > 4. The agent writes validated XML to `agent/sandbox/` and loads it onto your clipboard
-> 5. In FileMaker Script Workspace: **Cmd+V** to paste
+> 5. In FileMaker Script Workspace: **Cmd+V** (Windows: **Ctrl+V**) to paste
 >
 > **Every session checklist:**
 >
@@ -367,7 +367,7 @@ After the core setup is complete, mention these optional next steps:
 
 ### automation.json (OData + advanced deployment)
 
-> **Optional:** If you want the agent to trigger FileMaker scripts autonomously (via OData) or use Tier 2/3 auto-paste deployment, create `agent/config/automation.json` from the example template:
+> **Optional:** If you want the agent to trigger FileMaker scripts autonomously (via OData) or use Tier 2/3 auto-paste deployment (Mac only), create `agent/config/automation.json` from the example template:
 >
 > ```bash
 > cp agent/config/automation.json.example agent/config/automation.json
