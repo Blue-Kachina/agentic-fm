@@ -12,7 +12,7 @@ The formats come from [FMCuttingBoard](https://github.com/Blue-Kachina/fmcutting
 
 FMCuttingBoard has been tested on Windows only. Its macOS notes (`docs/MacPasteboardResearch.md`, and `"macos": {"status": "unknown"}` in the JSON) are experimental and are not used here. On the Mac, the source is agentic-fm's own `clipboard.py`, which works: the payload is plain UTF-8 XML with no length prefix.
 
-The captures do not record the FileMaker Pro version.
+The captures do not record the FileMaker Pro version. The round-trip test ([CLIPBOARD_ROUNDTRIP.md](CLIPBOARD_ROUNDTRIP.md), 2026-11-02, FileMaker Pro 26.0.3 on Windows 11) confirmed the same seven formats and payload rule, with non-ASCII text, and every one pasted back into FileMaker.
 
 ## Formats
 
@@ -60,20 +60,35 @@ When writing:
 - A layout-object copy also carries `CF_DIB` (id 8) and `CF_DIBV5` (id 17), a bitmap preview of the selection. Readers ignore them; writers need not produce them.
 - FMCuttingBoard also writes the XML as `CF_UNICODETEXT` (UTF-16LE, two-byte NUL terminator) beside the custom format, as a plain-text fallback, and adds the alias `Mac-XML` beside `Mac-XML2`. The captures do not show FileMaker itself putting either on the clipboard for these object types, and agentic-fm's `clipboard_win.py` writes the custom format alone.
 
+## Custom menus and menu sets
+
+Captured in the round-trip test (FileMaker Pro 26.0.3, Windows 11). FileMaker copies menus and menu sets (Ctrl+C in Manage Custom Menus) as plain text, with no `Mac-` format:
+
+- Format: `CF_UNICODETEXT` (id 13). Windows adds `CF_TEXT`, `CF_OEMTEXT` and `CF_LOCALE` from it.
+- Payload: UTF-16LE, no BOM, ending in a two-byte NUL, no line breaks.
+- Content: `<?xml version="1.0" encoding="utf-16"?><FMObjectTransfer …>` holding a `CustomMenuCatalog` or a `CustomMenuSetCatalog`.
+- FileMaker's own bytes, written back as `CF_UNICODETEXT` by another process, paste correctly.
+
+This matches the Mac, where menus are UTF-16 text (`«class ut16»`), see [CUSTOM_MENUS.md](CUSTOM_MENUS.md). Proofkit writes `Mac-XMGR` instead, which FileMaker does not use; `clipboard_win.py` used `Mac-ut16` until it was fixed.
+
+`clipboard_win.py` handles them as class `ut16`, the same code as on the Mac:
+
+- **Read:** when no `Mac-` format is on the clipboard, it takes `CF_UNICODETEXT` only if the text parses as an `FMObjectTransfer` holding a `CustomMenuCatalog` or `CustomMenuSetCatalog`; any other text is not a FileMaker object. It decodes UTF-16LE up to the NUL and drops the `encoding="utf-16"` declaration, since the XML is saved as UTF-8.
+- **Write:** it replaces any declaration with `<?xml version="1.0" encoding="utf-16"?>` and puts the text on the clipboard as `CF_UNICODETEXT`: UTF-16LE, no BOM, NUL-terminated. For FileMaker's own copies this gives back the captured bytes exactly.
+- `detect` reports such text as `CF_UNICODETEXT … <- FileMaker custom menu or menu set`.
+
 ## Not yet captured
 
 These object types have no FileMaker capture on Windows. Their format names and encodings are unconfirmed, and the tools disagree:
 
 | Object type | `clipboard_win.py` writes | Proofkit writes | Notes |
 | --- | --- | --- | --- |
-| Themes | `Mac-XMTH`, length-prefixed UTF-8 | `Mac-XMLT`, length-prefixed UTF-8 | The names differ; at most one can be right. |
-| Custom menus | `Mac-ut16`, UTF-16 with BOM, no prefix | `Mac-XMGR`, length-prefixed UTF-8 | On the Mac, menus are UTF-16 text (`«class ut16»`), see [CUSTOM_MENUS.md](CUSTOM_MENUS.md). |
-| Custom menu sets | `Mac-ut16`, as custom menus | not supported | |
+| Themes | `Mac-XMTH`, length-prefixed UTF-8 | `Mac-XMLT`, length-prefixed UTF-8 | The names differ; at most one can be right. In FileMaker Pro 26.0.3 on Windows, Ctrl+C in Manage Themes copies nothing. |
 | Legacy layout objects (`XMLO`) | `Mac-XMLO`, length-prefixed UTF-8 | not supported | FMCuttingBoard writes `Mac-XML` as its legacy alias instead. |
 
 To capture one: copy the object in FileMaker Pro on Windows, then list the clipboard's formats and save the raw bytes of each `Mac-` format. FMCuttingBoard's "Diagnostics: Dump Clipboard Formats" and "Save Raw Clipboard Capture" commands do both (VS Code or JetBrains); `clipboard_win.py detect` lists the names and sizes. The round-trip test ([CLIPBOARD_ROUNDTRIP.md](CLIPBOARD_ROUNDTRIP.md)) has a section for recording them.
 
-Also not covered by the captures: non-ASCII text (all captured payloads were ASCII, so UTF-8 is inferred, not observed), and differences between FileMaker Pro versions.
+Still not covered: differences between FileMaker Pro versions (only 26.0.3 has been run). Non-ASCII text is now observed as UTF-8 (`≠`, `¶`, `é` in every type in the round-trip test).
 
 ## Proofkit's clipboard tools
 
@@ -89,7 +104,7 @@ Proofkit's MCP server has `clipboard_write`, `clipboard_read` and `clipboard_lis
 | Value lists | `Mac-XMVL`, prefix correct | not tested |
 | Layout objects | `Mac-XML2`, prefix correct, declaration kept | Correct, declaration and LFs kept |
 | Themes | `Mac-XMLT` (see above) | not tested |
-| Custom menus | `Mac-XMGR` (see above) | `Mac-ut16` is not recognised: `clipboard_list_formats` returns nothing |
+| Custom menus | `Mac-XMGR`, which FileMaker does not use (see [Custom menus and menu sets](#custom-menus-and-menu-sets)) | `Mac-ut16` is not recognised: `clipboard_list_formats` returns nothing |
 
 For the seven captured formats, Proofkit's payloads match this spec byte for byte. It writes the custom format alone, with no `CF_UNICODETEXT`.
 

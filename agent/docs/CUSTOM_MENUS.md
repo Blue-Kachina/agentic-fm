@@ -13,6 +13,8 @@ This means `clipboard.py` handles menus via a separate code path:
 - **Write**: strips the XML declaration, re-encodes the content as UTF-16 with BOM, pushes as `«data ut16XXXX»`
 - **Read**: `osascript` returns the raw XML text for `ut16` (not a binary descriptor), so stdout is decoded directly as UTF-8
 
+On Windows, FileMaker also copies menus as plain Unicode text (`CF_UNICODETEXT`, UTF-16LE without a BOM), and `clipboard.py` (through `clipboard_win.py`) reads and writes them there, with the same commands. See [CLIPBOARD_FORMATS.md](CLIPBOARD_FORMATS.md#custom-menus-and-menu-sets).
+
 Auto-detection in `clipboard.py` works by checking for `<CustomMenu` or `<CustomMenuSet` elements in the XML — these are checked before `<Step>` to avoid false-positive `XMSS` detection (menu XML contains `<Step>` elements inside action blocks).
 
 The source file can be UTF-8 or UTF-16; `clipboard.py` detects the BOM and handles both.

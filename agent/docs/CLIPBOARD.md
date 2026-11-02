@@ -207,7 +207,7 @@ FileMaker Pro on Windows registers the same four-letter class codes as custom Wi
 | `XMTB`      | `Mac-XMTB`          |
 | `XMVL`      | `Mac-XMVL`          |
 | `XMTH`      | `Mac-XMTH`          |
-| `ut16`      | `Mac-ut16`          |
+| `ut16`      | `CF_UNICODETEXT` (plain UTF-16 text: custom menus and menu sets) |
 
 The data payload differs from macOS: FileMaker on Windows prepends a 4-byte little-endian `uint32` length field before the UTF-8 XML. It omits the XML declaration, except in `Mac-XML2` (layout objects):
 
@@ -217,11 +217,11 @@ The data payload differs from macOS: FileMaker on Windows prepends a 4-byte litt
 
 On macOS the payload is plain UTF-8 XML with no prefix or length field.
 
-[CLIPBOARD_FORMATS.md](CLIPBOARD_FORMATS.md) is the full Windows spec: the formats FileMaker was seen to write (from FMCuttingBoard's captures), the read and write rules, the object types not yet captured (`Mac-XMTH`, `Mac-ut16` and `Mac-XMLO` above are unconfirmed), and how Proofkit's clipboard tools compare.
+[CLIPBOARD_FORMATS.md](CLIPBOARD_FORMATS.md) is the full Windows spec: the formats FileMaker was seen to write (from FMCuttingBoard's captures), the read and write rules, how menus travel as plain text, the object types not yet captured (`Mac-XMTH` and `Mac-XMLO` above are unconfirmed), and how Proofkit's clipboard tools compare.
 
 ### clipboard_win.py
 
-`agent/scripts/clipboard_win.py` provides the same `read` / `write` interface as `clipboard.py` on native Windows, plus `detect`. It calls the Win32 clipboard (`user32.dll` / `kernel32.dll`) through `ctypes`, standard library only, and retries while another process holds the clipboard. It writes the payloads [CLIPBOARD_FORMATS.md](CLIPBOARD_FORMATS.md) specifies and reads the first FileMaker format on the clipboard. It does not run under WSL.
+`agent/scripts/clipboard_win.py` provides the same `read` / `write` interface as `clipboard.py` on native Windows, plus `detect`. It calls the Win32 clipboard (`user32.dll` / `kernel32.dll`) through `ctypes`, standard library only, and retries while another process holds the clipboard. It writes the payloads [CLIPBOARD_FORMATS.md](CLIPBOARD_FORMATS.md) specifies and reads the first FileMaker format on the clipboard; custom menus and menu sets travel as `CF_UNICODETEXT` and are recognised by their `FMObjectTransfer` content. It does not run under WSL.
 
 ```bash
 # Write XML to Windows clipboard (class auto-detected)

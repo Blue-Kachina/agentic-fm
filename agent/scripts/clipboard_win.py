@@ -12,6 +12,10 @@ The payload of each format is (spec: agent/docs/CLIPBOARD_FORMATS.md):
 
 This differs from macOS where the payload is plain UTF-8 XML with no prefix.
 
+Custom menus and menu sets are the exception: FileMaker copies them as plain Unicode
+text (CF_UNICODETEXT: UTF-16LE, no BOM, NUL-terminated), an <FMObjectTransfer> document
+declared encoding="utf-16". They keep the class code 'ut16', as on macOS.
+
 The clipboard is reached through user32/kernel32 with ctypes (standard library only).
 The encoding functions are pure and import on any OS; the clipboard calls need Windows.
 
@@ -68,10 +72,15 @@ XML_ELEMENT_TO_CLASS = {
     'Theme':          'XMTH',
     'CustomMenu':     'ut16',
     'CustomMenuSet':  'ut16',
+    'CustomMenuCatalog':    'ut16',
+    'CustomMenuSetCatalog': 'ut16',
 }
 
-# Menus are UTF-16 text with a BOM and no length prefix (unconfirmed on Windows, see the spec)
+# Menus travel as plain Unicode text, not as a registered FileMaker format
 UT16_CLASSES = {'ut16'}
+CF_UNICODETEXT = 13
+MENU_CATALOGS = {'CustomMenuCatalog', 'CustomMenuSetCatalog'}
+UTF16_DECLARATION = '<?xml version="1.0" encoding="utf-16"?>'
 
 # FileMaker keeps the XML declaration in layout objects and leaves it out everywhere else
 DECLARATION_CLASSES = {'XML2', 'XMLO'}
@@ -90,7 +99,8 @@ class ClipboardError(Exception):
 
 
 def win_format_name(cls):
-    return f'{WIN_PREFIX}{cls}'
+    """The clipboard format a class travels in: 'Mac-XMSS', or 'CF_UNICODETEXT' for menus."""
+    return 'CF_UNICODETEXT' if cls in UT16_CLASSES else f'{WIN_PREFIX}{cls}'
 
 
 def class_from_format_name(name):
@@ -98,7 +108,18 @@ def class_from_format_name(name):
     if not name.startswith(WIN_PREFIX):
         return None
     cls = name[len(WIN_PREFIX):]
-    return cls if cls in FM_CLASSES or cls in UT16_CLASSES else None
+    return cls if cls in FM_CLASSES else None
+
+
+def is_menu_text(text):
+    """True when plain clipboard text is a FileMaker custom menu or menu set copy."""
+    if '<FMObjectTransfer' not in text[:500]:
+        return False
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError:
+        return False
+    return root.tag == 'FMObjectTransfer' and any(child.tag in MENU_CATALOGS for child in root)
 
 
 # ---------------------------------------------------------------------------
@@ -152,7 +173,8 @@ def encode_payload(cls, xml_text):
     xml_text = _DECLARATION_RE.sub('', xml_text.lstrip('﻿'), count=1)
     xml_text = xml_text.replace('\r\n', '\n').replace('\r', '\n')
     if cls in UT16_CLASSES:
-        return xml_text.encode('utf-16')  # BOM included
+        # As FileMaker writes it: UTF-16LE, no BOM, its own declaration, a two-byte NUL
+        return (UTF16_DECLARATION + xml_text).encode('utf-16-le') + b'\x00\x00'
     if cls in DECLARATION_CLASSES:
         xml_text = XML_DECLARATION + xml_text
     body = xml_text.encode('utf-8')
@@ -167,7 +189,10 @@ def decode_payload(cls, raw_bytes):
     byte, as tools following the macOS layout write it) is read whole.
     """
     if cls in UT16_CLASSES:
-        return raw_bytes.decode('utf-16').rstrip('\x00')
+        # CF_UNICODETEXT is UTF-16LE; tolerate a BOM, drop the NUL terminator. The
+        # encoding="utf-16" declaration goes too: the text is saved as UTF-8
+        text = raw_bytes.decode('utf-16-le').lstrip('﻿').split('\x00', 1)[0]
+        return _DECLARATION_RE.sub('', text, count=1)
     name = win_format_name(cls)
     if len(raw_bytes) >= 4:
         length = struct.unpack('<I', raw_bytes[:4])[0]
@@ -283,12 +308,15 @@ def _get_bytes(fmt_id):
         kernel32.GlobalUnlock(handle)
 
 
-def set_clipboard(format_name, data):
-    """Replace the clipboard's contents with one custom format holding data."""
+def set_clipboard(fmt, data):
+    """Replace the clipboard's contents with one format holding data.
+
+    fmt is a custom format name (registered here) or a standard format id such as CF_UNICODETEXT.
+    """
     user32, kernel32 = _api()
-    fmt_id = user32.RegisterClipboardFormatW(format_name)
+    fmt_id = fmt if isinstance(fmt, int) else user32.RegisterClipboardFormatW(fmt)
     if not fmt_id:
-        raise _last_error(f'RegisterClipboardFormat({format_name})')
+        raise _last_error(f'RegisterClipboardFormat({fmt})')
     with _OpenClipboard():
         if not user32.EmptyClipboard():
             raise _last_error('EmptyClipboard')
@@ -308,24 +336,35 @@ def set_clipboard(format_name, data):
             raise err
 
 
+def _menu_text_bytes():
+    """CF_UNICODETEXT's bytes when they hold a FileMaker menu copy, else None. Clipboard must be open."""
+    raw = _get_bytes(CF_UNICODETEXT)
+    if raw and is_menu_text(raw.decode('utf-16-le', errors='replace').split('\x00', 1)[0]):
+        return raw
+    return None
+
+
 def get_fm_clipboard():
-    """(class, raw bytes) of the first FileMaker format on the clipboard, or (None, None)."""
+    """(class, raw bytes) of the FileMaker objects on the clipboard, or (None, None).
+
+    A 'Mac-' format wins; failing that, plain text holding a menu copy is class 'ut16'.
+    """
     with _OpenClipboard():
-        for fmt_id, name in _list_formats():
+        formats = _list_formats()
+        for fmt_id, name in formats:
             cls = class_from_format_name(name or '')
             if cls:
                 return cls, _get_bytes(fmt_id)
+        if any(fmt_id == CF_UNICODETEXT for fmt_id, _name in formats):
+            raw = _menu_text_bytes()
+            if raw:
+                return 'ut16', raw
     return None, None
 
 
 def detect_clipboard_class():
     """Return the FM class code currently on the clipboard, or None."""
-    with _OpenClipboard():
-        for _fmt_id, name in _list_formats():
-            cls = class_from_format_name(name or '')
-            if cls:
-                return cls
-    return None
+    return get_fm_clipboard()[0]
 
 
 # ---------------------------------------------------------------------------
@@ -367,7 +406,8 @@ def write_to_clipboard(input_path, cls=None):
         xml_text = decode_file(f.read())
     cls = normalize_class(cls) if cls else detect_class_from_xml(xml_text)
     format_name = win_format_name(cls)
-    set_clipboard(format_name, encode_payload(cls, xml_text))
+    fmt = CF_UNICODETEXT if cls in UT16_CLASSES else format_name
+    set_clipboard(fmt, encode_payload(cls, xml_text))
     label = FM_CLASSES.get(cls, 'Menu')
     print(f'Clipboard ready → {input_path} as {format_name} ({label})', file=sys.stderr)
 
@@ -375,16 +415,19 @@ def write_to_clipboard(input_path, cls=None):
 def detect_clipboard_formats():
     """List the custom formats on the clipboard, marking FileMaker's."""
     with _OpenClipboard():
-        formats = [(fmt_id, name, len(_get_bytes(fmt_id) or b''))
-                   for fmt_id, name in _list_formats() if name]
-    if not formats:
+        listed = _list_formats()
+        formats = [(fmt_id, name, len(_get_bytes(fmt_id) or b'')) for fmt_id, name in listed if name]
+        menu = _menu_text_bytes() if any(f == CF_UNICODETEXT for f, _n in listed) else None
+    if formats:
+        print('Custom clipboard formats on the Windows clipboard:')
+        for fmt_id, name, size in formats:
+            mark = '  <- FileMaker' if class_from_format_name(name) else ''
+            print(f'  {fmt_id:6}  {name}  ({size} bytes){mark}')
+    if menu:
+        print(f'  {CF_UNICODETEXT:6}  CF_UNICODETEXT  ({len(menu)} bytes)  <- FileMaker custom menu or menu set')
+    if not formats and not menu:
         print('No custom clipboard formats found.')
         print('(Clipboard may be empty or contain only built-in formats like CF_UNICODETEXT.)')
-        return
-    print('Custom clipboard formats on the Windows clipboard:')
-    for fmt_id, name, size in formats:
-        mark = '  <- FileMaker' if class_from_format_name(name) else ''
-        print(f'  {fmt_id:6}  {name}  ({size} bytes){mark}')
 
 
 def main():

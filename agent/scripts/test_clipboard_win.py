@@ -23,8 +23,23 @@ STEPS = ('<fmxmlsnippet type="FMObjectList"><Step enable="True" id="89" name="# 
          '<Text>a ≠ b ¶ café</Text></Step></fmxmlsnippet>')
 LAYOUT = ('<?xml version="1.0" encoding="UTF-8"?>\n<fmxmlsnippet type="LayoutObjectList">\n'
           '<Layout enclosingRectTop ="141.0000000"></Layout>\n</fmxmlsnippet>')
-MENU = ('<FMObjectTransfer><CustomMenu id="1" name="M"><MenuItemList><MenuItem>'
-        '<Step id="89" name="# (comment)"></Step></MenuItem></MenuItemList></CustomMenu></FMObjectTransfer>')
+# Shaped like FileMaker 26's copies from Manage Custom Menus (CF_UNICODETEXT, captured 2026-11-02)
+MENU = ('<FMObjectTransfer membercount="1" version="1" Source="26.0.3"><CustomMenuCatalog membercount="1">'
+        '<ObjectList membercount="1"><CustomMenu name="M" id="1"><MenuItemList membercount="1"><MenuItem>'
+        '<Step id="89" name="# (comment)"></Step><Override><Title><Calculation><Text><![CDATA["a ≠ b café"]]>'
+        '</Text></Calculation></Title></Override></MenuItem></MenuItemList></CustomMenu></ObjectList>'
+        '</CustomMenuCatalog><PasteIndexList membercount="1"><Object id="1"></Object></PasteIndexList></FMObjectTransfer>')
+MENU_SET = ('<FMObjectTransfer membercount="1" version="1" Source="26.0.3"><CustomMenuSetCatalog membercount="1">'
+            '<ObjectList membercount="1"><CustomMenuSet name="S" id="2" comment=""><CustomMenuList membercount="1">'
+            '<CustomMenuReference name="M" id="1"></CustomMenuReference></CustomMenuList></CustomMenuSet></ObjectList>'
+            '</CustomMenuSetCatalog><PasteIndexList membercount="1"><Object id="2"></Object></PasteIndexList>'
+            '</FMObjectTransfer>')
+UTF16_DECLARATION = '<?xml version="1.0" encoding="utf-16"?>'
+
+
+def _menu_text(xml: str) -> bytes:
+    """CF_UNICODETEXT bytes as FileMaker writes them."""
+    return (UTF16_DECLARATION + xml).encode('utf-16-le') + b'\x00\x00'
 
 SNIPPETS = {
     'XMSS': STEPS,
@@ -78,10 +93,14 @@ def test_crlf_and_cr_become_lf():
     assert body.count(b'\n') == LAYOUT.count('\n') + 1
 
 
-def test_menu_payload_is_utf16_with_bom_and_no_prefix():
-    data = cw.encode_payload('ut16', '<?xml version="1.0"?>\n' + MENU)
-    assert data[:2] == b'\xff\xfe'
-    assert data.decode('utf-16') == MENU
+@pytest.mark.parametrize('xml', [MENU, MENU_SET])
+def test_menu_payload_is_filemakers_unicode_text(xml):
+    # Any declaration in the file is replaced by FileMaker's own utf-16 one
+    for source in (xml, '<?xml version="1.0" encoding="UTF-8"?>\n' + xml, UTF16_DECLARATION + xml):
+        data = cw.encode_payload('ut16', source)
+        assert data == _menu_text(xml)
+        assert data[:2] == b'<\x00'  # no BOM
+        assert data.endswith(b'\x00\x00')
 
 
 @pytest.mark.parametrize('cls', sorted(SNIPPETS))
@@ -141,8 +160,31 @@ def test_short_or_foreign_payload_is_an_error():
         cw.decode_payload('XMSS', b'\x02\x00\x00\x00ab')
 
 
-def test_menu_decoding():
-    assert cw.decode_payload('ut16', MENU.encode('utf-16') + b'\x00\x00') == MENU
+@pytest.mark.parametrize('xml', [MENU, MENU_SET])
+def test_menu_decoding_drops_the_utf16_declaration(xml):
+    # The XML is saved as UTF-8, so a declaration saying utf-16 would be wrong
+    assert cw.decode_payload('ut16', _menu_text(xml)) == xml
+    # Bytes after the NUL terminator (GlobalSize rounding) and a BOM are ignored
+    assert cw.decode_payload('ut16', b'\xff\xfe' + _menu_text(xml) + b'\x00\x00\x41\x00') == xml
+
+
+def test_menu_text_recognised():
+    assert cw.is_menu_text(UTF16_DECLARATION + MENU)
+    assert cw.is_menu_text(MENU_SET)
+    assert cw.is_menu_text(cw.decode_payload('ut16', _menu_text(MENU)))
+
+
+@pytest.mark.parametrize('text', [
+    '',
+    'hello',
+    'a ≠ b',
+    STEPS,
+    '<FMObjectTransfer><BaseTableCatalog></BaseTableCatalog></FMObjectTransfer>',
+    '<FMObjectTransfer><CustomMenuCatalog>',  # cut short
+    '<Other><CustomMenuCatalog></CustomMenuCatalog></Other>',
+])
+def test_other_text_is_not_a_menu(text):
+    assert not cw.is_menu_text(text)
 
 
 # ---------------------------------------------------------------------------
@@ -156,13 +198,15 @@ def test_detect_class_from_xml(cls):
 
 def test_menu_detected_before_its_steps():
     assert cw.detect_class_from_xml(MENU) == 'ut16'
+    assert cw.detect_class_from_xml(MENU_SET) == 'ut16'
     assert cw.detect_class_from_xml('<broken><CustomMenu id="1"><Step id="1"') == 'ut16'
 
 
 def test_format_names():
     assert cw.win_format_name('XMSS') == 'Mac-XMSS'
+    assert cw.win_format_name('ut16') == 'CF_UNICODETEXT'
     assert cw.class_from_format_name('Mac-XML2') == 'XML2'
-    assert cw.class_from_format_name('Mac-ut16') == 'ut16'
+    assert cw.class_from_format_name('Mac-ut16') is None  # FileMaker never uses it
     assert cw.class_from_format_name('Mac-XXXX') is None
     assert cw.class_from_format_name('CF_UNICODETEXT') is None
 
@@ -193,10 +237,12 @@ def test_clipboard_calls_need_windows(monkeypatch):
 windows_only = pytest.mark.skipif(sys.platform != 'win32', reason='Win32 clipboard')
 
 
+ROUND_TRIPS = [(cls, SNIPPETS[cls]) for cls in sorted(SNIPPETS)] + [('ut16', MENU), ('ut16', MENU_SET)]
+
+
 @windows_only
-@pytest.mark.parametrize('cls', sorted(SNIPPETS) + ['ut16'])
-def test_write_then_read(tmp_path, cls):
-    text = MENU if cls == 'ut16' else SNIPPETS[cls]
+@pytest.mark.parametrize('cls, text', ROUND_TRIPS, ids=sorted(SNIPPETS) + ['menu', 'menu-set'])
+def test_write_then_read(tmp_path, cls, text):
     src = tmp_path / 'in.xml'
     src.write_bytes(text.encode('utf-8'))
 
@@ -216,6 +262,42 @@ def test_other_formats_are_skipped(tmp_path):
     assert cw.get_fm_clipboard() == (None, None)
     with pytest.raises(cw.ClipboardError, match='No FileMaker objects'):
         cw.read_from_clipboard()
+
+
+@windows_only
+@pytest.mark.parametrize('text', ['hello', STEPS, UTF16_DECLARATION + '<FMObjectTransfer></FMObjectTransfer>'])
+def test_plain_text_is_not_filemaker(text):
+    cw.set_clipboard(cw.CF_UNICODETEXT, text.encode('utf-16-le') + b'\x00\x00')
+    assert cw.get_fm_clipboard() == (None, None)
+
+
+@windows_only
+def test_menu_goes_on_the_clipboard_as_unicode_text(tmp_path):
+    src = tmp_path / 'menu.xml'
+    src.write_text(MENU, encoding='utf-8')
+    cw.write_to_clipboard(str(src))
+    with cw._OpenClipboard():
+        names = {fmt_id: name for fmt_id, name in cw._list_formats()}
+        raw = cw._get_bytes(cw.CF_UNICODETEXT)
+    assert cw.CF_UNICODETEXT in names
+    assert not any(name and name.startswith('Mac-') for name in names.values())
+    assert raw.startswith(_menu_text(MENU))
+
+
+@windows_only
+def test_cli_reads_a_filemaker_menu_copy(tmp_path):
+    out = tmp_path / 'menu.xml'
+    cw.set_clipboard(cw.CF_UNICODETEXT, _menu_text(MENU))
+    read = subprocess.run([sys.executable, str(SCRIPT), 'read', str(out)],
+                          capture_output=True, text=True, encoding='utf-8')
+    assert read.returncode == 0, read.stderr
+    saved = out.read_text(encoding='utf-8')
+    assert 'encoding="utf-16"' not in saved
+    assert 'a ≠ b café' in saved
+
+    detect = subprocess.run([sys.executable, str(SCRIPT), 'detect'],
+                            capture_output=True, text=True, encoding='utf-8')
+    assert 'CF_UNICODETEXT' in detect.stdout and 'custom menu' in detect.stdout
 
 
 @windows_only

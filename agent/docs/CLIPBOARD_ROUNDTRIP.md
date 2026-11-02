@@ -52,9 +52,9 @@ A type passes when steps 3, 5 and 7 pass.
 
 ## Extra: object types with no capture
 
-[CLIPBOARD_FORMATS.md](CLIPBOARD_FORMATS.md#not-yet-captured) lists types whose Windows format is unconfirmed. They are not part of the pass/fail, but while FileMaker is open, try each one FileMaker lets you copy (custom menus and menu sets in Manage Custom Menus, themes if FileMaker offers Copy for them):
+[CLIPBOARD_FORMATS.md](CLIPBOARD_FORMATS.md#not-yet-captured) lists types whose Windows format is unconfirmed. They are not part of the pass/fail, but while FileMaker is open, try each one FileMaker lets you copy (custom menus and menu sets in Manage Custom Menus, where Ctrl+C works although there is no Copy button; themes if FileMaker offers Copy for them):
 
-1. Copy it in FileMaker and run `clipboard_win.py detect`. Record every `Mac-` format name and size.
+1. Copy it in FileMaker and run `clipboard_win.py detect`. Record every `Mac-` format name and size. `detect` lists only custom formats: if it finds none, check whether FileMaker put the object on the clipboard as plain text (as it does with menus on Windows).
 2. Run steps 3 to 7 above and record what happened.
 
 These results settle which names are right (`Mac-XMTH` or `Mac-XMLT` for themes; `Mac-ut16` or `Mac-XMGR` for menus) and go back into CLIPBOARD_FORMATS.md.
@@ -67,20 +67,26 @@ Write down the step that failed, the command's full output, and what FileMaker d
 
 ### Windows
 
-FileMaker Pro version: · Windows version: · Run by: · Date:
+FileMaker Pro version: 26.0.3.307 · Windows version: 11 (10.0.26300.9711) · Run by: Matthew Leering · Date: 2026-11-02
+
+`xmllint` was not installed, so `read` saved FileMaker's XML unchanged and an equal size in step 6 means the bytes match.
 
 | Object type | File | FM format (size) | Read | Write format (size) | Paste | Follow-up |
 | --- | --- | --- | --- | --- | --- | --- |
-| Script steps | `steps.xml` | | | | | |
-| Scripts | `script.xml` | | | | | |
-| Fields | `field.xml` | | | | | |
-| Tables | `table.xml` | | | | | |
-| Custom functions | `function.xml` | | | | | |
-| Value lists | `valuelist.xml` | | | | | |
-| Layout objects | `layout.xml` | | | | | |
-| *Extra:* custom menu | `menu.xml` | | | | | |
-| *Extra:* menu set | `menuset.xml` | | | | | |
-| *Extra:* theme | `theme.xml` | | | | | |
+| Script steps | `steps.xml` | `Mac-XMSS` (496) | Pass | `Mac-XMSS` (496) | Pass; re-copied, byte-identical to the first copy | |
+| Scripts | `script.xml` | `Mac-XMSC` (608) | Pass | `Mac-XMSC` (608) | Pass | |
+| Fields | `field.xml` | `Mac-XMFD` (821) | Pass | `Mac-XMFD` (821) | Pass | |
+| Tables | `table.xml` | `Mac-XMTB` (1642) | Pass | `Mac-XMTB` (1642) | Pass | |
+| Custom functions | `function.xml` | `Mac-XMFN` (220) | Pass | `Mac-XMFN` (220) | Pass | |
+| Value lists | `valuelist.xml` | `Mac-XMVL` (191) | Pass; the line break between values is `&#13;` in the XML | `Mac-XMVL` (191) | Pass | |
+| Layout objects | `layout.xml` | `Mac-XML2` (14952), with the XML declaration and LFs | Pass | `Mac-XML2` (14952) | Pass | |
+| *Extra:* custom menu | `menu.xml` | `CF_UNICODETEXT` (3806), no `Mac-` format | **Fail**: no FileMaker format found | `Mac-ut16` (3728) | **Fail**: nothing pasted. FileMaker's own bytes written back as `CF_UNICODETEXT` paste correctly | P4-08 Menus as Unicode text on Windows (#54142) |
+| *Extra:* menu set | `menuset.xml` | `CF_UNICODETEXT` (2380), no `Mac-` format | **Fail**, as menus | not run | FileMaker's own bytes written back as `CF_UNICODETEXT` paste correctly | Same unit |
+| Custom menu, rerun after P4-08 | `menu2.xml` | `CF_UNICODETEXT` (3832) | Pass | `CF_UNICODETEXT` (3832) | Pass | |
+| Menu set, rerun after P4-08 | `menuset2.xml` | `CF_UNICODETEXT` (2404) | Pass | `CF_UNICODETEXT` (2404) | Pass | |
+| *Extra:* theme | — | Nothing: Ctrl+C in Manage Themes copies nothing | — | — | — | None |
+
+Menus and menu sets were copied with Ctrl+C in Manage Custom Menus, which has no Copy button. The first run's menu failures were fixed by P4-08 (#54142); the reruns (same day, same versions) pass.
 
 ### Mac
 
