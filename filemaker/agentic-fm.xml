@@ -1,12 +1,18 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <fmxmlsnippet type="FMObjectList">
   <Group groupCollapsed="False" includeInMenu="False" id="1" name="agentic-fm">
     <Script includeInMenu="False" SiriShortcutVisible="False" runFullAccess="False" id="2" name="Get agentic-fm path">
       <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
         <Text>PURPOSE: Set a global variable used by other scripts to key/value pairs used by agentic-fm.</Text>
       </Step>
-      <Step enable="True" id="89" name="# (comment)"/>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
       <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
         <Value>
           <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "path" ; "" ; JSONString ]
@@ -17,12 +23,17 @@
         </Repetition>
         <Name>$config_example</Name>
       </Step>
-      <Step enable="True" id="89" name="# (comment)"/>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
       <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
         <Restore state="False"/>
         <Calculation><![CDATA[IsEmpty ( $$AGENTIC.FM ) or JSONGetElementType ( $$AGENTIC.FM ; "" ) ≠ JSONObject]]></Calculation>
       </Step>
       <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
         <Repetition>
           <Calculation><![CDATA[1]]></Calculation>
         </Repetition>
@@ -30,6 +41,7 @@
       </Step>
       <Step enable="True" id="181" name="Get Folder Path">
         <AllowFolderCreation state="False"/>
+        <DisableStepCollapsed state="False"/>
         <Repetition>
           <Calculation><![CDATA[1]]></Calculation>
         </Repetition>
@@ -42,9 +54,11 @@
         <Name>$path</Name>
       </Step>
       <Step enable="True" id="69" name="Else">
+        <DisableStepCollapsed state="False"/>
         <Restore state="False"/>
       </Step>
       <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
         <Value>
           <Calculation><![CDATA[JSONGetElement ( $$AGENTIC.FM ; "path" )]]></Calculation>
         </Value>
@@ -53,12 +67,20 @@
         </Repetition>
         <Name>$path</Name>
       </Step>
-      <Step enable="True" id="70" name="End If"/>
-      <Step enable="True" id="89" name="# (comment)"/>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
       <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
         <Text>Validate path</Text>
       </Step>
       <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
         <Value>
           <Calculation><![CDATA[$path & "fmparse.sh"]]></Calculation>
         </Value>
@@ -68,16 +90,22 @@
         <Name>$fmparse</Name>
       </Step>
       <Step enable="True" id="188" name="Get File Exists">
+        <DisableStepCollapsed state="False"/>
         <UniversalPathList>$fmparse</UniversalPathList>
         <Text/>
         <Field>$exists</Field>
       </Step>
-      <Step enable="True" id="89" name="# (comment)"/>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
       <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
         <Restore state="False"/>
         <Calculation><![CDATA[not $exists]]></Calculation>
       </Step>
       <Step enable="True" id="87" name="Show Custom Dialog">
+        <DisableStepCollapsed state="False"/>
         <Title>
           <Calculation><![CDATA["Invalid folder path"]]></Calculation>
         </Title>
@@ -93,11 +121,18 @@
         </Buttons>
       </Step>
       <Step enable="True" id="103" name="Exit Script">
+        <DisableStepCollapsed state="False"/>
         <Calculation><![CDATA[False]]></Calculation>
       </Step>
-      <Step enable="True" id="70" name="End If"/>
-      <Step enable="True" id="89" name="# (comment)"/>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
       <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
         <Value>
           <Calculation><![CDATA[JSONSetElement ( If ( IsEmpty ( $$AGENTIC.FM ) ; "{}" ; $$AGENTIC.FM ) ;
 	[ "path" ; $path ; JSONString ]
@@ -108,336 +143,38 @@
         </Repetition>
         <Name>$$AGENTIC.FM</Name>
       </Step>
-      <Step enable="True" id="89" name="# (comment)"/>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
       <Step enable="True" id="103" name="Exit Script">
+        <DisableStepCollapsed state="False"/>
         <Calculation><![CDATA[True]]></Calculation>
       </Step>
     </Script>
-    <Script includeInMenu="False" SiriShortcutVisible="False" runFullAccess="False" id="3" name="Explode XML">
-      <Step enable="True" id="89" name="# (comment)">
-        <Text>PURPOSE: Push out solution XML to be parsed for AI use.</Text>
-      </Step>
-      <Step enable="False" id="61" name="Insert Text">
-        <SelectAll state="False"/>
-        <Text>INTERACTIVE MODE (FM Pro):&#xD;  Run with no parameter. Saves XML to desktop, POSTs to localhost:8765/explode.&#xD;  Requires companion server running and $$AGENTIC.FM configured.&#xD;&#xD;SERVER MODE (OData via AGFMScriptBridge):&#xD;  Pass JSON parameter with keys:&#xD;    repo_path     &#x2014; absolute POSIX path to the agentic-fm project root on the companion server host&#xD;    export_path   &#x2014; absolute POSIX path where FMS will write the XML export (must be host-accessible)&#xD;    companion_url &#x2014; base URL of the companion server (e.g. http://host.docker.internal:8765)&#xD;    solution_name &#x2014; (optional) override solution name; defaults to Get(FileName)&#xD;&#xD;  NOTE: export_path must be a path FMS can write to AND the companion server host can read.&#xD;  On a Linux FMS container with a host-mounted Data dir, use that mount path.&#xD;  The FM path is constructed as "filelinux:" &amp; export_path &#x2014; adjust prefix for other OS.&#xD;&#xD;RETURNS (server mode): companion server response JSON { success, exit_code, stdout, stderr }</Text>
-        <Field>$README</Field>
-      </Step>
-      <Step enable="True" id="89" name="# (comment)"/>
-      <Step enable="False" id="89" name="# (comment)">
-        <Text>MARK: Server mode</Text>
-      </Step>
-      <Step enable="True" id="141" name="Set Variable">
-        <Value>
-          <Calculation><![CDATA[Get ( ScriptParameter )]]></Calculation>
-        </Value>
-        <Name>$input</Name>
-      </Step>
-      <Step enable="True" id="68" name="If">
-        <Restore state="False"/>
-        <Calculation><![CDATA[JSONGetElementType ( $input ; "repo_path" ) = JSONString]]></Calculation>
-      </Step>
-      <Step enable="True" id="141" name="Set Variable">
-        <Value>
-          <Calculation><![CDATA[JSONGetElement ( $input ; "repo_path" )]]></Calculation>
-        </Value>
-        <Name>$repoPath</Name>
-      </Step>
-      <Step enable="True" id="141" name="Set Variable">
-        <Value>
-          <Calculation><![CDATA[JSONGetElement ( $input ; "export_path" )]]></Calculation>
-        </Value>
-        <Name>$exportPath</Name>
-      </Step>
-      <Step enable="True" id="141" name="Set Variable">
-        <Value>
-          <Calculation><![CDATA[JSONGetElement ( $input ; "companion_url" )]]></Calculation>
-        </Value>
-        <Name>$companionUrl</Name>
-      </Step>
-      <Step enable="True" id="141" name="Set Variable">
-        <Value>
-          <Calculation><![CDATA[Let (
-	~override = JSONGetElement ( $input ; "solution_name" ) ;
-	If ( IsEmpty ( ~override ) ; Get ( FileName ) ; ~override )
-)]]></Calculation>
-        </Value>
-        <Name>$solutionName</Name>
-      </Step>
-      <Step enable="True" id="89" name="# (comment)">
-        <Text>Build FM path: filelinux: prefix for FMS on Linux. Adjust for other OS.</Text>
-      </Step>
-      <Step enable="True" id="141" name="Set Variable">
-        <Value>
-          <Calculation><![CDATA["filelinux:" & $exportPath]]></Calculation>
-        </Value>
-        <Name>$xmlFmPath</Name>
-      </Step>
-      <Step enable="True" id="3" name="Save a Copy as XML">
-        <Option state="False"/>
-        <UniversalPathList>$xmlFmPath</UniversalPathList>
-        <Calculation><![CDATA[Get ( WindowName )]]></Calculation>
-      </Step>
-      <Step enable="True" id="141" name="Set Variable">
-        <Value>
-          <Calculation><![CDATA[Get ( LastError )]]></Calculation>
-        </Value>
-        <Name>$saveError</Name>
-      </Step>
-      <Step enable="True" id="68" name="If">
-        <Restore state="False"/>
-        <Calculation><![CDATA[$saveError ≠ 0]]></Calculation>
-      </Step>
-      <Step enable="True" id="103" name="Exit Script">
-        <Calculation><![CDATA[JSONSetElement ( "{}" ;
-	[ "success" ; False ; JSONBoolean ] ;
-	[ "error" ; "Save as XML failed (error " & $saveError & ")" ; JSONString ]
-)]]></Calculation>
-      </Step>
-      <Step enable="True" id="70" name="End If"/>
-      <Step enable="True" id="89" name="# (comment)"/>
-      <Step enable="True" id="141" name="Set Variable">
-        <Value>
-          <Calculation><![CDATA[JSONSetElement ( "{}" ;
-	[ "solution_name" ; $solutionName ; JSONString ] ;
-	[ "export_file_path" ; $exportPath ; JSONString ] ;
-	[ "repo_path" ; $repoPath ; JSONString ]
-)]]></Calculation>
-        </Value>
-        <Name>$payload</Name>
-      </Step>
-      <Step enable="True" id="160" name="Insert from URL">
-        <NoInteract state="True"/>
-        <DontEncodeURL state="False"/>
-        <SelectAll state="True"/>
-        <VerifySSLCertificates state="False"/>
-        <CURLOptions>
-          <Calculation><![CDATA["-X POST -H \"Content-Type: application/json\" -d " & Quote ( $payload )]]></Calculation>
-        </CURLOptions>
-        <Calculation><![CDATA[$companionUrl & "/explode"]]></Calculation>
-        <Text/>
-        <Field>$response</Field>
-      </Step>
-      <Step enable="True" id="141" name="Set Variable">
-        <Value>
-          <Calculation><![CDATA[Get ( LastError )]]></Calculation>
-        </Value>
-        <Name>$httpError</Name>
-      </Step>
-      <Step enable="True" id="68" name="If">
-        <Restore state="False"/>
-        <Calculation><![CDATA[$httpError ≠ 0]]></Calculation>
-      </Step>
-      <Step enable="True" id="103" name="Exit Script">
-        <Calculation><![CDATA[JSONSetElement ( "{}" ;
-	[ "success" ; False ; JSONBoolean ] ;
-	[ "error" ; "Companion server unreachable (error " & $httpError & ")" ; JSONString ]
-)]]></Calculation>
-      </Step>
-      <Step enable="True" id="70" name="End If"/>
-      <Step enable="True" id="103" name="Exit Script">
-        <Calculation><![CDATA[$response]]></Calculation>
-      </Step>
-      <Step enable="True" id="70" name="End If"/>
-      <Step enable="True" id="89" name="# (comment)"/>
-      <Step enable="False" id="89" name="# (comment)">
-        <Text>MARK: Interactive mode</Text>
-      </Step>
-      <Step enable="True" id="89" name="# (comment)">
-        <Text>DEPENDENCY: The companion server must be running (agent/scripts/companion_server.py)</Text>
-      </Step>
-      <Step enable="True" id="89" name="# (comment)"/>
-      <Step enable="True" id="1" name="Perform Script">
-        <Script id="2" name="Get agentic-fm path"/>
-      </Step>
-      <Step enable="True" id="68" name="If">
-        <Restore state="False"/>
-        <Calculation><![CDATA[not Get ( ScriptResult )]]></Calculation>
-      </Step>
-      <Step enable="True" id="87" name="Show Custom Dialog">
-        <Title>
-          <Calculation><![CDATA["Bad install"]]></Calculation>
-        </Title>
-        <Message>
-          <Calculation><![CDATA["The agentic-fm install was not found. Please check the $$AGENTIC.FM global variable"]]></Calculation>
-        </Message>
-        <Buttons>
-          <Button CommitState="True">
-            <Calculation><![CDATA["OK"]]></Calculation>
-          </Button>
-          <Button CommitState="False"/>
-          <Button CommitState="False"/>
-        </Buttons>
-      </Step>
-      <Step enable="True" id="103" name="Exit Script"/>
-      <Step enable="True" id="70" name="End If"/>
-      <Step enable="True" id="89" name="# (comment)"/>
-      <Step enable="True" id="141" name="Set Variable">
-        <Value>
-          <Calculation><![CDATA[Get ( DesktopPath ) & Get ( FileName ) & ".xml"]]></Calculation>
-        </Value>
-        <Repetition>
-          <Calculation><![CDATA[1]]></Calculation>
-        </Repetition>
-        <Name>$output</Name>
-      </Step>
-      <Step enable="True" id="3" name="Save a Copy as XML">
-        <Option state="False"/>
-        <UniversalPathList>$output</UniversalPathList>
-        <Calculation><![CDATA[Get ( WindowName )]]></Calculation>
-      </Step>
-      <Step enable="True" id="89" name="# (comment)"/>
-      <Step enable="True" id="141" name="Set Variable">
-        <Value>
-          <Calculation><![CDATA[JSONSetElement ( "{}" ;
-	[ "solution_name" ; Get ( FileName ) ; JSONString ] ;
-	[ "export_file_path" ; ConvertFromFileMakerPath ( $output ; 1 ) ; JSONString ] ;
-	[ "repo_path" ; ConvertFromFileMakerPath ( JSONGetElement ( $$AGENTIC.FM ; "path" ) ; 1 ) ; JSONString ] ;
-	[ "exploder_bin_path" ; "~/bin/fm-xml-export-exploder" ; JSONString ]
-)]]></Calculation>
-        </Value>
-        <Repetition>
-          <Calculation><![CDATA[1]]></Calculation>
-        </Repetition>
-        <Name>$payload</Name>
-      </Step>
-      <Step enable="True" id="89" name="# (comment)"/>
-      <Step enable="True" id="160" name="Insert from URL">
-        <NoInteract state="True"/>
-        <DontEncodeURL state="False"/>
-        <SelectAll state="True"/>
-        <VerifySSLCertificates state="False"/>
-        <CURLOptions>
-          <Calculation><![CDATA["-X POST -H \"Content-Type: application/json\" -d " & Quote ( $payload )]]></Calculation>
-        </CURLOptions>
-        <Calculation><![CDATA["http://localhost:8765/explode"]]></Calculation>
-        <Text/>
-        <Field>$response</Field>
-      </Step>
-      <Step enable="True" id="141" name="Set Variable">
-        <Value>
-          <Calculation><![CDATA[Get ( LastError )]]></Calculation>
-        </Value>
-        <Repetition>
-          <Calculation><![CDATA[1]]></Calculation>
-        </Repetition>
-        <Name>$httpError</Name>
-      </Step>
-      <Step enable="True" id="89" name="# (comment)"/>
-      <Step enable="True" id="68" name="If">
-        <Restore state="False"/>
-        <Calculation><![CDATA[$httpError ≠ 0]]></Calculation>
-      </Step>
-      <Step enable="True" id="87" name="Show Custom Dialog">
-        <Title>
-          <Calculation><![CDATA["Companion server not running"]]></Calculation>
-        </Title>
-        <Message>
-          <Calculation><![CDATA["Start the companion server first:¶¶python3 agent/scripts/companion_server.py¶¶Then run Explode XML again."]]></Calculation>
-        </Message>
-        <Buttons>
-          <Button CommitState="True">
-            <Calculation><![CDATA["OK"]]></Calculation>
-          </Button>
-          <Button CommitState="False"/>
-          <Button CommitState="False"/>
-        </Buttons>
-      </Step>
-      <Step enable="True" id="103" name="Exit Script"/>
-      <Step enable="True" id="70" name="End If"/>
-      <Step enable="True" id="89" name="# (comment)"/>
-      <Step enable="True" id="141" name="Set Variable">
-        <Value>
-          <Calculation><![CDATA[JSONGetElement ( $response ; "success" )]]></Calculation>
-        </Value>
-        <Repetition>
-          <Calculation><![CDATA[1]]></Calculation>
-        </Repetition>
-        <Name>$success</Name>
-      </Step>
-      <Step enable="True" id="141" name="Set Variable">
-        <Value>
-          <Calculation><![CDATA[JSONGetElement ( $response ; "stdout" )]]></Calculation>
-        </Value>
-        <Repetition>
-          <Calculation><![CDATA[1]]></Calculation>
-        </Repetition>
-        <Name>$stdout</Name>
-      </Step>
-      <Step enable="True" id="141" name="Set Variable">
-        <Value>
-          <Calculation><![CDATA[JSONGetElement ( $response ; "stderr" )]]></Calculation>
-        </Value>
-        <Repetition>
-          <Calculation><![CDATA[1]]></Calculation>
-        </Repetition>
-        <Name>$stderr</Name>
-      </Step>
-      <Step enable="True" id="141" name="Set Variable">
-        <Value>
-          <Calculation><![CDATA[JSONGetElement ( $response ; "exit_code" )]]></Calculation>
-        </Value>
-        <Repetition>
-          <Calculation><![CDATA[1]]></Calculation>
-        </Repetition>
-        <Name>$exitCode</Name>
-      </Step>
-      <Step enable="True" id="89" name="# (comment)"/>
-      <Step enable="True" id="68" name="If">
-        <Restore state="False"/>
-        <Calculation><![CDATA[not $success or $exitCode ≠ 0]]></Calculation>
-      </Step>
-      <Step enable="True" id="87" name="Show Custom Dialog">
-        <Title>
-          <Calculation><![CDATA["Error"]]></Calculation>
-        </Title>
-        <Message>
-          <Calculation><![CDATA[$stderr & If ( not IsEmpty ( $stdout ) ; ¶ & $stdout ; "" )]]></Calculation>
-        </Message>
-        <Buttons>
-          <Button CommitState="True">
-            <Calculation><![CDATA["OK"]]></Calculation>
-          </Button>
-          <Button CommitState="False"/>
-          <Button CommitState="False"/>
-        </Buttons>
-      </Step>
-      <Step enable="True" id="69" name="Else">
-        <Restore state="False"/>
-      </Step>
-      <Step enable="True" id="87" name="Show Custom Dialog">
-        <Title>
-          <Calculation><![CDATA["Finished"]]></Calculation>
-        </Title>
-        <Message>
-          <Calculation><![CDATA["The XML has been placed into agentic-fm's xml_parsed folder." & If ( not IsEmpty ( $stdout ) ; "¶¶" & $stdout ; "" )]]></Calculation>
-        </Message>
-        <Buttons>
-          <Button CommitState="True">
-            <Calculation><![CDATA["OK"]]></Calculation>
-          </Button>
-          <Button CommitState="False"/>
-          <Button CommitState="False"/>
-        </Buttons>
-      </Step>
-      <Step enable="True" id="70" name="End If"/>
-      <Step enable="True" id="89" name="# (comment)"/>
-      <Step enable="True" id="103" name="Exit Script"/>
-      <Step enable="True" id="89" name="# (comment)"/>
-    </Script>
     <Script includeInMenu="False" SiriShortcutVisible="False" runFullAccess="False" id="4" name="Push Context">
       <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
         <Text>PURPOSE: Push the current layout context to agentic-fm.</Text>
       </Step>
       <Step enable="False" id="61" name="Insert Text">
         <SelectAll state="False"/>
-        <Text>INTERACTIVE MODE (FM Pro):&#xD;  Run with no parameter. Prompts for task description, writes CONTEXT.json directly via file steps.&#xD;&#xD;SERVER MODE (OData via AGFMScriptBridge):&#xD;  Pass JSON parameter with keys:&#xD;    task          &#x2014; task description string&#xD;    repo_path     &#x2014; absolute POSIX path to the agentic-fm project root on the companion server host&#xD;    companion_url &#x2014; base URL of the companion server (e.g. http://host.docker.internal:8765)&#xD;    layout        &#x2014; (optional) layout name to navigate to before generating context&#xD;&#xD;  CONTEXT.json is written by the companion server at {repo_path}/agent/CONTEXT.json.&#xD;&#xD;RETURNS (server mode): JSON { success, path } or { success, error }</Text>
+        <DisableStepCollapsed state="False"/>
+        <Text>INTERACTIVE MODE (FM Pro):&#13;  Run with no parameter. Prompts for task description, writes CONTEXT.json directly via file steps.&#13;&#13;SERVER MODE (OData via AGFMScriptBridge):&#13;  Pass JSON parameter with keys:&#13;    task          — task description string&#13;    repo_path     — absolute POSIX path to the agentic-fm project root on the companion server host&#13;    companion_url — base URL of the companion server (e.g. http://host.docker.internal:8765)&#13;    layout        — (optional) layout name to navigate to before generating context&#13;&#13;  CONTEXT.json is written by the companion server at {repo_path}/agent/CONTEXT.json.&#13;&#13;RETURNS (server mode): JSON { success, path } or { success, error }</Text>
         <Field>$README</Field>
       </Step>
-      <Step enable="True" id="89" name="# (comment)"/>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
       <Step enable="False" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
         <Text>MARK: Server mode</Text>
       </Step>
       <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
         <Value>
           <Calculation><![CDATA[Get ( ScriptParameter )]]></Calculation>
         </Value>
@@ -447,10 +184,12 @@
         <Name>$input</Name>
       </Step>
       <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
         <Restore state="False"/>
         <Calculation><![CDATA[JSONGetElementType ( $input ; "task" ) = JSONString]]></Calculation>
       </Step>
       <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
         <Value>
           <Calculation><![CDATA[JSONGetElement ( $input ; "task" )]]></Calculation>
         </Value>
@@ -460,6 +199,7 @@
         <Name>$task</Name>
       </Step>
       <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
         <Value>
           <Calculation><![CDATA[JSONGetElement ( $input ; "companion_url" )]]></Calculation>
         </Value>
@@ -469,6 +209,7 @@
         <Name>$companionUrl</Name>
       </Step>
       <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
         <Value>
           <Calculation><![CDATA[JSONGetElement ( $input ; "repo_path" )]]></Calculation>
         </Value>
@@ -477,11 +218,17 @@
         </Repetition>
         <Name>$repoPath</Name>
       </Step>
-      <Step enable="True" id="89" name="# (comment)"/>
       <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
         <Text>Navigate to the requested layout before generating context (keeps both operations in the same FM session)</Text>
       </Step>
       <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
         <Value>
           <Calculation><![CDATA[JSONGetElement ( $input ; "layout" )]]></Calculation>
         </Value>
@@ -491,15 +238,23 @@
         <Name>$layout</Name>
       </Step>
       <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
         <Restore state="False"/>
         <Calculation><![CDATA[not IsEmpty ( $layout )]]></Calculation>
       </Step>
       <Step enable="True" id="1" name="Perform Script">
+        <DisableStepCollapsed state="False"/>
         <Script id="14" name="AGFMGoToLayout"/>
       </Step>
-      <Step enable="True" id="70" name="End If"/>
-      <Step enable="True" id="89" name="# (comment)"/>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
       <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
         <Value>
           <Calculation><![CDATA[Context ( $task )]]></Calculation>
         </Value>
@@ -509,6 +264,7 @@
         <Name>$context</Name>
       </Step>
       <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
         <Value>
           <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "repo_path" ; $repoPath ; JSONString ] ;
@@ -524,6 +280,7 @@
         <NoInteract state="True"/>
         <DontEncodeURL state="False"/>
         <SelectAll state="True"/>
+        <DisableStepCollapsed state="False"/>
         <VerifySSLCertificates state="False"/>
         <CURLOptions>
           <Calculation><![CDATA["-X POST -H \"Content-Type: application/json\" -d " & Quote ( $payload )]]></Calculation>
@@ -533,6 +290,7 @@
         <Field>$response</Field>
       </Step>
       <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
         <Value>
           <Calculation><![CDATA[Get ( LastError )]]></Calculation>
         </Value>
@@ -542,38 +300,55 @@
         <Name>$httpError</Name>
       </Step>
       <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
         <Restore state="False"/>
         <Calculation><![CDATA[$httpError ≠ 0]]></Calculation>
       </Step>
       <Step enable="True" id="103" name="Exit Script">
+        <DisableStepCollapsed state="False"/>
         <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "success" ; False ; JSONBoolean ] ;
 	[ "error" ; "Companion server unreachable (error " & $httpError & ")" ; JSONString ]
 )]]></Calculation>
       </Step>
-      <Step enable="True" id="70" name="End If"/>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
       <Step enable="True" id="103" name="Exit Script">
+        <DisableStepCollapsed state="False"/>
         <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "success" ; JSONGetElement ( $response ; "success" ) ; JSONBoolean ] ;
 	[ "path" ; JSONGetElement ( $response ; "path" ) ; JSONString ]
 )]]></Calculation>
       </Step>
-      <Step enable="True" id="70" name="End If"/>
-      <Step enable="True" id="89" name="# (comment)"/>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
       <Step enable="False" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
         <Text>MARK: Interactive mode</Text>
       </Step>
       <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
         <Text>Check for a valid install.</Text>
       </Step>
       <Step enable="True" id="1" name="Perform Script">
+        <DisableStepCollapsed state="False"/>
         <Script id="2" name="Get agentic-fm path"/>
       </Step>
       <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
         <Restore state="False"/>
         <Calculation><![CDATA[not Get ( ScriptResult )]]></Calculation>
       </Step>
       <Step enable="True" id="87" name="Show Custom Dialog">
+        <DisableStepCollapsed state="False"/>
         <Title>
           <Calculation><![CDATA["Bad install"]]></Calculation>
         </Title>
@@ -588,10 +363,18 @@
           <Button CommitState="False"/>
         </Buttons>
       </Step>
-      <Step enable="True" id="103" name="Exit Script"/>
-      <Step enable="True" id="70" name="End If"/>
-      <Step enable="True" id="89" name="# (comment)"/>
+      <Step enable="True" id="103" name="Exit Script">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
       <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
         <Value>
           <Calculation><![CDATA["Be as descriptive as possible."]]></Calculation>
         </Value>
@@ -601,6 +384,7 @@
         <Name>$task</Name>
       </Step>
       <Step enable="True" id="87" name="Show Custom Dialog">
+        <DisableStepCollapsed state="False"/>
         <Title>
           <Calculation><![CDATA["Task description"]]></Calculation>
         </Title>
@@ -632,12 +416,18 @@
         </InputFields>
       </Step>
       <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
         <Restore state="False"/>
         <Calculation><![CDATA[Get ( LastMessageChoice ) = 2]]></Calculation>
       </Step>
-      <Step enable="True" id="103" name="Exit Script"/>
-      <Step enable="True" id="70" name="End If"/>
+      <Step enable="True" id="103" name="Exit Script">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
       <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
         <Value>
           <Calculation><![CDATA[Context ( $task )]]></Calculation>
         </Value>
@@ -647,6 +437,7 @@
         <Name>$context</Name>
       </Step>
       <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
         <Value>
           <Calculation><![CDATA[JSONGetElement ( $$AGENTIC.FM ; "path" ) & "agent/context/snapshot.xml"]]></Calculation>
         </Value>
@@ -656,6 +447,7 @@
         <Name>$snapshotPath</Name>
       </Step>
       <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
         <Value>
           <Calculation><![CDATA[JSONSetElement ( $context ;
 	[ "snapshot_path" ; "agent/context/snapshot.xml" ; JSONString ] ;
@@ -667,8 +459,12 @@
         </Repetition>
         <Name>$context</Name>
       </Step>
-      <Step enable="True" id="89" name="# (comment)"/>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
       <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
         <Value>
           <Calculation><![CDATA["CONTEXT.json"]]></Calculation>
         </Value>
@@ -678,6 +474,7 @@
         <Name>$contextFile</Name>
       </Step>
       <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
         <Value>
           <Calculation><![CDATA[JSONGetElement ( $$AGENTIC.FM ; "path" ) & "agent/" & $contextFile]]></Calculation>
         </Value>
@@ -686,26 +483,39 @@
         </Repetition>
         <Name>$target</Name>
       </Step>
-      <Step enable="True" id="89" name="# (comment)"/>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
       <Step enable="True" id="188" name="Get File Exists">
+        <DisableStepCollapsed state="False"/>
         <UniversalPathList>$target</UniversalPathList>
         <Text/>
         <Field>$exists</Field>
       </Step>
       <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
         <Restore state="False"/>
         <Calculation><![CDATA[$exists]]></Calculation>
       </Step>
       <Step enable="True" id="197" name="Delete File">
+        <DisableStepCollapsed state="False"/>
         <UniversalPathList>$target</UniversalPathList>
       </Step>
-      <Step enable="True" id="70" name="End If"/>
-      <Step enable="True" id="89" name="# (comment)"/>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
       <Step enable="True" id="190" name="Create Data File">
         <CreateDirectories state="False"/>
+        <DisableStepCollapsed state="False"/>
         <UniversalPathList>$target</UniversalPathList>
       </Step>
       <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
         <Value>
           <Calculation><![CDATA[Get ( LastError )]]></Calculation>
         </Value>
@@ -715,34 +525,42 @@
         <Name>$error</Name>
       </Step>
       <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
         <Restore state="False"/>
         <Calculation><![CDATA[not $error]]></Calculation>
       </Step>
       <Step enable="True" id="191" name="Open Data File">
+        <DisableStepCollapsed state="False"/>
         <UniversalPathList>$target</UniversalPathList>
         <Text/>
         <Field>$fileID</Field>
       </Step>
       <Step enable="True" id="192" name="Write to Data File">
         <AppendLineFeed state="True"/>
+        <DisableStepCollapsed state="False"/>
         <DataSourceType value="2"/>
         <Calculation><![CDATA[$fileID]]></Calculation>
         <Text/>
         <Field>$context</Field>
       </Step>
       <Step enable="True" id="196" name="Close Data File">
+        <DisableStepCollapsed state="False"/>
         <Calculation><![CDATA[$fileID]]></Calculation>
       </Step>
       <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
         <Text>Save snapshot for agent data context</Text>
       </Step>
       <Step enable="True" id="152" name="Save Records as Snapshot Link">
         <CreateDirectories state="True"/>
+        <DisableStepCollapsed state="False"/>
         <CreateEmail state="False"/>
         <SaveType value="BrowsedRecords"/>
         <UniversalPathList>$snapshotPath</UniversalPathList>
       </Step>
       <Step enable="True" id="87" name="Show Custom Dialog">
+        <DisableStepCollapsed state="False"/>
         <Title>
           <Calculation><![CDATA["Context written"]]></Calculation>
         </Title>
@@ -757,47 +575,1944 @@
           <Button CommitState="False"/>
         </Buttons>
       </Step>
-      <Step enable="True" id="70" name="End If"/>
-      <Step enable="True" id="89" name="# (comment)"/>
-      <Step enable="True" id="103" name="Exit Script"/>
-      <Step enable="True" id="89" name="# (comment)"/>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+      <Step enable="True" id="103" name="Exit Script">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+    </Script>
+    <Script includeInMenu="False" SiriShortcutVisible="False" runFullAccess="False" id="21" name="Explode XML">
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>PURPOSE: Save every open FileMaker file of a multi-file solution as XML into one timestamped export folder, together with a Summary.xml manifest.</Text>
+      </Step>
+      <Step enable="False" id="61" name="Insert Text">
+        <SelectAll state="False"/>
+        <DisableStepCollapsed state="False"/>
+        <Text>FLOW:&#13;  1. Lists the open files (DatabaseNames, flagging any whose window is hidden or missing, which Select Window cannot bring forward; those are skipped and left out of Summary.xml) and asks whether they all belong to a single solution: export all files, only the current file, or cancel.&#13;  2. Asks for the solution name (one name for the whole batch). The HTML viewer (fm-saxml --html) and WebMCP (--webmcp) are on by default; to change that, edit $buildHtmlViewer and $buildWebMcpViewer in the configuration at the top of the script.&#13;  3. Checks that the companion server answers (GET /health); if not, offers to export anyway (the conversion is then skipped with the usual message).&#13;  4. For each open file: tells the companion it starts (POST /progress, file_start), runs Save a Copy as XML (with Include details for analysis tools) into one timestamped folder, SaXML_&lt;file&gt;_&lt;date&gt;_&lt;time&gt;, in FileMaker's temporary folder (Get ( TemporaryPath ); FileMaker deletes it on quit), then reports file_done; after the last file it reports done. Progress calls are best effort: short timeouts, errors ignored, and the first failure turns them off for the rest of the run, so the export never waits on the companion.&#13;  5. When more than one file was selected, writes Summary.xml into that folder: one entry for every file with a window, including the ones whose export fails (file name, host or folder, expected XML path, export time, generator="agentic-fm"; format in fm-saxml docs/manifest.md). fm-saxml compares it with the folder, so a failed export is reported as missing.&#13;  6. Hands the folder to the companion server: one POST /convert (solution name, folder path, html, webmcp) that returns a job ID at once, then polls GET /convert/&lt;job id&gt; every second (30 minutes at most) until the job is done, showing the stage and file N of M in the window title. No long request.&#13;  7. Shows which files were exported and which failed, and the conversion result or error.&#13;&#13;REQUIREMENTS:&#13;  - Full Access privileges in every open file (needed by Save a Copy as XML)&#13;  - FileMaker Pro 26 or later (Include details for analysis tools)&#13;  - The companion server running on this machine (agent/scripts/launchers/start_companion.cmd on Windows, start_companion.sh on Mac), started with the Python that has fm-saxml installed (the harness .venv); agentic-fm 2fb663a or later for the html and webmcp switches; agentic-fm f6fab25 or later and fm-saxml 0.6.9 or later for progress (an older companion or fm-saxml still converts, without progress)&#13;&#13;PARAMETERS: none&#13;&#13;RETURNS: nothing</Text>
+        <Field>$README</Field>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+      <Step enable="False" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>MARK: Configuration</Text>
+      </Step>
+      <Step enable="True" id="86" name="Set Error Capture">
+        <Set state="True"/>
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Viewer switches sent to the companion's /convert (fm-saxml --html and --webmcp). Both are on by default; set either to False to leave that part out. WebMCP is a layer of the HTML viewer, so $buildWebMcpViewer = True builds the HTML viewer even when $buildHtmlViewer is False.</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[True]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$buildHtmlViewer</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[True]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$buildWebMcpViewer</Name>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Companion server address (it binds to 127.0.0.1, so it runs on this machine). Used by every call below.</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA["http://127.0.0.1:8765"]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$companionUrl</Name>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Progress reporting (POST /progress) is best effort: short timeouts, errors ignored. $progressOff turns it off for the rest of the run after the first failed call, so a stopped companion costs at most one timeout.</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[False]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$progressOff</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA["-X POST --header \"Content-Type: application/json\" --data @$progressPayload --connect-timeout 1 --max-time 2"]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$progressCurl</Name>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+      <Step enable="False" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>MARK: Confirm open files</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[DatabaseNames]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$fileList</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[ValueCount ( $fileList )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$fileCount</Name>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Build the list shown to the user first, flagging any open file that has no visible window to export from (hidden windows cannot be selected, so the file is skipped and left out of Summary.xml)</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[""]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$listing</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[""]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$exportList</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[""]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$exportWindows</Name>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Remember the window the script started in so it can be restored after the window switches</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Get ( WindowName )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$originalWindow</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[0]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$i</Name>
+      </Step>
+      <Step enable="True" id="71" name="Loop">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <FlushType value="Always"/>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[$i + 1]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$i</Name>
+      </Step>
+      <Step enable="True" id="72" name="Exit Loop If">
+        <DisableStepCollapsed state="False"/>
+        <Calculation><![CDATA[$i > $fileCount]]></Calculation>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[GetValue ( $fileList ; $i )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$probeFile</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[WindowNames ( $probeFile )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$probeWindows</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[""]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$probeWindow</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[0]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$w</Name>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Hidden windows are listed by WindowNames but cannot be selected (error 112), so try each window of the file and keep the first one Select Window can actually bring forward</Text>
+      </Step>
+      <Step enable="True" id="71" name="Loop">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <FlushType value="Always"/>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[$w + 1]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$w</Name>
+      </Step>
+      <Step enable="True" id="72" name="Exit Loop If">
+        <DisableStepCollapsed state="False"/>
+        <Calculation><![CDATA[$w > ValueCount ( $probeWindows )]]></Calculation>
+      </Step>
+      <Step enable="True" id="123" name="Select Window">
+        <DisableStepCollapsed state="False"/>
+        <LimitToWindowsOfCurrentFile state="False"/>
+        <Window value="ByName"/>
+        <Name>
+          <Calculation><![CDATA[GetValue ( $probeWindows ; $w )]]></Calculation>
+        </Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Let ( ~error = Get ( LastError ) ; If ( ~error = 0 ; GetValue ( $probeWindows ; $w ) ; "" ) )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$probeWindow</Name>
+      </Step>
+      <Step enable="True" id="72" name="Exit Loop If">
+        <DisableStepCollapsed state="False"/>
+        <Calculation><![CDATA[not IsEmpty ( $probeWindow )]]></Calculation>
+      </Step>
+      <Step enable="True" id="73" name="End Loop">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[List ( $listing ; $probeFile & If ( IsEmpty ( $probeWindow ) ; " (no visible window - skipped)" ; "" ) )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$listing</Name>
+      </Step>
+      <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Calculation><![CDATA[not IsEmpty ( $probeWindow )]]></Calculation>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[List ( $exportList ; $probeFile )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$exportList</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[List ( $exportWindows ; $probeWindow )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$exportWindows</Name>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="73" name="End Loop">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Return to the window the script started in</Text>
+      </Step>
+      <Step enable="True" id="123" name="Select Window">
+        <DisableStepCollapsed state="False"/>
+        <LimitToWindowsOfCurrentFile state="False"/>
+        <Window value="ByName"/>
+        <Name>
+          <Calculation><![CDATA[$originalWindow]]></Calculation>
+        </Name>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+      <Step enable="True" id="87" name="Show Custom Dialog">
+        <DisableStepCollapsed state="False"/>
+        <Title>
+          <Calculation><![CDATA["Export XML: open files"]]></Calculation>
+        </Title>
+        <Message>
+          <Calculation><![CDATA["These " & $fileCount & " file(s) are currently open:¶¶" & $listing & "¶¶Are all of them part of a single solution?¶¶Files with no visible window are skipped.¶¶Export all of them, or only the current file (" & Get ( FileName ) & ")?"]]></Calculation>
+        </Message>
+        <Buttons>
+          <Button CommitState="True">
+            <Calculation><![CDATA["Export all files"]]></Calculation>
+          </Button>
+          <Button CommitState="False">
+            <Calculation><![CDATA["Current file only"]]></Calculation>
+          </Button>
+          <Button CommitState="False">
+            <Calculation><![CDATA["Cancel"]]></Calculation>
+          </Button>
+        </Buttons>
+      </Step>
+      <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Calculation><![CDATA[Get ( LastMessageChoice ) = 3]]></Calculation>
+      </Step>
+      <Step enable="True" id="103" name="Exit Script">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Not a single solution: narrow the export to the current file instead of asking the user to close the other files</Text>
+      </Step>
+      <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Calculation><![CDATA[Get ( LastMessageChoice ) = 2]]></Calculation>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Get ( FileName )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$fileList</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$fileCount</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[$originalWindow]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$exportWindows</Name>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Export all: keep only the files that have a selectable window, so Summary.xml and the export loop never include the others</Text>
+      </Step>
+      <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Calculation><![CDATA[Get ( LastMessageChoice ) = 1]]></Calculation>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[$exportList]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$fileList</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[ValueCount ( $fileList )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$fileCount</Name>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+      <Step enable="False" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>MARK: Conversion options</Text>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Asked before the export so the long part of the run is unattended. One solution name for the whole batch (the docs go to exports/&lt;name&gt; in the harness). The viewer switches come from $buildHtmlViewer and $buildWebMcpViewer in the configuration at the top.</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Get ( FileName )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$solutionName</Name>
+      </Step>
+      <Step enable="True" id="87" name="Show Custom Dialog">
+        <DisableStepCollapsed state="False"/>
+        <Title>
+          <Calculation><![CDATA["Convert with fm-saxml"]]></Calculation>
+        </Title>
+        <Message>
+          <Calculation><![CDATA["After the export, the folder is handed to the companion server and converted with fm-saxml.¶¶All " & $fileCount & " file(s) are converted as ONE solution under the name below. Reusing a name replaces its previous conversion.¶¶HTML viewer: " & If ( $buildHtmlViewer or $buildWebMcpViewer ; "on" ; "off" ) & "¶WebMCP: " & If ( $buildWebMcpViewer ; "on" ; "off" )]]></Calculation>
+        </Message>
+        <Buttons>
+          <Button CommitState="True">
+            <Calculation><![CDATA["OK"]]></Calculation>
+          </Button>
+          <Button CommitState="False"/>
+          <Button CommitState="False"/>
+        </Buttons>
+        <InputFields>
+          <InputField UsePasswordCharacter="False">
+            <Field>$solutionName</Field>
+            <Label>
+              <Calculation><![CDATA["Solution name: "]]></Calculation>
+            </Label>
+          </InputField>
+          <InputField UsePasswordCharacter="False">
+            <Field table="" id="0" name=""/>
+          </InputField>
+          <InputField UsePasswordCharacter="False">
+            <Field table="" id="0" name=""/>
+          </InputField>
+        </InputFields>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[If ( IsEmpty ( Trim ( $solutionName ) ) ; Get ( FileName ) ; Trim ( $solutionName ) )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$solutionName</Name>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Check the companion before the long part of the run, so a stopped companion is noticed now rather than after the export</Text>
+      </Step>
+      <Step enable="True" id="160" name="Insert from URL">
+        <NoInteract state="True"/>
+        <DontEncodeURL state="False"/>
+        <SelectAll state="True"/>
+        <DisableStepCollapsed state="False"/>
+        <VerifySSLCertificates state="False"/>
+        <CURLOptions>
+          <Calculation><![CDATA["--connect-timeout 1 --max-time 2"]]></Calculation>
+        </CURLOptions>
+        <Calculation><![CDATA[$companionUrl & "/health"]]></Calculation>
+        <Text/>
+        <Field>$healthResponse</Field>
+      </Step>
+      <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Calculation><![CDATA[Get ( LastError ) ≠ 0]]></Calculation>
+      </Step>
+      <Step enable="True" id="87" name="Show Custom Dialog">
+        <DisableStepCollapsed state="False"/>
+        <Title>
+          <Calculation><![CDATA["Companion server not running"]]></Calculation>
+        </Title>
+        <Message>
+          <Calculation><![CDATA["The companion server does not answer at " & $companionUrl & ".¶¶Start it (agent/scripts/launchers/start_companion.cmd on Windows, start_companion.sh on Mac) and run this script again, or export now and convert the folder later."]]></Calculation>
+        </Message>
+        <Buttons>
+          <Button CommitState="True">
+            <Calculation><![CDATA["Cancel"]]></Calculation>
+          </Button>
+          <Button CommitState="False">
+            <Calculation><![CDATA["Export anyway"]]></Calculation>
+          </Button>
+          <Button CommitState="False"/>
+        </Buttons>
+      </Step>
+      <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Calculation><![CDATA[Get ( LastMessageChoice ) = 1]]></Calculation>
+      </Step>
+      <Step enable="True" id="103" name="Exit Script">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Exporting anyway: skip the progress calls, which would only fail</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[True]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$progressOff</Name>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+      <Step enable="False" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>MARK: Export each open file</Text>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Read one timestamp and derive the folder name and both Summary.xml attributes from it, so a run that crosses midnight cannot produce a mismatched date and time</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Get ( CurrentTimestamp )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$now</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Let (
+	~date = GetAsDate ( $now ) ;
+	Year ( ~date ) & "-" & Right ( "0" & Month ( ~date ) ; 2 ) & "-" & Right ( "0" & Day ( ~date ) ; 2 )
+)]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$today</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Let (
+	~time = GetAsTime ( $now ) ;
+	$today & "_" & Right ( "0" & Hour ( ~time ) ; 2 ) & Right ( "0" & Minute ( ~time ) ; 2 ) & Right ( "0" & Int ( Seconds ( ~time ) ) ; 2 )
+)]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$stamp</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Let (
+	[
+		~prefix = If ( Get ( SystemPlatform ) = -2 ; "filewin:" ; "filemac:" ) ;
+		~root = Get ( TemporaryPath )
+	] ;
+	~prefix & ~root & If ( Right ( ~root ; 1 ) = "/" ; "" ; "/" ) & "SaXML_" & Get ( FileName ) & "_" & $stamp & "/"
+)]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$exportFolder</Name>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Replicates a FileMaker Pro 26 multi-file folder export (every XML plus Summary.xml in one folder) under FileMaker's temporary folder (Get ( TemporaryPath ), which has no path prefix, so the filewin:/filemac: prefix is added). Creating the (empty) Summary.xml with Create folders On also creates the folder itself.</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[$exportFolder & "Summary.xml"]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$summaryPath</Name>
+      </Step>
+      <Step enable="True" id="190" name="Create Data File">
+        <CreateDirectories state="True"/>
+        <DisableStepCollapsed state="False"/>
+        <UniversalPathList>$summaryPath</UniversalPathList>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Get ( LastError )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$folderError</Name>
+      </Step>
+      <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Calculation><![CDATA[$folderError ≠ 0]]></Calculation>
+      </Step>
+      <Step enable="True" id="87" name="Show Custom Dialog">
+        <DisableStepCollapsed state="False"/>
+        <Title>
+          <Calculation><![CDATA["Export folder"]]></Calculation>
+        </Title>
+        <Message>
+          <Calculation><![CDATA["Could not create the export folder (error " & $folderError & "):¶" & $exportFolder]]></Calculation>
+        </Message>
+        <Buttons>
+          <Button CommitState="True">
+            <Calculation><![CDATA["OK"]]></Calculation>
+          </Button>
+          <Button CommitState="False"/>
+          <Button CommitState="False"/>
+        </Buttons>
+      </Step>
+      <Step enable="True" id="103" name="Exit Script">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>A single file needs no Summary.xml: the placeholder above only existed to create the folder, so delete it</Text>
+      </Step>
+      <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Calculation><![CDATA[$fileCount = 1]]></Calculation>
+      </Step>
+      <Step enable="True" id="197" name="Delete File">
+        <DisableStepCollapsed state="False"/>
+        <UniversalPathList>$summaryPath</UniversalPathList>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[""]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$results</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[""]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$summaryFiles</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[0]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$failureCount</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[0]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$i</Name>
+      </Step>
+      <Step enable="True" id="71" name="Loop">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <FlushType value="Always"/>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[$i + 1]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$i</Name>
+      </Step>
+      <Step enable="True" id="72" name="Exit Loop If">
+        <DisableStepCollapsed state="False"/>
+        <Calculation><![CDATA[$i > $fileCount]]></Calculation>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[GetValue ( $fileList ; $i )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$fileName</Name>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Save a Copy as XML targets a window: use the window already confirmed selectable for this file</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[GetValue ( $exportWindows ; $i )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$windowName</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[$exportFolder & $fileName & ".xml"]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$output</Name>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Native path for Summary.xml: WinPath (2) on Windows, POSIX (1) on Mac (Get ( SystemPlatform ) = -2 is Windows). Add the filewin:/filemac: prefix when $output has none, or the conversion returns "?"</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Let ( [
+		~windows = Get ( SystemPlatform ) = -2 ;
+		~prefix = If ( Left ( $output ; 4 ) = "file" ; "" ; If ( ~windows ; "filewin:" ; "filemac:" ) )
+	] ;
+	ConvertFromFileMakerPath ( ~prefix & $output ; If ( ~windows ; 2 ; 1 ) )
+)]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$outputNative</Name>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>File/@path for Summary.xml, from this file's own location: the host name for a hosted file, the containing folder (native path, trailing separator) for a local file. Empty when its window cannot be selected.</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[""]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$filePath</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[0]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$selectError</Name>
+      </Step>
+      <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Calculation><![CDATA[not IsEmpty ( $windowName )]]></Calculation>
+      </Step>
+      <Step enable="True" id="123" name="Select Window">
+        <DisableStepCollapsed state="False"/>
+        <LimitToWindowsOfCurrentFile state="False"/>
+        <Window value="ByName"/>
+        <Name>
+          <Calculation><![CDATA[$windowName]]></Calculation>
+        </Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Get ( LastError )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$selectError</Name>
+      </Step>
+      <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Calculation><![CDATA[$selectError = 0]]></Calculation>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Let ( [
+			~fp = Get ( FilePath ) ;
+			~windows = Get ( SystemPlatform ) = -2 ;
+			~sep = If ( ~windows ; "\\" ; "/" ) ;
+			~folder = Left ( ~fp ; Position ( ~fp ; "/" ; Length ( ~fp ) ; -1 ) ) ;
+			~folderFM = If ( Left ( ~folder ; 5 ) = "file:" ; If ( ~windows ; "filewin:" ; "filemac:" ) & Middle ( ~folder ; 6 ; Length ( ~folder ) ) ; ~folder ) ;
+			~native = ConvertFromFileMakerPath ( ~folderFM ; If ( ~windows ; 2 ; 1 ) )
+		] ;
+		If ( Left ( ~fp ; 6 ) = "fmnet:" ;
+			Middle ( ~fp ; 8 ; Position ( ~fp ; "/" ; 8 ; 1 ) - 8 ) ;
+			~native & If ( Right ( ~native ; 1 ) = ~sep ; "" ; ~sep )
+		)
+	)]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$filePath</Name>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Single-pass loop: each failure sets $failure and exits to the result bookkeeping below</Text>
+      </Step>
+      <Step enable="True" id="71" name="Loop">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <FlushType value="Always"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>A file with no selectable window cannot be exported</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Case ( IsEmpty ( $windowName ) ; "no window found to export from" ; $selectError ≠ 0 ; "could not bring the window forward (Select Window error " & $selectError & ")" ; "" )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$failure</Name>
+      </Step>
+      <Step enable="True" id="72" name="Exit Loop If">
+        <DisableStepCollapsed state="False"/>
+        <Calculation><![CDATA[not IsEmpty ( $failure )]]></Calculation>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Tell the companion this file's export starts. Only files with a selectable window get here, so a skipped file sends nothing.</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[JSONSetElement ( "{}" ;
+	[ "solution_name" ; $solutionName ; JSONString ] ;
+	[ "stage" ; "export" ; JSONString ] ;
+	[ "event" ; "file_start" ; JSONString ] ;
+	[ "file" ; $fileName & ".fmp12" ; JSONString ] ;
+	[ "index" ; $i ; JSONNumber ] ;
+	[ "total" ; $fileCount ; JSONNumber ]
+)]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$progressPayload</Name>
+      </Step>
+      <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Calculation><![CDATA[not $progressOff]]></Calculation>
+      </Step>
+      <Step enable="True" id="160" name="Insert from URL">
+        <NoInteract state="True"/>
+        <DontEncodeURL state="False"/>
+        <SelectAll state="True"/>
+        <DisableStepCollapsed state="False"/>
+        <VerifySSLCertificates state="False"/>
+        <CURLOptions>
+          <Calculation><![CDATA[$progressCurl]]></Calculation>
+        </CURLOptions>
+        <Calculation><![CDATA[$companionUrl & "/progress"]]></Calculation>
+        <Text/>
+        <Field>$progressResponse</Field>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Get ( LastError ) ≠ 0]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$progressOff</Name>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="3" name="Save a Copy as XML">
+        <Option state="True"/>
+        <OutputEntireBinaryData state="False"/>
+        <SpecifyJSONOptions state="True"/>
+        <DisableStepCollapsed state="False"/>
+        <UniversalPathList>$output</UniversalPathList>
+        <Calculation><![CDATA[$windowName]]></Calculation>
+        <SaXML>
+          <JSONOptions>
+            <Calculation><![CDATA[JSONSetElement ( "{}" ;
+  [ "catalogs_included" ; JSONMakeArray (
+  "PersistentStoreCatalog
+  BaseDirectoryCatalog
+  FileAccessCatalog
+  ExternalDataSourceCatalog
+  BaseTableCatalog
+  TableOccurrenceCatalog
+  CustomFunctionsCatalog
+  ValueListCatalog
+  FieldCatalog
+  RelationshipCatalog
+  CustomMenuCatalog
+  CustomMenuSetCatalog
+  ScriptCatalog
+  ThemeCatalog
+  LayoutCatalog
+  LibraryCatalog
+  PrivilegeSetsCatalog
+  ExtendedPrivilegesCatalog
+  AccountsCatalog
+  Metadata"
+  ; " " ; JSONString ) ; JSONArray ] ;
+  [ "include_details" ; True ; JSONBoolean ] ;
+  [ "split_catalogs" ; False ; JSONBoolean ] ;
+  [ "standalone_binarydata" ; False ; JSONBoolean ]
+)]]></Calculation>
+          </JSONOptions>
+        </SaXML>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Let (
+	~error = Get ( LastError ) ;
+	If ( ~error ≠ 0 ; "Save a Copy as XML failed (error " & ~error & ")" ; "" )
+)]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$failure</Name>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Report file_done only for a file that saved: the companion would otherwise log a failed file as exported</Text>
+      </Step>
+      <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Calculation><![CDATA[IsEmpty ( $failure ) and not $progressOff]]></Calculation>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[JSONSetElement ( $progressPayload ; "event" ; "file_done" ; JSONString )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$progressPayload</Name>
+      </Step>
+      <Step enable="True" id="160" name="Insert from URL">
+        <NoInteract state="True"/>
+        <DontEncodeURL state="False"/>
+        <SelectAll state="True"/>
+        <DisableStepCollapsed state="False"/>
+        <VerifySSLCertificates state="False"/>
+        <CURLOptions>
+          <Calculation><![CDATA[$progressCurl]]></Calculation>
+        </CURLOptions>
+        <Calculation><![CDATA[$companionUrl & "/progress"]]></Calculation>
+        <Text/>
+        <Field>$progressResponse</Field>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Get ( LastError ) ≠ 0]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$progressOff</Name>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="72" name="Exit Loop If">
+        <DisableStepCollapsed state="False"/>
+        <Calculation><![CDATA[not IsEmpty ( $failure )]]></Calculation>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+      <Step enable="True" id="72" name="Exit Loop If">
+        <DisableStepCollapsed state="False"/>
+        <Calculation><![CDATA[True]]></Calculation>
+      </Step>
+      <Step enable="True" id="73" name="End Loop">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+      <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Calculation><![CDATA[IsEmpty ( $failure )]]></Calculation>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[List ( $results ; "OK - " & $fileName )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$results</Name>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Else</Text>
+      </Step>
+      <Step enable="True" id="69" name="Else">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[$failureCount + 1]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$failureCount</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[List ( $results ; "FAILED - " & $fileName & ": " & $failure )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$results</Name>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>List the file in Summary.xml whether or not it exported. A failed file keeps the path its XML would have had, so fm-saxml reports it as missing instead of the gap going unnoticed.</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Let ( [
+			~name = Substitute ( $fileName ; [ Char ( 38 ) ; Char ( 38 ) & "amp;" ] ; [ Char ( 60 ) ; Char ( 38 ) & "lt;" ] ; [ Char ( 62 ) ; Char ( 38 ) & "gt;" ] ; [ Char ( 34 ) ; Char ( 38 ) & "quot;" ] ) ;
+			~filePath = Substitute ( $filePath ; [ Char ( 38 ) ; Char ( 38 ) & "amp;" ] ; [ Char ( 60 ) ; Char ( 38 ) & "lt;" ] ; [ Char ( 62 ) ; Char ( 38 ) & "gt;" ] ; [ Char ( 34 ) ; Char ( 38 ) & "quot;" ] ) ;
+			~path = Substitute ( $outputNative ; [ Char ( 38 ) ; Char ( 38 ) & "amp;" ] ; [ Char ( 60 ) ; Char ( 38 ) & "lt;" ] ; [ Char ( 62 ) ; Char ( 38 ) & "gt;" ] ; [ Char ( 34 ) ; Char ( 38 ) & "quot;" ] )
+		] ;
+		List (
+			$summaryFiles ;
+			"	<File name=\"" & ~name & ".fmp12\" path=\"" & ~filePath & "\">" & ¶ &
+			"		<XML path=\"" & ~path & "\"></XML>" & ¶ &
+			"	</File>"
+		)
+	)]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$summaryFiles</Name>
+      </Step>
+      <Step enable="True" id="73" name="End Loop">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Return to the window the script started in</Text>
+      </Step>
+      <Step enable="True" id="123" name="Select Window">
+        <DisableStepCollapsed state="False"/>
+        <LimitToWindowsOfCurrentFile state="False"/>
+        <Window value="ByName"/>
+        <Name>
+          <Calculation><![CDATA[$originalWindow]]></Calculation>
+        </Name>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Tell the companion the export step is over (it logs the total time and its panel moves on to the conversion)</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[JSONSetElement ( "{}" ;
+	[ "solution_name" ; $solutionName ; JSONString ] ;
+	[ "stage" ; "export" ; JSONString ] ;
+	[ "event" ; "done" ; JSONString ] ;
+	[ "file" ; "" ; JSONString ] ;
+	[ "index" ; $fileCount ; JSONNumber ] ;
+	[ "total" ; $fileCount ; JSONNumber ]
+)]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$progressPayload</Name>
+      </Step>
+      <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Calculation><![CDATA[not $progressOff]]></Calculation>
+      </Step>
+      <Step enable="True" id="160" name="Insert from URL">
+        <NoInteract state="True"/>
+        <DontEncodeURL state="False"/>
+        <SelectAll state="True"/>
+        <DisableStepCollapsed state="False"/>
+        <VerifySSLCertificates state="False"/>
+        <CURLOptions>
+          <Calculation><![CDATA[$progressCurl]]></Calculation>
+        </CURLOptions>
+        <Calculation><![CDATA[$companionUrl & "/progress"]]></Calculation>
+        <Text/>
+        <Field>$progressResponse</Field>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Get ( LastError ) ≠ 0]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$progressOff</Name>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+      <Step enable="False" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>MARK: Write Summary.xml</Text>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Summary.xml lists every file with a window, including failed exports (their XML is simply absent from the folder, which fm-saxml reports as missing), in the format expected by the fm-saxml converter. It is written next to the exported XML files.</Text>
+      </Step>
+      <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Calculation><![CDATA[$fileCount > 1 and not IsEmpty ( $summaryFiles )]]></Calculation>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Substitute (
+	"<?xml version=\"1.0\" encoding=\"UTF-8\"?>" & ¶ &
+	"<FMPReport CreationDate=\"" & $today & "\" CreationTime=\"" & GetAsTime ( $now ) & "\" type=\"Summary\" generator=\"agentic-fm\" version=\"2.3.0.0\" membercount=\"" & $fileCount & "\">" & ¶ &
+	$summaryFiles & ¶ &
+	"</FMPReport>" & ¶ ;
+	¶ ; Char ( 10 )
+)]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$summaryXml</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[""]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$summaryFailure</Name>
+      </Step>
+      <Step enable="True" id="191" name="Open Data File">
+        <DisableStepCollapsed state="False"/>
+        <UniversalPathList>$summaryPath</UniversalPathList>
+        <Text/>
+        <Field>$summaryFileId</Field>
+      </Step>
+      <Step enable="True" id="192" name="Write to Data File">
+        <AppendLineFeed state="False"/>
+        <DisableStepCollapsed state="False"/>
+        <DataSourceType value="2"/>
+        <Calculation><![CDATA[$summaryFileId]]></Calculation>
+        <Text/>
+        <Field>$summaryXml</Field>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Let ( ~error = Get ( LastError ) ; If ( ~error ≠ 0 ; "Write to Data File failed (error " & ~error & ")" ; "" ) )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$summaryFailure</Name>
+      </Step>
+      <Step enable="True" id="196" name="Close Data File">
+        <DisableStepCollapsed state="False"/>
+        <Calculation><![CDATA[$summaryFileId]]></Calculation>
+      </Step>
+      <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Calculation><![CDATA[not IsEmpty ( $summaryFailure )]]></Calculation>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[List ( $results ; "Summary.xml FAILED: " & $summaryFailure )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$results</Name>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[If ( IsEmpty ( $summaryFailure ) ; List ( $results ; "Export folder (XMLs + Summary.xml): " & $exportFolder ) ; $results )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$results</Name>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Multiple files but no manifest content (the run ended early): do not leave the empty Summary.xml placeholder in the folder</Text>
+      </Step>
+      <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Calculation><![CDATA[$fileCount > 1 and IsEmpty ( $summaryFiles )]]></Calculation>
+      </Step>
+      <Step enable="True" id="197" name="Delete File">
+        <DisableStepCollapsed state="False"/>
+        <UniversalPathList>$summaryPath</UniversalPathList>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Calculation><![CDATA[$fileCount = 1]]></Calculation>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[List ( $results ; "Export folder: " & $exportFolder )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$results</Name>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+      <Step enable="False" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>MARK: Convert with the companion</Text>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Hand the export folder to the companion server: one POST /convert for the whole batch (one solution name), which returns a job ID at once, then poll GET /convert/&lt;job id&gt; every second until the job is done. Insert from URL never waits on fm-saxml, so there is no long request and no --max-time. The companion binds to 127.0.0.1, so it must run on this machine.</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA["Conversion skipped: no file was exported."]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$convertResult</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[0]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$convertOk</Name>
+      </Step>
+      <Step enable="True" id="68" name="If">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Calculation><![CDATA[$fileCount - $failureCount > 0]]></Calculation>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[""]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$convertResult</Name>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>export_path is a native path (WinPath on Windows, POSIX on Mac). Several files: the folder (Summary.xml inside), without its trailing separator. One file: that file's own XML, since it has no Summary.xml.</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Let ( [
+		~windows = Get ( SystemPlatform ) = -2 ;
+		~sep = If ( ~windows ; "\\" ; "/" ) ;
+		~native = ConvertFromFileMakerPath ( $exportFolder ; If ( ~windows ; 2 ; 1 ) )
+	] ;
+	If ( $fileCount = 1 ;
+		$outputNative ;
+		If ( Right ( ~native ; 1 ) = ~sep ; Left ( ~native ; Length ( ~native ) - 1 ) ; ~native )
+	)
+)]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$exportPath</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[JSONSetElement ( "{}" ;
+	[ "solution_name" ; $solutionName ; JSONString ] ;
+	[ "export_path" ; $exportPath ; JSONString ] ;
+	[ "html" ; $buildHtmlViewer ; JSONBoolean ] ;
+	[ "webmcp" ; $buildWebMcpViewer ; JSONBoolean ]
+)]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$payload</Name>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Single-pass loop: each failure sets $convertResult and exits to the summary below</Text>
+      </Step>
+      <Step enable="True" id="71" name="Loop">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <FlushType value="Always"/>
+      </Step>
+      <Step enable="True" id="160" name="Insert from URL">
+        <NoInteract state="True"/>
+        <DontEncodeURL state="False"/>
+        <SelectAll state="True"/>
+        <DisableStepCollapsed state="False"/>
+        <VerifySSLCertificates state="False"/>
+        <CURLOptions>
+          <Calculation><![CDATA["-X POST --header \"Content-Type: application/json\" --data @$payload"]]></Calculation>
+        </CURLOptions>
+        <Calculation><![CDATA[$companionUrl & "/convert"]]></Calculation>
+        <Text/>
+        <Field>$response</Field>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Get ( LastError )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$httpError</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[If ( $httpError ≠ 0 ; "NOT converted: the companion server did not answer (error " & $httpError & "). Start it at " & $companionUrl & " (agent/scripts/launchers/start_companion.cmd on Windows, start_companion.sh on Mac), then convert the export folder above, or export again." ; "" )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$convertResult</Name>
+      </Step>
+      <Step enable="True" id="72" name="Exit Loop If">
+        <DisableStepCollapsed state="False"/>
+        <Calculation><![CDATA[not IsEmpty ( $convertResult )]]></Calculation>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>A job ID is 12 characters. A 409 (this solution is already converting) also carries the running job's ID, so it is polled like a new job. Any other answer has no job_id (JSONGetElement gives "?") and its error is shown.</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[JSONGetElement ( $response ; "job_id" )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$jobId</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[If ( Length ( $jobId ) ≠ 12 ;
+	"NOT converted: " & Let ( ~error = JSONGetElement ( $response ; "error" ) ; If ( ~error = "?" ; $response ; ~error ) ) ;
+	""
+)]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$convertResult</Name>
+      </Step>
+      <Step enable="True" id="72" name="Exit Loop If">
+        <DisableStepCollapsed state="False"/>
+        <Calculation><![CDATA[not IsEmpty ( $convertResult )]]></Calculation>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Poll every second until the job is no longer queued or running. A conversion takes seconds to several minutes; give up after 30 minutes (the job keeps running in the companion).</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Get ( CurrentTimestamp )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$pollStart</Name>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>The window title shows the conversion's progress while polling; $titleNow tracks the title it has now, and the original title is put back after the loop</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[$originalWindow]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$titleNow</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA["queued"]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$state</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[""]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$status</Name>
+      </Step>
+      <Step enable="True" id="71" name="Loop">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <FlushType value="Always"/>
+      </Step>
+      <Step enable="True" id="62" name="Pause/Resume Script">
+        <DisableStepCollapsed state="False"/>
+        <PauseTime value="ForDuration"/>
+        <Calculation><![CDATA[1]]></Calculation>
+      </Step>
+      <Step enable="True" id="160" name="Insert from URL">
+        <NoInteract state="True"/>
+        <DontEncodeURL state="False"/>
+        <SelectAll state="True"/>
+        <DisableStepCollapsed state="False"/>
+        <VerifySSLCertificates state="False"/>
+        <CURLOptions>
+          <Calculation><![CDATA["--connect-timeout 2 --max-time 5"]]></Calculation>
+        </CURLOptions>
+        <Calculation><![CDATA[$companionUrl & "/convert/" & $jobId]]></Calculation>
+        <Text/>
+        <Field>$status</Field>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Get ( LastError )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$httpError</Name>
+      </Step>
+      <Step enable="True" id="72" name="Exit Loop If">
+        <DisableStepCollapsed state="False"/>
+        <Calculation><![CDATA[$httpError ≠ 0]]></Calculation>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[JSONGetElement ( $status ; "state" )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$state</Name>
+      </Step>
+      <Step enable="True" id="72" name="Exit Loop If">
+        <DisableStepCollapsed state="False"/>
+        <Calculation><![CDATA[$state ≠ "queued" and $state ≠ "running"]]></Calculation>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>Still queued or running: show the stage and file N of M from the job's progress block (an fm-saxml without --progress leaves it empty, and the title says working)</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Let ( [
+	~raw = JSONGetElement ( $status ; "progress" ) ;
+	~p = If ( Left ( ~raw ; 1 ) = "?" ; "{}" ; ~raw ) ;
+	~stage = JSONGetElement ( ~p ; "stage" ) ;
+	~index = JSONGetElement ( ~p ; "index" ) ;
+	~total = JSONGetElement ( ~p ; "total" ) ;
+	~file = JSONGetElement ( ~p ; "file" ) ;
+	~label = Case (
+		~stage = "read" ; "Reading" ;
+		~stage = "scrub" ; "Scrubbing" ;
+		~stage = "analyze" ; "Analyzing" ;
+		~stage = "write_raw" ; "Writing raw XML" ;
+		~stage = "write_pages" ; "Writing pages" ;
+		""
+	) ;
+	~seconds = Round ( Get ( CurrentTimestamp ) - $pollStart ; 0 )
+] ;
+	"Converting " & $solutionName & " - " &
+	Case (
+		$state = "queued" ; "waiting for another conversion" ;
+		not IsEmpty ( ~label ) and GetAsNumber ( ~total ) > 0 ;
+			~label & " " & ~index & " of " & ~total & If ( IsEmpty ( ~file ) or Left ( ~file ; 1 ) = "?" ; "" ; " (" & ~file & ")" ) ;
+		"working"
+	) &
+	" - " & ~seconds & "s"
+)]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$progressTitle</Name>
+      </Step>
+      <Step enable="True" id="124" name="Set Window Title">
+        <DisableStepCollapsed state="False"/>
+        <LimitToWindowsOfCurrentFile state="False"/>
+        <Window value="ByName"/>
+        <Name>
+          <Calculation><![CDATA[$titleNow]]></Calculation>
+        </Name>
+        <NewName>
+          <Calculation><![CDATA[$progressTitle]]></Calculation>
+        </NewName>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>A window the user closed during the pause can't be renamed: keep the last title that worked</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[If ( Get ( LastError ) = 0 ; $progressTitle ; $titleNow )]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$titleNow</Name>
+      </Step>
+      <Step enable="True" id="72" name="Exit Loop If">
+        <DisableStepCollapsed state="False"/>
+        <Calculation><![CDATA[Get ( CurrentTimestamp ) - $pollStart > 1800]]></Calculation>
+      </Step>
+      <Step enable="True" id="73" name="End Loop">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="124" name="Set Window Title">
+        <DisableStepCollapsed state="False"/>
+        <LimitToWindowsOfCurrentFile state="False"/>
+        <Window value="ByName"/>
+        <Name>
+          <Calculation><![CDATA[$titleNow]]></Calculation>
+        </Name>
+        <NewName>
+          <Calculation><![CDATA[$originalWindow]]></Calculation>
+        </NewName>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>The job is done (or polling stopped): turn its state into the text for the final dialog. A 404 (the companion restarted, so it forgot the job) has no state and lands on the last line.</Text>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[Case (
+	$httpError ≠ 0 ;
+		"Lost contact with the companion server while converting (error " & $httpError & "). Job " & $jobId & " may still be running: open " & $companionUrl & "/convert/" & $jobId & " to check." ;
+	$state = "succeeded" ;
+		Let ( [
+			~c = JSONGetElement ( $status ; "counts" ) ;
+			~viewer = JSONGetElement ( $status ; "viewer_path" ) ;
+			~warnings = JSONGetElement ( $status ; "warning_count" )
+		] ;
+			"Converted " & JSONGetElement ( ~c ; "files" ) & " file(s) as solution " & $solutionName & ": " &
+			JSONGetElement ( ~c ; "tables" ) & " tables, " &
+			JSONGetElement ( ~c ; "fields" ) & " fields, " &
+			JSONGetElement ( ~c ; "table_occurrences" ) & " table occurrences, " &
+			JSONGetElement ( ~c ; "relationships" ) & " relationships, " &
+			JSONGetElement ( ~c ; "layouts" ) & " layouts, " &
+			JSONGetElement ( ~c ; "scripts" ) & " scripts." & ¶ &
+			"Docs: " & JSONGetElement ( $status ; "output_path" ) &
+			If ( not IsEmpty ( ~viewer ) and ~viewer ≠ "?" ; ¶ & "HTML viewer: " & ~viewer ; "" ) & ¶ &
+			"Warnings: " & ~warnings & If ( GetAsNumber ( ~warnings ) > 0 ; " (see Reports/warnings.md in the docs folder)" ; "" )
+		) ;
+	$state = "failed" ;
+		Let ( [
+			~log = JSONGetElement ( $status ; "log_tail" )
+		] ;
+			"Conversion FAILED: " & JSONGetElement ( $status ; "error" ) &
+			If ( IsEmpty ( ~log ) or ~log = "?" ; "" ; ¶ & ¶ & "End of fm-saxml's output:" & ¶ & Right ( ~log ; 800 ) )
+		) ;
+	$state = "queued" or $state = "running" ;
+		"Still converting after 30 minutes. Job " & $jobId & " keeps running in the companion: open " & $companionUrl & "/convert/" & $jobId & " to check." ;
+	"Unexpected answer from the companion server: " & $status
+)]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$convertResult</Name>
+      </Step>
+      <Step enable="True" id="141" name="Set Variable">
+        <DisableStepCollapsed state="False"/>
+        <Value>
+          <Calculation><![CDATA[$httpError = 0 and $state = "succeeded"]]></Calculation>
+        </Value>
+        <Repetition>
+          <Calculation><![CDATA[1]]></Calculation>
+        </Repetition>
+        <Name>$convertOk</Name>
+      </Step>
+      <Step enable="True" id="72" name="Exit Loop If">
+        <DisableStepCollapsed state="False"/>
+        <Calculation><![CDATA[True]]></Calculation>
+      </Step>
+      <Step enable="True" id="73" name="End Loop">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="70" name="End If">
+        <DisableStepCollapsed state="False"/>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+      <Step enable="False" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+        <Text>MARK: Summary</Text>
+      </Step>
+      <Step enable="True" id="87" name="Show Custom Dialog">
+        <DisableStepCollapsed state="False"/>
+        <Title>
+          <Calculation><![CDATA[If ( $failureCount = 0 and $convertOk ; "Finished" ; "Finished with errors" )]]></Calculation>
+        </Title>
+        <Message>
+          <Calculation><![CDATA[( $fileCount - $failureCount ) & " of " & $fileCount & " file(s) were exported.¶¶" & $results & "¶¶" & $convertResult]]></Calculation>
+        </Message>
+        <Buttons>
+          <Button CommitState="True">
+            <Calculation><![CDATA["OK"]]></Calculation>
+          </Button>
+          <Button CommitState="False"/>
+          <Button CommitState="False"/>
+        </Buttons>
+      </Step>
+      <Step enable="True" id="89" name="# (comment)">
+        <DisableStepCollapsed state="False"/>
+        <Restore state="False"/>
+      </Step>
+      <Step enable="True" id="103" name="Exit Script">
+        <DisableStepCollapsed state="False"/>
+      </Step>
     </Script>
     <Group groupCollapsed="False" includeInMenu="False" id="13" name="OData">
       <Script includeInMenu="False" SiriShortcutVisible="False" runFullAccess="False" id="14" name="AGFMGoToLayout">
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>PURPOSE: Navigate to a layout by name. For use via OData/AGFMBridge.</Text>
         </Step>
         <Step enable="False" id="61" name="Insert Text">
           <SelectAll state="False"/>
-          <Text>PARAMETER: JSON object with key:&#xD;  layout &#x2014; exact name of the layout to navigate to&#xD;&#xD;RETURNS: JSON { success, layout, tableOccurrence } on success&#xD;         JSON { success, error } on failure&#xD;&#xD;EXAMPLE call via AGFMBridge:&#xD;  { "script": "AGFMGoToLayout", "parameter": "{\"layout\": \"Invoices\"}" }</Text>
+          <DisableStepCollapsed state="False"/>
+          <Text>PARAMETER: JSON object with key:&#13;  layout — exact name of the layout to navigate to&#13;&#13;RETURNS: JSON { success, layout, tableOccurrence } on success&#13;         JSON { success, error } on failure&#13;&#13;EXAMPLE call via AGFMBridge:&#13;  { "script": "AGFMGoToLayout", "parameter": "{\"layout\": \"Invoices\"}" }</Text>
           <Field>$README</Field>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[Get ( ScriptParameter )]]></Calculation>
           </Value>
           <Name>$input</Name>
         </Step>
         <Step enable="True" id="68" name="If">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
           <Calculation><![CDATA[not JSONGetElementType ( $input ; "layout" )]]></Calculation>
         </Step>
         <Step enable="True" id="103" name="Exit Script">
+          <DisableStepCollapsed state="False"/>
           <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "success" ; False ; JSONBoolean ] ;
 	[ "error" ; "Missing required key: layout" ; JSONString ]
 )]]></Calculation>
         </Step>
-        <Step enable="True" id="70" name="End If"/>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="70" name="End If">
+          <DisableStepCollapsed state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[JSONGetElement ( $input ; "layout" )]]></Calculation>
           </Value>
           <Name>$layout</Name>
         </Step>
         <Step enable="True" id="6" name="Go to Layout">
+          <DisableStepCollapsed state="False"/>
           <LayoutDestination value="LayoutNameByCalc"/>
           <Calculation><![CDATA[$layout]]></Calculation>
           <Layout id="0" name="">
@@ -805,25 +2520,36 @@
           </Layout>
         </Step>
         <Step enable="True" id="103" name="Exit Script">
+          <DisableStepCollapsed state="False"/>
           <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "success" ; True ; JSONBoolean ] ;
 	[ "layout" ; Get ( LayoutName ) ; JSONString ] ;
 	[ "tableOccurrence" ; Get ( LayoutTableName ) ; JSONString ]
 )]]></Calculation>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
       </Script>
       <Script includeInMenu="False" SiriShortcutVisible="False" runFullAccess="False" id="15" name="AGFMScriptBridge">
         <Step enable="True" id="89" name="# (comment)">
-          <Text>PURPOSE: OData bridge &#x2014; accepts JSON { script, parameter } and performs the named script</Text>
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+          <Text>PURPOSE: OData bridge — accepts JSON { script, parameter } and performs the named script</Text>
         </Step>
         <Step enable="False" id="61" name="Insert Text">
           <SelectAll state="False"/>
-          <Text>PARAMETER: JSON object with keys:&#xD;  script    &#x2014; name of the script to run&#xD;  parameter &#x2014; value to pass as script parameter (optional)&#xD;&#xD;RETURNS: JSON { success, script, result } on success&#xD;         JSON { success, error } on failure&#xD;&#xD;CALLED VIA: OData POST /fmi/odata/v4/{db}/Script.AGFMScriptBridge&#xD;  body: { "scriptParameterValue": "{\"script\":\"Push Context\",\"parameter\":\"...\"}" }</Text>
+          <DisableStepCollapsed state="False"/>
+          <Text>PARAMETER: JSON object with keys:&#13;  script    — name of the script to run&#13;  parameter — value to pass as script parameter (optional)&#13;&#13;RETURNS: JSON { success, script, result } on success&#13;         JSON { success, error } on failure&#13;&#13;CALLED VIA: OData POST /fmi/odata/v4/{db}/Script.AGFMScriptBridge&#13;  body: { "scriptParameterValue": "{\"script\":\"Push Context\",\"parameter\":\"...\"}" }</Text>
           <Field>$README</Field>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="False" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "script" ; "Push Context" ; JSONString ] ;
@@ -832,74 +2558,112 @@
           </Value>
           <Name>$example_call</Name>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="False" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>MARK:Input</Text>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[Get ( ScriptParameter )]]></Calculation>
           </Value>
           <Name>$input</Name>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="True" id="68" name="If">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
           <Calculation><![CDATA[JSONGetElementType ( $input ; "" ) ≠ JSONObject]]></Calculation>
         </Step>
         <Step enable="True" id="103" name="Exit Script">
+          <DisableStepCollapsed state="False"/>
           <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "success" ; False ; JSONBoolean ] ;
 	[ "error" ; "Invalid parameter: expected JSON object" ; JSONString ]
 )]]></Calculation>
         </Step>
-        <Step enable="True" id="70" name="End If"/>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="70" name="End If">
+          <DisableStepCollapsed state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="False" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>MARK:Resolve</Text>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[JSONGetElement ( $input ; "script" )]]></Calculation>
           </Value>
           <Name>$script</Name>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[JSONGetElement ( $input ; "parameter" )]]></Calculation>
           </Value>
           <Name>$parameter</Name>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="True" id="68" name="If">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
           <Calculation><![CDATA[not Position ( ¶ & ScriptNames ( "" ) & ¶ ; ¶ & $script & ¶ ; 1 ; 1 )]]></Calculation>
         </Step>
         <Step enable="True" id="103" name="Exit Script">
+          <DisableStepCollapsed state="False"/>
           <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "success" ; False ; JSONBoolean ] ;
 	[ "error" ; "Script not found: " & $script ; JSONString ]
 )]]></Calculation>
         </Step>
-        <Step enable="True" id="70" name="End If"/>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="70" name="End If">
+          <DisableStepCollapsed state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="False" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>MARK:Execute</Text>
         </Step>
         <Step enable="True" id="1" name="Perform Script">
           <Calculated>
             <Calculation><![CDATA[$script]]></Calculation>
           </Calculated>
+          <DisableStepCollapsed state="False"/>
           <Calculation><![CDATA[$parameter]]></Calculation>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[Get ( ScriptResult )]]></Calculation>
           </Value>
           <Name>$result</Name>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="True" id="103" name="Exit Script">
+          <DisableStepCollapsed state="False"/>
           <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "success" ; True ; JSONBoolean ] ;
 	[ "script" ; $script ; JSONString ] ;
@@ -909,18 +2673,27 @@
       </Script>
       <Script includeInMenu="False" SiriShortcutVisible="False" runFullAccess="False" id="16" name="AGFMEvaluation">
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>PURPOSE: Evaluate a FileMaker calculation expression server-side and return the result.</Text>
         </Step>
         <Step enable="False" id="61" name="Insert Text">
           <SelectAll state="False"/>
-          <Text>CALLED BY: agent via OData &#x2192; AGFMScriptBridge&#xD;&#xD;PARAMETER: JSON object&#xD;  expression &#x2014; the FM calculation string to evaluate (required)&#xD;  layout     &#x2014; layout name to navigate to before evaluating (optional; recommended for field-reference calcs)&#xD;&#xD;RETURNS:&#xD;  { success: true,  error_code: 0,    result: "...", expression: "...", layout: "..." }&#xD;  { success: false, error_code: &lt;N&gt;, result: "",    expression: "...", layout: "..." }&#xD;&#xD;SIDE EFFECT: saves snapshot-eval.xml to Get(DocumentsPath) for agent context verification.&#xD;  Agent reads layout field in snapshot and confirms it matches agent/CONTEXT.json current_layout.name.&#xD;&#xD;EXAMPLE call via AGFMScriptBridge:&#xD;  { "script": "AGFMEvaluation", "parameter": "{\"expression\": \"Sum ( LineItems::ExtendedPrice )\", \"layout\": \"Invoices Details\"}" }</Text>
+          <DisableStepCollapsed state="False"/>
+          <Text>CALLED BY: agent via OData → AGFMScriptBridge&#13;&#13;PARAMETER: JSON object&#13;  expression — the FM calculation string to evaluate (required)&#13;  layout     — layout name to navigate to before evaluating (optional; recommended for field-reference calcs)&#13;&#13;RETURNS:&#13;  { success: true,  error_code: 0,    result: "...", expression: "...", layout: "..." }&#13;  { success: false, error_code: &lt;N&gt;, result: "",    expression: "...", layout: "..." }&#13;&#13;SIDE EFFECT: saves snapshot-eval.xml to Get(DocumentsPath) for agent context verification.&#13;  Agent reads layout field in snapshot and confirms it matches agent/CONTEXT.json current_layout.name.&#13;&#13;EXAMPLE call via AGFMScriptBridge:&#13;  { "script": "AGFMEvaluation", "parameter": "{\"expression\": \"Sum ( LineItems::ExtendedPrice )\", \"layout\": \"Invoices Details\"}" }</Text>
           <Field>$README</Field>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>Parse parameters</Text>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[Get ( ScriptParameter )]]></Calculation>
           </Value>
@@ -930,18 +2703,26 @@
           <Name>$input</Name>
         </Step>
         <Step enable="True" id="68" name="If">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
           <Calculation><![CDATA[JSONGetElementType ( $input ; "" ) ≠ JSONObject]]></Calculation>
         </Step>
         <Step enable="True" id="103" name="Exit Script">
+          <DisableStepCollapsed state="False"/>
           <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "success" ; False ; JSONBoolean ] ;
 	[ "error" ; "Invalid parameter: expected JSON object" ; JSONString ]
 )]]></Calculation>
         </Step>
-        <Step enable="True" id="70" name="End If"/>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="70" name="End If">
+          <DisableStepCollapsed state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[JSONGetElement ( $input ; "expression" )]]></Calculation>
           </Value>
@@ -951,6 +2732,7 @@
           <Name>$expression</Name>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[JSONGetElement ( $input ; "layout" )]]></Calculation>
           </Value>
@@ -959,27 +2741,41 @@
           </Repetition>
           <Name>$layout</Name>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="True" id="68" name="If">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
           <Calculation><![CDATA[IsEmpty ( $expression )]]></Calculation>
         </Step>
         <Step enable="True" id="103" name="Exit Script">
+          <DisableStepCollapsed state="False"/>
           <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "success" ; False ; JSONBoolean ] ;
 	[ "error" ; "Missing required key: expression" ; JSONString ]
 )]]></Calculation>
         </Step>
-        <Step enable="True" id="70" name="End If"/>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="70" name="End If">
+          <DisableStepCollapsed state="False"/>
+        </Step>
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>Navigate to layout if provided</Text>
         </Step>
         <Step enable="True" id="68" name="If">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
           <Calculation><![CDATA[not IsEmpty ( $layout )]]></Calculation>
         </Step>
         <Step enable="True" id="6" name="Go to Layout">
+          <DisableStepCollapsed state="False"/>
           <LayoutDestination value="LayoutNameByCalc"/>
           <Calculation><![CDATA[$layout]]></Calculation>
           <Layout id="0" name="">
@@ -987,6 +2783,7 @@
           </Layout>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[Get ( LastError )]]></Calculation>
           </Value>
@@ -996,10 +2793,12 @@
           <Name>$gotoError</Name>
         </Step>
         <Step enable="True" id="68" name="If">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
           <Calculation><![CDATA[$gotoError ≠ 0]]></Calculation>
         </Step>
         <Step enable="True" id="103" name="Exit Script">
+          <DisableStepCollapsed state="False"/>
           <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "success" ; False ; JSONBoolean ] ;
 	[ "error_code" ; $gotoError ; JSONNumber ] ;
@@ -1007,13 +2806,23 @@
 	[ "expression" ; $expression ; JSONString ]
 )]]></Calculation>
         </Step>
-        <Step enable="True" id="70" name="End If"/>
-        <Step enable="True" id="70" name="End If"/>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="70" name="End If">
+          <DisableStepCollapsed state="False"/>
+        </Step>
+        <Step enable="True" id="70" name="End If">
+          <DisableStepCollapsed state="False"/>
+        </Step>
         <Step enable="True" id="89" name="# (comment)">
-          <Text>Evaluate &#x2014; EvaluationError returns 0 if valid, FM error code otherwise</Text>
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+          <Text>Evaluate — EvaluationError returns 0 if valid, FM error code otherwise</Text>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[EvaluationError ( $expression )]]></Calculation>
           </Value>
@@ -1023,6 +2832,7 @@
           <Name>$errorCode</Name>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[If ( $errorCode = 0 ; Evaluate ( $expression ) ; "" )]]></Calculation>
           </Value>
@@ -1031,11 +2841,17 @@
           </Repetition>
           <Name>$result</Name>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>Save verification snapshot for agent context check</Text>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[Get ( DocumentsPath ) & "snapshot-eval.xml"]]></Calculation>
           </Value>
@@ -1046,12 +2862,17 @@
         </Step>
         <Step enable="True" id="152" name="Save Records as Snapshot Link">
           <CreateDirectories state="False"/>
+          <DisableStepCollapsed state="False"/>
           <CreateEmail state="False"/>
           <SaveType value="BrowsedRecords"/>
           <UniversalPathList>$snapshotPath</UniversalPathList>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="True" id="103" name="Exit Script">
+          <DisableStepCollapsed state="False"/>
           <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "success" ; $errorCode = 0 ; JSONBoolean ] ;
 	[ "error_code" ; $errorCode ; JSONNumber ] ;
@@ -1065,14 +2886,25 @@
     <Group groupCollapsed="False" includeInMenu="False" id="11" name="Extras">
       <Script includeInMenu="False" SiriShortcutVisible="False" runFullAccess="False" id="9" name="Agentic-fm Webviewer">
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>PURPOSE: Start or stop the agentic-fm webviewer from within FileMaker.</Text>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>DEPENDENCY: The companion server must be running (agent/scripts/companion_server.py)</Text>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA["http://localhost:8765"]]></Calculation>
           </Value>
@@ -1083,18 +2915,25 @@
         </Step>
         <Step enable="True" id="61" name="Insert Text">
           <SelectAll state="True"/>
-          <Text>&lt;!DOCTYPE html&gt;&lt;html lang="en"&gt;&lt;head&gt;&lt;meta charset="UTF-8"&gt;&lt;meta name="viewport" content="width=device-width,initial-scale=1"&gt;&lt;style&gt;*{box-sizing:border-box;margin:0;padding:0}html,body{height:100%;width:100%}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,sans-serif;background:#0f0f0f;color:#e4e4e7;display:flex;align-items:center;justify-content:center;user-select:none}.card{text-align:center;padding:2rem;max-width:560px;width:100%}.icon{width:52px;height:52px;border-radius:50%;background:#1f1f1f;border:1px solid #2a2a2a;display:flex;align-items:center;justify-content:center;margin:0 auto 1.5rem;font-size:1.4rem}h1{font-size:1rem;font-weight:600;color:#f4f4f5;letter-spacing:-.01em;margin-bottom:.4rem}p{font-size:.8125rem;color:#71717a;line-height:1.65;margin-bottom:1.25rem}pre{background:#161616;border:1px solid #262626;border-radius:7px;padding:.65rem .9rem;font-family:ui-monospace,"SF Mono","Cascadia Code",monospace;font-size:.75rem;color:#a1a1aa;text-align:left;overflow:auto}&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class="card"&gt;&lt;div class="icon"&gt;&#x26A1;&lt;/div&gt;&lt;h1&gt;Companion server offline&lt;/h1&gt;&lt;p&gt;Start the server, then run the script 'Agentic-fm webviewer' to launch agentic-fm.&lt;/p&gt;&lt;pre&gt;python3 agent/scripts/companion_server.py&lt;/pre&gt;&lt;/div&gt;&lt;/body&gt;&lt;/html&gt;</Text>
+          <DisableStepCollapsed state="False"/>
+          <Text>&lt;!DOCTYPE html&gt;&lt;html lang="en"&gt;&lt;head&gt;&lt;meta charset="UTF-8"&gt;&lt;meta name="viewport" content="width=device-width,initial-scale=1"&gt;&lt;style&gt;*{box-sizing:border-box;margin:0;padding:0}html,body{height:100%;width:100%}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,sans-serif;background:#0f0f0f;color:#e4e4e7;display:flex;align-items:center;justify-content:center;user-select:none}.card{text-align:center;padding:2rem;max-width:560px;width:100%}.icon{width:52px;height:52px;border-radius:50%;background:#1f1f1f;border:1px solid #2a2a2a;display:flex;align-items:center;justify-content:center;margin:0 auto 1.5rem;font-size:1.4rem}h1{font-size:1rem;font-weight:600;color:#f4f4f5;letter-spacing:-.01em;margin-bottom:.4rem}p{font-size:.8125rem;color:#71717a;line-height:1.65;margin-bottom:1.25rem}pre{background:#161616;border:1px solid #262626;border-radius:7px;padding:.65rem .9rem;font-family:ui-monospace,"SF Mono","Cascadia Code",monospace;font-size:.75rem;color:#a1a1aa;text-align:left;overflow:auto}&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;div class="card"&gt;&lt;div class="icon"&gt;⚡&lt;/div&gt;&lt;h1&gt;Companion server offline&lt;/h1&gt;&lt;p&gt;Start the server, then run the script 'Agentic-fm webviewer' to launch agentic-fm.&lt;/p&gt;&lt;pre&gt;python3 agent/scripts/companion_server.py&lt;/pre&gt;&lt;/div&gt;&lt;/body&gt;&lt;/html&gt;</Text>
           <Field>$html</Field>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="True" id="1" name="Perform Script">
+          <DisableStepCollapsed state="False"/>
           <Script id="2" name="Get agentic-fm path"/>
         </Step>
         <Step enable="True" id="68" name="If">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
           <Calculation><![CDATA[not Get ( ScriptResult )]]></Calculation>
         </Step>
         <Step enable="True" id="87" name="Show Custom Dialog">
+          <DisableStepCollapsed state="False"/>
           <Title>
             <Calculation><![CDATA["Bad install"]]></Calculation>
           </Title>
@@ -1109,22 +2948,33 @@
             <Button CommitState="False"/>
           </Buttons>
         </Step>
-        <Step enable="True" id="103" name="Exit Script"/>
-        <Step enable="True" id="70" name="End If"/>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="103" name="Exit Script">
+          <DisableStepCollapsed state="False"/>
+        </Step>
+        <Step enable="True" id="70" name="End If">
+          <DisableStepCollapsed state="False"/>
+        </Step>
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>Check webviewer status.</Text>
         </Step>
         <Step enable="True" id="160" name="Insert from URL">
           <NoInteract state="True"/>
           <DontEncodeURL state="False"/>
           <SelectAll state="True"/>
+          <DisableStepCollapsed state="False"/>
           <VerifySSLCertificates state="False"/>
           <Calculation><![CDATA[$server & "/webviewer/status"]]></Calculation>
           <Text/>
           <Field>$response</Field>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[Get ( LastError )]]></Calculation>
           </Value>
@@ -1133,12 +2983,17 @@
           </Repetition>
           <Name>$httpError</Name>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="True" id="68" name="If">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
           <Calculation><![CDATA[$httpError ≠ 0]]></Calculation>
         </Step>
         <Step enable="True" id="87" name="Show Custom Dialog">
+          <DisableStepCollapsed state="False"/>
           <Title>
             <Calculation><![CDATA["Companion server not running"]]></Calculation>
           </Title>
@@ -1153,10 +3008,18 @@
             <Button CommitState="False"/>
           </Buttons>
         </Step>
-        <Step enable="True" id="103" name="Exit Script"/>
-        <Step enable="True" id="70" name="End If"/>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="103" name="Exit Script">
+          <DisableStepCollapsed state="False"/>
+        </Step>
+        <Step enable="True" id="70" name="End If">
+          <DisableStepCollapsed state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[JSONGetElement ( $response ; "running" )]]></Calculation>
           </Value>
@@ -1166,6 +3029,7 @@
           <Name>$running</Name>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[$running]]></Calculation>
           </Value>
@@ -1175,6 +3039,7 @@
           <Name>$state</Name>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "repo_path" ; ConvertFromFileMakerPath ( JSONGetElement ( $$AGENTIC.FM ; "path" ) ; 1 ) ; JSONString ]
@@ -1185,12 +3050,17 @@
           </Repetition>
           <Name>$payload</Name>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="True" id="68" name="If">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
           <Calculation><![CDATA[$running]]></Calculation>
         </Step>
         <Step enable="True" id="87" name="Show Custom Dialog">
+          <DisableStepCollapsed state="False"/>
           <Title>
             <Calculation><![CDATA["Stop webviewer?"]]></Calculation>
           </Title>
@@ -1208,6 +3078,7 @@
           </Buttons>
         </Step>
         <Step enable="True" id="68" name="If">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
           <Calculation><![CDATA[Get ( LastMessageChoice ) = 1]]></Calculation>
         </Step>
@@ -1215,6 +3086,7 @@
           <NoInteract state="True"/>
           <DontEncodeURL state="False"/>
           <SelectAll state="True"/>
+          <DisableStepCollapsed state="False"/>
           <VerifySSLCertificates state="False"/>
           <CURLOptions>
             <Calculation><![CDATA["-X POST -H \"Content-Type: application/json\" -d " & Quote ( $payload )]]></Calculation>
@@ -1224,6 +3096,7 @@
           <Field>$response</Field>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[Get ( LastError )]]></Calculation>
           </Value>
@@ -1233,10 +3106,12 @@
           <Name>$httpError</Name>
         </Step>
         <Step enable="True" id="68" name="If">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
           <Calculation><![CDATA[$httpError ≠ 0 or not JSONGetElement ( $response ; "success" )]]></Calculation>
         </Step>
         <Step enable="True" id="87" name="Show Custom Dialog">
+          <DisableStepCollapsed state="False"/>
           <Title>
             <Calculation><![CDATA["Error"]]></Calculation>
           </Title>
@@ -1252,9 +3127,11 @@
           </Buttons>
         </Step>
         <Step enable="True" id="69" name="Else">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
         </Step>
         <Step enable="True" id="87" name="Show Custom Dialog">
+          <DisableStepCollapsed state="False"/>
           <Title>
             <Calculation><![CDATA["Webviewer stopped"]]></Calculation>
           </Title>
@@ -1270,6 +3147,7 @@
           </Buttons>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[False]]></Calculation>
           </Value>
@@ -1278,18 +3156,26 @@
           </Repetition>
           <Name>$state</Name>
         </Step>
-        <Step enable="True" id="70" name="End If"/>
-        <Step enable="True" id="70" name="End If"/>
+        <Step enable="True" id="70" name="End If">
+          <DisableStepCollapsed state="False"/>
+        </Step>
+        <Step enable="True" id="70" name="End If">
+          <DisableStepCollapsed state="False"/>
+        </Step>
         <Step enable="True" id="69" name="Else">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
         </Step>
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>Start the webviewer.</Text>
         </Step>
         <Step enable="True" id="160" name="Insert from URL">
           <NoInteract state="True"/>
           <DontEncodeURL state="False"/>
           <SelectAll state="True"/>
+          <DisableStepCollapsed state="False"/>
           <VerifySSLCertificates state="False"/>
           <CURLOptions>
             <Calculation><![CDATA["-X POST -H \"Content-Type: application/json\" -d " & Quote ( $payload )]]></Calculation>
@@ -1299,6 +3185,7 @@
           <Field>$response</Field>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[Get ( LastError )]]></Calculation>
           </Value>
@@ -1308,10 +3195,12 @@
           <Name>$httpError</Name>
         </Step>
         <Step enable="True" id="68" name="If">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
           <Calculation><![CDATA[$httpError ≠ 0 or not JSONGetElement ( $response ; "success" )]]></Calculation>
         </Step>
         <Step enable="True" id="87" name="Show Custom Dialog">
+          <DisableStepCollapsed state="False"/>
           <Title>
             <Calculation><![CDATA["Error"]]></Calculation>
           </Title>
@@ -1327,9 +3216,11 @@
           </Buttons>
         </Step>
         <Step enable="True" id="69" name="Else">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
         </Step>
         <Step enable="True" id="87" name="Show Custom Dialog">
+          <DisableStepCollapsed state="False"/>
           <Title>
             <Calculation><![CDATA["Webviewer started"]]></Calculation>
           </Title>
@@ -1345,6 +3236,7 @@
           </Buttons>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[True]]></Calculation>
           </Value>
@@ -1353,21 +3245,33 @@
           </Repetition>
           <Name>$state</Name>
         </Step>
-        <Step enable="True" id="70" name="End If"/>
-        <Step enable="True" id="70" name="End If"/>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="70" name="End If">
+          <DisableStepCollapsed state="False"/>
+        </Step>
+        <Step enable="True" id="70" name="End If">
+          <DisableStepCollapsed state="False"/>
+        </Step>
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>Refresh any agentic-fm web viewer.</Text>
         </Step>
         <Step enable="True" id="68" name="If">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
           <Calculation><![CDATA[Position ( LayoutObjectNames ( Get ( FileName ) ; Get ( LayoutName ) ) ; "agentic-fm" ; 1 ; 1 )]]></Calculation>
         </Step>
         <Step enable="True" id="68" name="If">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
           <Calculation><![CDATA[$state = True]]></Calculation>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[""]]></Calculation>
           </Value>
@@ -1377,15 +3281,18 @@
           <Name>$html</Name>
         </Step>
         <Step enable="True" id="146" name="Set Web Viewer">
+          <DisableStepCollapsed state="False"/>
           <Action value="Reset"/>
           <ObjectName>
             <Calculation><![CDATA["agentic-fm"]]></Calculation>
           </ObjectName>
         </Step>
         <Step enable="True" id="69" name="Else">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
         </Step>
         <Step enable="True" id="146" name="Set Web Viewer">
+          <DisableStepCollapsed state="False"/>
           <Action value="GoToURL"/>
           <ObjectName>
             <Calculation><![CDATA["agentic-fm"]]></Calculation>
@@ -1394,32 +3301,57 @@
             <Calculation><![CDATA[$html]]></Calculation>
           </URL>
         </Step>
-        <Step enable="True" id="70" name="End If"/>
-        <Step enable="True" id="70" name="End If"/>
-        <Step enable="True" id="89" name="# (comment)"/>
-        <Step enable="True" id="103" name="Exit Script"/>
+        <Step enable="True" id="70" name="End If">
+          <DisableStepCollapsed state="False"/>
+        </Step>
+        <Step enable="True" id="70" name="End If">
+          <DisableStepCollapsed state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
+        <Step enable="True" id="103" name="Exit Script">
+          <DisableStepCollapsed state="False"/>
+        </Step>
       </Script>
       <Script includeInMenu="False" SiriShortcutVisible="False" runFullAccess="False" id="5" name="Agentic-fm Menu">
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>PURPOSE: Handle all menu calls from a custom menu and pass through to a web viewer.</Text>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>NOTE: This relies on a custom menu set being attached to the layout where the agentic-fm web viewer object is being used.</Text>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[Get ( ScriptParameter )]]></Calculation>
           </Value>
           <Name>$action</Name>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="True" id="68" name="If">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
           <Calculation><![CDATA[Left ( $action ; 5 ) = "agfm."]]></Calculation>
         </Step>
         <Step enable="True" id="175" name="Perform JavaScript in Web Viewer">
+          <DisableStepCollapsed state="False"/>
           <ObjectName>
             <Calculation><![CDATA["agentic-fm"]]></Calculation>
           </ObjectName>
@@ -1433,25 +3365,34 @@
           </Parameters>
         </Step>
         <Step enable="True" id="125" name="Else If">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
           <Calculation><![CDATA[$action = "editor.action.clipboardPasteAction"]]></Calculation>
         </Step>
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>Handle special case of pasting when clipboard has more than just text.</Text>
         </Step>
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>WebKit paste fails when rich/binary formats (XMSS, RTF, scrap styles) are on the pasteboard.</Text>
         </Step>
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>Known issue with MBS: If FileMaker objects are copied to the clipboard they won't paste unless switching out of FileMaker and coming back.</Text>
         </Step>
         <Step enable="True" id="48" name="Paste">
           <NoStyle state="True"/>
           <SelectAll state="True"/>
           <LinkAvail state="False"/>
+          <DisableStepCollapsed state="False"/>
           <Field table="Table" id="13" name="CLIPBOARD"/>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[Table::CLIPBOARD]]></Calculation>
           </Value>
@@ -1461,6 +3402,7 @@
           <Name>$text</Name>
         </Step>
         <Step enable="True" id="175" name="Perform JavaScript in Web Viewer">
+          <DisableStepCollapsed state="False"/>
           <ObjectName>
             <Calculation><![CDATA["agentic-fm"]]></Calculation>
           </ObjectName>
@@ -1473,11 +3415,15 @@
             </P>
           </Parameters>
         </Step>
-        <Step enable="True" id="103" name="Exit Script"/>
+        <Step enable="True" id="103" name="Exit Script">
+          <DisableStepCollapsed state="False"/>
+        </Step>
         <Step enable="True" id="69" name="Else">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
         </Step>
         <Step enable="True" id="175" name="Perform JavaScript in Web Viewer">
+          <DisableStepCollapsed state="False"/>
           <ObjectName>
             <Calculation><![CDATA["agentic-fm"]]></Calculation>
           </ObjectName>
@@ -1490,78 +3436,119 @@
             </P>
           </Parameters>
         </Step>
-        <Step enable="True" id="70" name="End If"/>
-        <Step enable="True" id="89" name="# (comment)"/>
-        <Step enable="True" id="103" name="Exit Script"/>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="70" name="End If">
+          <DisableStepCollapsed state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
+        <Step enable="True" id="103" name="Exit Script">
+          <DisableStepCollapsed state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
       </Script>
       <Script includeInMenu="False" SiriShortcutVisible="False" runFullAccess="False" id="18" name="Agentic-fm Paste">
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>PURPOSE: Open a script tab in Script Workspace. Used by Tier 2 deployment via companion /trigger.</Text>
         </Step>
         <Step enable="False" id="61" name="Insert Text">
           <SelectAll state="False"/>
-          <Text>CALLED BY: companion server /trigger endpoint via AppleScript&#xD;  The companion sets the job via POST /pending before firing do script.&#xD;  This script GETs /pending to retrieve: target (script name).&#xD;&#xD;PARAMETERS (from /pending JSON):&#xD;  target &#x2014; name of the script to open in Script Workspace&#xD;&#xD;RETURNS: JSON { success, script } or { success, error }&#xD;&#xD;REQUIRES: MBS Plugin with ScriptWorkspace functions&#xD;&#xD;NOTE: This script only OPENS the target script tab. The actual paste&#xD;  (AXPress tab focus + Cmd+A + Delete + Cmd+V + Cmd+S) is handled by&#xD;  deploy.py via a second raw_applescript call through the companion.&#xD;  AXPress must run from outside FM &#x2014; Perform AppleScript within FM&#xD;  causes Script Workspace to lose focus on the step editor.</Text>
+          <DisableStepCollapsed state="False"/>
+          <Text>CALLED BY: companion server /trigger endpoint via AppleScript&#13;  The companion sets the job via POST /pending before firing do script.&#13;  This script GETs /pending to retrieve: target (script name).&#13;&#13;PARAMETERS (from /pending JSON):&#13;  target — name of the script to open in Script Workspace&#13;&#13;RETURNS: JSON { success, script } or { success, error }&#13;&#13;REQUIRES: MBS Plugin with ScriptWorkspace functions&#13;&#13;NOTE: This script only OPENS the target script tab. The actual paste&#13;  (AXPress tab focus + Cmd+A + Delete + Cmd+V + Cmd+S) is handled by&#13;  deploy.py via a second raw_applescript call through the companion.&#13;  AXPress must run from outside FM — Perform AppleScript within FM&#13;  causes Script Workspace to lose focus on the step editor.</Text>
           <Field>$README</Field>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>Fetch the pending job from the companion server</Text>
         </Step>
         <Step enable="True" id="160" name="Insert from URL">
           <NoInteract state="True"/>
           <DontEncodeURL state="False"/>
           <SelectAll state="False"/>
+          <DisableStepCollapsed state="False"/>
           <VerifySSLCertificates state="False"/>
           <Calculation><![CDATA["http://localhost:8765/pending"]]></Calculation>
           <Text/>
           <Field>$pendingJSON</Field>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[JSONGetElement ( $pendingJSON ; "target" )]]></Calculation>
           </Value>
           <Name>$target</Name>
         </Step>
         <Step enable="True" id="68" name="If">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
           <Calculation><![CDATA[IsEmpty ( $target )]]></Calculation>
         </Step>
         <Step enable="True" id="103" name="Exit Script">
+          <DisableStepCollapsed state="False"/>
           <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "success" ; False ; JSONBoolean ] ;
 	[ "error" ; "No pending job — companion /pending returned empty" ; JSONString ]
 )]]></Calculation>
         </Step>
-        <Step enable="True" id="70" name="End If"/>
+        <Step enable="True" id="70" name="End If">
+          <DisableStepCollapsed state="False"/>
+        </Step>
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>Bring FM to front before opening Script Workspace</Text>
         </Step>
         <Step enable="True" id="67" name="Perform AppleScript">
+          <DisableStepCollapsed state="False"/>
           <ContentType value="Text"/>
           <Text>tell me to activate</Text>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
-        <Step enable="True" id="88" name="Open Script Workspace"/>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
+        <Step enable="True" id="88" name="Open Script Workspace">
+          <DisableStepCollapsed state="False"/>
+        </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[MBS ( "ScriptWorkspace.OpenScript" ; $target )]]></Calculation>
           </Value>
           <Name>$openResult</Name>
         </Step>
         <Step enable="True" id="68" name="If">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
           <Calculation><![CDATA[Left ( $openResult ; 5 ) ≠ "OK"]]></Calculation>
         </Step>
         <Step enable="True" id="103" name="Exit Script">
+          <DisableStepCollapsed state="False"/>
           <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "success" ; False ; JSONBoolean ] ;
 	[ "error" ; "ScriptWorkspace.OpenScript failed: " & $openResult ; JSONString ]
 )]]></Calculation>
         </Step>
-        <Step enable="True" id="70" name="End If"/>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="70" name="End If">
+          <DisableStepCollapsed state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="True" id="103" name="Exit Script">
+          <DisableStepCollapsed state="False"/>
           <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "success" ; True ; JSONBoolean ] ;
 	[ "script" ; $target ; JSONString ]
@@ -1570,22 +3557,36 @@
       </Script>
       <Script includeInMenu="False" SiriShortcutVisible="False" runFullAccess="False" id="10" name="Agentic-fm Debug">
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>PURPOSE: Write runtime debug state to agent/debug/output.json for agent inspection.</Text>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>Called by other scripts via Perform Script with a JSON parameter.</Text>
         </Step>
         <Step enable="False" id="61" name="Insert Text">
           <SelectAll state="False"/>
-          <Text>lastError and lastErrorLocation are captured as the very first step so they&#xD;reflect the caller's error state &#x2014; any successful Set Variable resets Get(LastError) to 0.&#xD;&#xD;PARAMETER FORMAT:&#xD;  JSONSetElement ( "{}" ;&#xD;    [ "label" ; "description of this debug point" ; JSONString ] ;&#xD;    [ "vars"  ; JSONSetElement ( "{}" ;&#xD;        [ "myVar" ; $myVar ; JSONString ]&#xD;      ) ; JSONRaw ]&#xD;  )&#xD;&#xD;To capture current line number (no real error), force a harmless error&#xD;immediately before Perform Script in the calling script:&#xD;  Set Error Capture [ On ]&#xD;  Set Field []&#xD;  Perform Script [ "Agentic-fm Debug" ; Parameter: ... ]&#xD;  Set Error Capture [ Off ]</Text>
+          <DisableStepCollapsed state="False"/>
+          <Text>lastError and lastErrorLocation are captured as the very first step so they&#13;reflect the caller's error state — any successful Set Variable resets Get(LastError) to 0.&#13;&#13;PARAMETER FORMAT:&#13;  JSONSetElement ( "{}" ;&#13;    [ "label" ; "description of this debug point" ; JSONString ] ;&#13;    [ "vars"  ; JSONSetElement ( "{}" ;&#13;        [ "myVar" ; $myVar ; JSONString ]&#13;      ) ; JSONRaw ]&#13;  )&#13;&#13;To capture current line number (no real error), force a harmless error&#13;immediately before Perform Script in the calling script:&#13;  Set Error Capture [ On ]&#13;  Set Field []&#13;  Perform Script [ "Agentic-fm Debug" ; Parameter: ... ]&#13;  Set Error Capture [ Off ]</Text>
           <Field>$README</Field>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>Capture caller's error state before any other step can reset Get(LastError) to 0</Text>
         </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "lastError" ; Get ( LastError ) ; JSONNumber ] ;
@@ -1594,15 +3595,23 @@
           </Value>
           <Name>$errorContext</Name>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[Get ( ScriptParameter )]]></Calculation>
           </Value>
           <Name>$param</Name>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="True" id="141" name="Set Variable">
+          <DisableStepCollapsed state="False"/>
           <Value>
             <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "label" ; JSONGetElement ( $param ; "label" ) ; JSONString ] ;
@@ -1614,11 +3623,15 @@
           </Value>
           <Name>$payload</Name>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="True" id="160" name="Insert from URL">
           <NoInteract state="True"/>
           <DontEncodeURL state="False"/>
           <SelectAll state="True"/>
+          <DisableStepCollapsed state="False"/>
           <VerifySSLCertificates state="False"/>
           <CURLOptions>
             <Calculation><![CDATA["-X POST -H \"Content-Type: application/json\" -d " & Quote ( $payload )]]></Calculation>
@@ -1627,12 +3640,17 @@
           <Text/>
           <Field>$response</Field>
         </Step>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
         <Step enable="True" id="68" name="If">
+          <DisableStepCollapsed state="False"/>
           <Restore state="False"/>
           <Calculation><![CDATA[Get ( LastError ) ≠ 0]]></Calculation>
         </Step>
         <Step enable="True" id="87" name="Show Custom Dialog">
+          <DisableStepCollapsed state="False"/>
           <Title>
             <Calculation><![CDATA["Agentic-fm Debug"]]></Calculation>
           </Title>
@@ -1647,14 +3665,27 @@
             <Button CommitState="False"/>
           </Buttons>
         </Step>
-        <Step enable="True" id="70" name="End If"/>
-        <Step enable="True" id="89" name="# (comment)"/>
-        <Step enable="True" id="103" name="Exit Script"/>
-        <Step enable="True" id="89" name="# (comment)"/>
+        <Step enable="True" id="70" name="End If">
+          <DisableStepCollapsed state="False"/>
+        </Step>
         <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
+        <Step enable="True" id="103" name="Exit Script">
+          <DisableStepCollapsed state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
+        </Step>
+        <Step enable="True" id="89" name="# (comment)">
+          <DisableStepCollapsed state="False"/>
+          <Restore state="False"/>
           <Text>Example of how to call Agentic-fm Debug</Text>
         </Step>
         <Step enable="False" id="1" name="Perform Script">
+          <DisableStepCollapsed state="False"/>
           <Calculation><![CDATA[JSONSetElement ( "{}" ;
 	[ "label" ; "after Insert from URL" ; JSONString ] ;
 	[ "vars"  ; JSONSetElement ( "{}" ;
