@@ -1407,6 +1407,42 @@ def _clipboard_script() -> str:
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "clipboard.py")
 
 
+TRIGGER_BACKENDS = ("url", "applescript")
+
+
+def _default_trigger_backend() -> str:
+    """AppleScript on macOS (it can address FileMaker by app name), an fmp:// URL elsewhere."""
+    return "applescript" if sys.platform == "darwin" else "url"
+
+
+def fmp_script_url(target_file: str, script: str, parameter: str = "") -> str:
+    """The fmp:// URL that runs `script` in the open file `target_file`.
+
+    `$` addresses a file already open in FileMaker Pro. File, script and
+    parameter are percent-encoded as UTF-8 with nothing left safe, so spaces,
+    `&`, `=`, `?`, `#`, `/` and non-ASCII text survive. An empty parameter is left out.
+    """
+    def enc(s: str) -> str:
+        return urllib.parse.quote(s, safe="")
+
+    url = f"fmp://$/{enc(target_file)}?script={enc(script)}"
+    if parameter:
+        url += f"&param={enc(parameter)}"
+    return url
+
+
+def _open_fmp_url(url: str) -> None:
+    """Hand an fmp:// URL to the OS, which passes it to FileMaker Pro. Raises OSError on failure."""
+    if sys.platform == "win32":
+        os.startfile(url)
+    elif sys.platform == "darwin":
+        result = subprocess.run(["open", url], capture_output=True, text=True, timeout=30)
+        if result.returncode != 0:
+            raise OSError(result.stderr.strip() or f"open exited with {result.returncode}")
+    else:
+        raise OSError("fmp:// URLs need FileMaker Pro, on Windows or macOS")
+
+
 # ---------------------------------------------------------------------------
 # Threading HTTP server (handles concurrent requests)
 # ---------------------------------------------------------------------------
@@ -2117,10 +2153,12 @@ class CompanionHandler(BaseHTTPRequestHandler):
 
     def _handle_trigger(self):
         """
-        Trigger FM Pro to perform a named script via osascript.
+        Trigger FM Pro to perform a named script, through an fmp:// URL or osascript.
 
-        Payload: { "fm_app_name": "FileMaker Pro — ...", "script": "name", "parameter": "..." }
-        Returns: { "success": bool, "stdout": str, "stderr": str }
+        Payload: { "script": "name", "parameter": "...", "target_file": "...",
+                   "backend": "url" | "applescript", "fm_app_name": "FileMaker Pro — ..." }
+        Returns: { "success": bool, "backend": str, ... } — "url" for the url
+        backend, "stdout" and "stderr" for AppleScript.
         """
         try:
             body = self._read_body()
@@ -2134,29 +2172,56 @@ class CompanionHandler(BaseHTTPRequestHandler):
         parameter = payload.get("parameter", "")
         target_file = payload.get("target_file", "")
 
+        # raw_applescript bypasses the FM do script path — no script name required
+        raw = payload.get("raw_applescript", "")
+        backend = payload.get("backend") or ("applescript" if raw else _default_trigger_backend())
+        if backend not in TRIGGER_BACKENDS:
+            self._send_json({"success": False, "error": f"Unknown backend: {backend!r} (use url or applescript)"},
+                            status=400)
+            return
+        if raw and backend != "applescript":
+            self._send_json({"success": False, "error": "raw_applescript needs the applescript backend"}, status=400)
+            return
+        if not raw and not script:
+            self._send_json({"success": False, "error": "Missing required field: script"}, status=400)
+            return
+        if backend == "url" and not target_file:
+            self._send_json({"success": False, "error": "The url backend needs target_file (the open file's name)"},
+                            status=400)
+            return
+
+        if not raw and parameter:
+            # Store the target and auto_save flag in the pending slot so the
+            # FM script can retrieve them via GET /pending (AppleScript parameter
+            # passing via "given parameter:" is unreliable in FM Pro 22).
+            # The url backend also passes the parameter itself.
+            global _pending_job
+            auto_save = bool(payload.get("auto_save", False))
+            select_all = bool(payload.get("select_all", True))
+            with _pending_lock:
+                _pending_job = {"target": parameter, "auto_save": auto_save, "select_all": select_all}
+            log.info("Pending job set: target=%r auto_save=%s select_all=%s", parameter, auto_save, select_all)
+
+        if backend == "url":
+            url = fmp_script_url(target_file, script, parameter)
+            try:
+                _open_fmp_url(url)
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                log.error("Trigger failed: could not open %s: %s", url, exc)
+                self._send_json({"success": False, "backend": "url", "url": url,
+                                 "error": f"Could not open the fmp:// URL: {exc}"}, status=500)
+                return
+            log.info("Trigger: sent '%s' in %s to FileMaker as an fmp:// URL", script, target_file)
+            self._send_json({"success": True, "backend": "url", "url": url})
+            return
+
         def as_str(s):
             """Escape double-quotes for use inside an AppleScript double-quoted string."""
             return s.replace("\\", "\\\\").replace('"', '\\"')
 
-        # raw_applescript bypasses the FM do script path — no script name required
-        raw = payload.get("raw_applescript", "")
         if raw:
             applescript = raw
-        elif not script:
-            self._send_json({"success": False, "error": "Missing required field: script"}, status=400)
-            return
         else:
-            # Store the target and auto_save flag in the pending slot so the
-            # FM script can retrieve them via GET /pending (AppleScript parameter
-            # passing via "given parameter:" is unreliable in FM Pro 22).
-            if parameter:
-                global _pending_job
-                auto_save = bool(payload.get("auto_save", False))
-                select_all = bool(payload.get("select_all", True))
-                with _pending_lock:
-                    _pending_job = {"target": parameter, "auto_save": auto_save, "select_all": select_all}
-                log.info("Pending job set: target=%r auto_save=%s select_all=%s", parameter, auto_save, select_all)
-
             # When target_file is provided, address the specific FM document
             # by name instead of positional document 1. This ensures the
             # correct file is targeted when multiple files are open.
@@ -2188,6 +2253,7 @@ class CompanionHandler(BaseHTTPRequestHandler):
                 log.error("Trigger failed: %s", result.stderr)
             self._send_json({
                 "success": success,
+                "backend": "applescript",
                 "stdout": result.stdout.strip(),
                 "stderr": result.stderr.strip(),
             })

@@ -4,7 +4,7 @@ The companion server is a lightweight local HTTP server that runs host-side tool
 
 **Why this exists:** FileMaker has no built-in mechanism to execute arbitrary shell commands. The companion server fills this gap — no third-party plugin is required. As long as the server is running on the developer's machine, FileMaker can trigger XML conversion and context generation through a simple HTTP POST.
 
-**Platforms:** The companion runs on macOS and Windows. `POST /convert` (fm-saxml), `/context`, `/debug`, `/lint`, `/pending` and `/preview` work on both. `/trigger`, which drives FileMaker through AppleScript, is macOS-only. `GET` and `POST /clipboard` work on macOS and native Windows, not under WSL. `POST /webviewer/stop` needs macOS or Linux.
+**Platforms:** The companion runs on macOS and Windows. `POST /convert` (fm-saxml), `/context`, `/debug`, `/lint`, `/pending` and `/preview` work on both. `/trigger` runs a FileMaker script on both through an `fmp://` URL; its AppleScript backend (the default on macOS, and the only way to run `raw_applescript`) is macOS-only. `GET` and `POST /clipboard` work on macOS and native Windows, not under WSL. `POST /webviewer/stop` needs macOS or Linux.
 
 ---
 
@@ -295,7 +295,7 @@ Every route, with its request and response schemas, is in [`companion_openapi.ya
 | POST | `/context` | Write `CONTEXT.json` |
 | GET, POST | `/pending` | Read and clear, or set, the pending paste job |
 | GET, POST | `/clipboard` | Read FileMaker objects from, or write XML to, the clipboard |
-| POST | `/trigger` | Run a FileMaker script through AppleScript (macOS) |
+| POST | `/trigger` | Run a FileMaker script through an `fmp://` URL, or AppleScript (macOS) |
 | POST | `/debug` | Write runtime debug state |
 | POST | `/lint` | Lint FileMaker code with FMLint |
 | GET | `/webviewer/status` | Whether the webviewer dev server is running |
@@ -689,9 +689,36 @@ Accepts fmxmlsnippet XML content and writes it to the clipboard as FileMaker obj
 
 ### POST /trigger
 
-Triggers FM Pro on the host to run a named FileMaker script via AppleScript (`osascript`). Used by `deploy.py` for Tier 2/3 automated deployment.
+Triggers FM Pro on the host to run a named FileMaker script, through an `fmp://` URL (Windows and macOS) or AppleScript (`osascript`, macOS). Used by `deploy.py` for Tier 2/3 automated deployment, and by the debug and test skills to run a script.
 
-**Request body:**
+**Choosing the backend:** `backend` is `"url"` or `"applescript"`. Without it, the companion uses AppleScript on macOS (as before) and the URL everywhere else; `raw_applescript` always uses AppleScript.
+
+| | `url` | `applescript` |
+| --- | --- | --- |
+| Platforms | Windows and macOS | macOS |
+| Needs | `script` and `target_file` (the open file's name) | `script`, or `raw_applescript` |
+| Script parameter | Passed to the script (`Get ( ScriptParameter )`) and stored as the pending job | Stored as the pending job only |
+| Extended privilege | `fmurlscript` | `fmextscriptaccess` |
+| `success` means | The OS handed the URL to FileMaker Pro | `osascript` exited with 0 |
+
+Use the URL to run a script and pass it a parameter. Use AppleScript on the Mac when you need FileMaker addressed by app name or `raw_applescript` (driving Script Workspace, as `deploy.py` does).
+
+**Request body (url):**
+```json
+{
+  "backend": "url",
+  "script": "Test_Invoice Total",
+  "target_file": "Invoices",
+  "parameter": "{\"id\":42}"
+}
+```
+The companion builds `fmp://$/<target_file>?script=<script>&param=<parameter>` and opens it: `os.startfile` on Windows, `open` on macOS. `$` means a file already open in FileMaker Pro, so `target_file` must be that file's name (not case sensitive; the `.fmp12` extension is optional), not part of it as with AppleScript. File, script and parameter are percent-encoded as UTF-8 with no character left as is, so spaces, `&`, `=`, `?`, `#`, `/`, `%`, line breaks and non-ASCII text arrive unchanged. An empty `parameter` is left out of the URL.
+
+**Response (url):** `{ "success": true, "backend": "url", "url": "fmp://$/Invoices?script=..." }`. `400` for an unknown `backend`, `raw_applescript` with `url`, or a missing `script` or `target_file`; `500` with `error` when the OS can't open the URL (FileMaker Pro is not installed, or on Linux). The URL is handed over without waiting: `success` does not mean the script ran or finished. FileMaker reports a missing privilege, file or script in its own dialog, not to the companion. To get a result back, have the script post it (as `Agentic-fm Debug` does to `/debug`).
+
+**Confirmed on Windows** (2026-11-02, FileMaker Pro 26.0.3, Windows 11): a test script named `URL Test & ≠ é`, in a local file, posted `Get ( ScriptParameter )` to `/debug`. With no `backend` given, the companion chose the URL. The parameter `a & b = c ≠ d ¶ café / ? # % +`, plus a line break, arrived exactly as sent, as did a plain parameter and none at all. Without `fmurlscript`, FileMaker refused as described below. Not yet confirmed on a Mac.
+
+**Request body (applescript):**
 ```json
 {
   "fm_app_name": "FileMaker Pro — 22.0.4.406",
@@ -713,7 +740,7 @@ end tell
 
 With `target_file`, `tell document 1` becomes `tell (first document whose name contains "<target_file>")`, so the right file is addressed when several are open.
 
-**Response:** `{ "success": bool, "stdout": str, "stderr": str }`. This is `200` even when `osascript` fails: check `success` and `stderr`. `400` when neither `script` nor `raw_applescript` is sent; `500` when `osascript` takes over 30 seconds or is missing (not macOS).
+**Response (applescript):** `{ "success": bool, "backend": "applescript", "stdout": str, "stderr": str }`. This is `200` even when `osascript` fails: check `success` and `stderr`. `400` when neither `script` nor `raw_applescript` is sent; `500` when `osascript` takes over 30 seconds or is missing (not macOS).
 
 **Parameter passing note:** FM Pro 22 does not reliably receive script parameters via `given parameter:` in `do script`, so the server does not send one. When `parameter` is provided, the server stores it as the pending job's `target` (with `auto_save` and `select_all`) before firing AppleScript. The triggered FM script calls `GET /pending` via Insert from URL to retrieve them. The pending job is cleared on first read.
 
@@ -722,9 +749,9 @@ With `target_file`, `tell document 1` becomes `tell (first document whose name c
 **`select_all` field:** Passed to `Agentic-fm Paste` through the pending job. Defaults to `true`.
 
 **Requirements:**
-- macOS only (`osascript` must be available on the host)
-- FM Pro must be running with the target solution open
-- The `fmextscriptaccess` extended privilege (**Allow Apple events and ActiveX to perform FileMaker operations**) must be enabled on the account's privilege set in Manage Security. Without it, `do script` returns a privilege violation error (`-10004`) at runtime.
+- FM Pro must be running with the target solution open, on the same machine as the companion
+- For the `url` backend: the `fmurlscript` extended privilege (**Allow URLs to run FileMaker scripts**) must be enabled on the account's privilege set in Manage Security (File > Manage > Security > Privilege Sets > the set > Extended Privileges). Without it FileMaker shows "Your access privileges do not allow you to perform this action." and the script does not run, while the companion still answers `success: true`. The URL goes to the FileMaker Pro version installed last, which registered `fmp://` with the OS
+- For the `applescript` backend: macOS (`osascript` must be available on the host), and the `fmextscriptaccess` extended privilege (**Allow Apple events and ActiveX to perform FileMaker operations**) must be enabled on the account's privilege set in Manage Security. Without it, `do script` returns a privilege violation error (`-10004`) at runtime.
 - For `auto_save`: FileMaker Pro must have Accessibility access granted in System Preferences → Privacy & Security → Accessibility so System Events can send keystrokes.
 - For `raw_applescript` override (Tier 3 script creation): include `"raw_applescript": "tell application..."` to execute arbitrary AppleScript instead of the default template.
 

@@ -25,9 +25,10 @@ info:
     - Every request except `GET /health` counts as activity for the idle auto-shutdown.
 
     **Platforms:** `/convert`, `/context`, `/debug`, `/lint`, `/pending`, `/preview` and
-    `/health` work on macOS and Windows. `/trigger` and `GET /clipboard` need macOS
-    (`osascript`). `POST /clipboard` uses `clipboard.py` on macOS and `clipboard_win.py`
-    under WSL. `/webviewer/stop` uses POSIX process groups.
+    `/health` work on macOS and Windows. `/trigger` runs a script through an `fmp://` URL
+    on both; its AppleScript backend needs macOS (`osascript`). `GET` and `POST /clipboard`
+    run `clipboard.py` on macOS and native Windows, not under WSL. `/webviewer/stop` uses
+    POSIX process groups.
   license:
     name: See the repository LICENSE
 servers:
@@ -452,16 +453,25 @@ paths:
     post:
       tags: [FileMaker bridge]
       operationId: triggerScript
-      summary: Run a FileMaker script through AppleScript (macOS)
+      summary: Run a FileMaker script through an fmp:// URL, or AppleScript (macOS)
       description: |
-        Runs `osascript` to `do script` in FileMaker Pro. When `parameter` is given it is
-        stored as the pending job's `target` (FileMaker reads it back with
-        `GET /pending`), because `given parameter:` is unreliable in FM Pro 22.
-        With `raw_applescript`, that AppleScript runs instead and `script` is not needed.
+        Two backends, picked with `backend`; without it, AppleScript on macOS and the
+        URL elsewhere, and `raw_applescript` always uses AppleScript.
 
-        Requires macOS, FileMaker Pro running with the file open, and the
-        `fmextscriptaccess` extended privilege. A failing `osascript` still answers
-        `200` with `success: false`; check `stderr`.
+        `url` (Windows and macOS): opens `fmp://$/<target_file>?script=<script>&param=<parameter>`,
+        each part percent-encoded as UTF-8, so `target_file` must be the open file's name.
+        The script gets `parameter` as its script parameter. Needs the `fmurlscript`
+        extended privilege. `success` only means the OS handed the URL to FileMaker Pro;
+        FileMaker reports errors in its own dialog.
+
+        `applescript` (macOS): runs `osascript` to `do script` in FileMaker Pro. With
+        `raw_applescript`, that AppleScript runs instead and `script` is not needed.
+        Needs the `fmextscriptaccess` extended privilege. A failing `osascript` still
+        answers `200` with `success: false`; check `stderr`.
+
+        With either backend, a `parameter` is also stored as the pending job's `target`
+        (FileMaker reads it back with `GET /pending`), because `given parameter:` is
+        unreliable in FM Pro 22. FileMaker Pro must be running with the file open.
       requestBody:
         required: true
         content:
@@ -469,19 +479,25 @@ paths:
             schema:
               type: object
               properties:
+                backend:
+                  type: string
+                  enum: [url, applescript]
+                  description: Default `applescript` on macOS (or with `raw_applescript`), `url` elsewhere.
                 fm_app_name:
                   type: string
                   default: FileMaker Pro
-                  description: Exact AppleScript application name, e.g. `FileMaker Pro — 22.0.4.406`.
+                  description: AppleScript only. Exact application name, e.g. `FileMaker Pro — 22.0.4.406`.
                 script:
                   type: string
                   description: Script to run. Required unless `raw_applescript` is set.
                 parameter:
                   type: string
-                  description: Stored as the pending job's `target`.
+                  description: The script parameter (url backend), and stored as the pending job's `target`.
                 target_file:
                   type: string
-                  description: Address the first open document whose name contains this, instead of document 1.
+                  description: |
+                    url: the open file's name (required). applescript: address the first open
+                    document whose name contains this, instead of document 1.
                 auto_save: { type: boolean, default: false }
                 select_all: { type: boolean, default: true }
                 raw_applescript:
@@ -493,23 +509,31 @@ paths:
               parameter: TargetScriptName
       responses:
         "200":
-          description: osascript ran; `success` is its exit status.
+          description: |
+            url: the OS took the URL (`url` is what was opened). applescript: osascript ran,
+            and `success` is its exit status.
           content:
             application/json:
               schema:
                 type: object
-                required: [success, stdout, stderr]
+                required: [success, backend]
                 properties:
                   success: { type: boolean }
-                  stdout: { type: string }
-                  stderr: { type: string }
+                  backend: { type: string, enum: [url, applescript] }
+                  url: { type: string, description: url backend only. }
+                  stdout: { type: string, description: applescript backend only. }
+                  stderr: { type: string, description: applescript backend only. }
         "400":
-          description: Invalid JSON, or neither `script` nor `raw_applescript`.
+          description: |
+            Invalid JSON, an unknown `backend`, `raw_applescript` with the url backend, no
+            `script` (and no `raw_applescript`), or no `target_file` for the url backend.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Failure" }
         "500":
-          description: osascript timed out (30 s), is missing (not macOS), or another error.
+          description: |
+            The OS could not open the fmp:// URL (no FileMaker Pro, or Linux); osascript
+            timed out (30 s) or is missing (not macOS); or another error.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Failure" }
