@@ -9,6 +9,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -120,6 +121,100 @@ def test_results_url_round_trips_to_the_tool_call():
 def test_results_rejects_tools_a_results_page_cannot_run(docs, capsys):
     assert _main("results", "-s", "Bagel", "--docs-root", str(docs), "--tool", "navigate_to") == 1
     assert "find_references" in capsys.readouterr().err
+
+
+def test_results_rejects_arguments_the_tool_does_not_take(docs, capsys):
+    # what an agent wrote in a skill eval: the link ran, and the tool found nothing
+    assert _main("results", "-s", "Bagel", "--docs-root", str(docs), "--tool", "find_references",
+                 "--args", '{"name": "EverythingBagel::textField"}') == 1
+    err = capsys.readouterr().err
+    assert "'name'" in err and "docId" in err
+
+
+@pytest.mark.parametrize("tool, args, needs", [
+    ("rename_impact", {}, "docId"),
+    ("query", {"steps": []}, "steps"),
+    ("find_references", {"direction": "incoming"}, "docId or docIds or targetType + parentDocId"),
+    ("find_references", {"targetType": "field"}, "targetType + parentDocId"),
+    ("what_can_access", {"type": "script"}, "account or privilegeSet"),
+])
+def test_results_rejects_calls_without_what_the_tool_needs(tool, args, needs):
+    with pytest.raises(fmdocs.FmDocsError, match=needs.replace("+", r"\+")):
+        fmdocs.results_url("B", tool, args)
+
+
+def test_the_calls_in_docs_site_pass_the_check():
+    text = (Path(__file__).resolve().parents[1] / "docs" / "DOCS_SITE.md").read_text(encoding="utf-8")
+    calls = re.findall(r"`(\w+) (\{.*?\})`", text)
+    assert len(calls) >= 9
+    for tool, args in calls:
+        fmdocs.results_url("B", tool, json.loads(args))
+
+
+def _webmcp_tools(js: str) -> dict[str, tuple[set[str], set[str]]]:
+    """{tool: (argument names, required names)} from fm-saxml's webmcp.js tool(...) calls."""
+    found = {}
+    for m in re.finditer(r"\btool\('(\w+)',", js):
+        parts, depth, i, start, quote = [], 0, m.end(), m.end(), None
+        while True:   # split tool(...)'s arguments on its top-level commas, skipping strings and comments
+            c = js[i]
+            if not quote and js.startswith("//", i):
+                i = js.index("\n", i)
+                continue
+            if not quote and js.startswith("/*", i):
+                i = js.index("*/", i) + 2
+                continue
+            if quote:
+                if c == "\\":
+                    i += 1
+                elif c == quote:
+                    quote = None
+            elif c in "'\"`":
+                quote = c
+            elif c in "([{":
+                depth += 1
+            elif c in ")]}":
+                if depth == 0:
+                    parts.append(js[start:i])
+                    break
+                depth -= 1
+            elif c == "," and depth == 0:
+                parts.append(js[start:i])
+                start = i + 1
+            i += 1
+        props, opts = parts[1].strip(), parts[3] if len(parts) > 3 else ""
+        names, depth, quote = set(), 0, None
+        for j, c in enumerate(props):   # the keys at the top level of the properties literal
+            if quote:
+                quote = None if c == quote and props[j - 1] != "\\" else quote
+            elif c in "'\"`":
+                quote = c
+            elif c in "([{":
+                depth += 1
+                if depth == 1:
+                    key_from = j + 1
+            elif c in ")]}":
+                depth -= 1
+            elif c == "," and depth == 1:
+                key_from = j + 1
+            elif c == ":" and depth == 1:
+                names.add(props[key_from:j].strip())
+                key_from = len(props)
+        names.discard("")   # a ':' in a value (a ternary) leaves an empty key
+        if re.search(r"\bquery:\s*true", opts):
+            names |= {"display", "title"}
+        req = re.search(r"\brequired:\s*\[([^\]]*)\]", opts)
+        found[m.group(1)] = (names, set(re.findall(r"'(\w+)'", req.group(1))) if req else set())
+    return found
+
+
+def test_result_tools_match_the_installed_fm_saxml():
+    import fm_saxml
+    js = (Path(fm_saxml.__file__).parent / "render" / "html" / "templates" / "webmcp.js").read_text(encoding="utf-8")
+    tools = _webmcp_tools(js)
+    for tool, (accepted, required) in fmdocs.RESULT_TOOLS.items():
+        assert tool in tools, f"fm-saxml has no tool {tool}"
+        assert (accepted, set(required)) == tools[tool], tool
 
 
 # -- age ------------------------------------------------------------------------------

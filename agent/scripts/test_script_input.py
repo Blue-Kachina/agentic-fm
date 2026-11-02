@@ -87,22 +87,18 @@ def test_preview_matches_golden(unscrubbed, path):
     assert gf.compare(f"saxmlpreview/{path.stem}.txt", r.stdout) is None
 
 
-# fm-saxml scrubs raw/ by default. In the fixture that changes two lines of OneOfEverything:
-# the AI and RAG account names are credentials, redacted on purpose. Only the values change;
-# since fm-saxml 0.6.6 the redaction leaves the XML's structure alone (before, the RAG step's
-# parameter type was redacted too and the step couldn't be decoded).
-SCRUBBED_LINES = [
-    ('21\tConfigure AI Account [ Account Name: "accountNameGoesHere" ; Model Provider: OpenAI ]',
-     '21\tConfigure AI Account [ Account Name: "[REDACTED:api_key#1]" ; Model Provider: OpenAI ]'),
-    ('26\tConfigure RAG Account [ RAG Account Name: "RAGAccountName" ]',
-     '26\tConfigure RAG Account [ RAG Account Name: "[REDACTED:api_key#2]" ]'),
-]
+# fm-saxml scrubs raw/ by default. Up to 0.6.11 that redacted the AI and RAG account names
+# of OneOfEverything (steps 21 and 26); since 0.6.12 an account name is not a secret (other
+# AI steps refer to the account by it), and OneOfEverything has nothing else to redact. So
+# its preview from scrubbed docs is the golden one, line for line.
+SCRUBBED_LINES: list[tuple[str, str]] = []
 
 
 def test_preview_from_scrubbed_docs(docs):
     r = _run(PREVIEW, "-s", str(docs), "--script", "OneOfEverything")
     assert r.returncode == 0, r.stderr
     golden = (gf.GOLDEN / "saxmlpreview" / "OneOfEverything - ID 1.txt").read_text(encoding="utf-8")
+    assert len(r.stdout.splitlines()) == len(golden.splitlines())
     changed = [(a, b) for a, b in zip(golden.splitlines(), r.stdout.splitlines()) if a != b]
     assert changed == SCRUBBED_LINES
 

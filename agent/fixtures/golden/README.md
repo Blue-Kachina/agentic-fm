@@ -16,7 +16,7 @@ each difference.
 
 The fm-saxml side is not stored: tests convert `saxml/EverythingBagel.xml` with the installed
 fm-saxml (`golden_fixture.build_docs()`), so it always matches the version under test. The
-fork's CI pins fm-saxml-converter 0.6.6.
+fork's CI pins fm-saxml-converter 0.6.12.
 
 ### The Mac run (inputs)
 

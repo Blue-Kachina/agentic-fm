@@ -52,14 +52,37 @@ PREVIOUS_DIR = ".previous"          # in the docs root: <docs root>/.previous/<d
 JOB_RECORD = "_companion_job.json"  # companion_server.JOB_RECORD_IN_OUTPUT
 STALE_DAYS = 7
 
-# The WebMCP tools a results page can run (fm-saxml templates/webmcp.js). Left out:
-# get_current_page, show_results and navigate_to (they act on the open page) and the
-# page-scoped list_* tools.
-RESULT_TOOLS = (
-    "describe_schema", "get_solution_overview", "search_entities", "query_entities",
-    "find_script_steps", "get_entity", "find_references", "find_unreferenced",
-    "find_indirection", "rename_impact", "traverse", "who_can_access", "what_can_access", "query",
-)
+# The WebMCP tools a results page can run (fm-saxml templates/webmcp.js), each with the
+# arguments its schema accepts and those it requires; test_fmdocs.py checks this against
+# the installed fm-saxml. Left out: get_current_page, show_results and navigate_to (they
+# act on the open page) and the page-scoped list_* tools.
+_SHOWN = {"display", "title"}       # what every query tool also takes
+RESULT_TOOLS: dict[str, tuple[set[str], tuple[str, ...]]] = {
+    "describe_schema": ({"type", "file"}, ()),
+    "get_solution_overview": (set(), ()),
+    "search_entities": ({"query", "types", "deep", "file", "limit"} | _SHOWN, ("query",)),
+    "query_entities": ({"type", "where", "file", "fields", "limit"} | _SHOWN, ("type",)),
+    "find_script_steps": ({"stepName", "textContains", "regex", "scriptName", "scriptFolder", "targetDocId",
+                           "enabled", "file", "limit"} | _SHOWN, ()),
+    "get_entity": ({"docId", "file"}, ("docId",)),
+    "find_references": ({"docId", "docIds", "targetType", "parentDocId", "direction", "relationshipType",
+                         "sourceType", "includeStructural", "includeByName", "groupBy", "file", "limit"} | _SHOWN, ()),
+    "find_unreferenced": ({"type", "where", "file", "limit"} | _SHOWN, ("type",)),
+    "find_indirection": ({"class", "sink", "nameKind", "targetDocId", "scriptDocId", "breaksOnRename",
+                          "file", "limit"} | _SHOWN, ()),
+    "rename_impact": ({"docId", "file", "limit"} | _SHOWN, ("docId",)),
+    "traverse": ({"from", "direction", "relationshipTypes", "maxDepth", "to", "stopAt", "file", "limit"} | _SHOWN,
+                 ("from",)),
+    "who_can_access": ({"docId", "action", "includeDenied", "file", "limit"} | _SHOWN, ("docId",)),
+    "what_can_access": ({"account", "privilegeSet", "type", "action", "includeDenied", "file", "limit"} | _SHOWN,
+                        ("type",)),
+    "query": ({"steps", "limit"} | _SHOWN, ("steps",)),
+}
+# Tools that need one of several argument sets, which their code checks, not their schema.
+_RESULT_ONE_OF = {
+    "find_references": (("docId",), ("docIds",), ("targetType", "parentDocId")),
+    "what_can_access": (("account",), ("privilegeSet",)),
+}
 
 # entities.json collections that are derived from others, and entity keys that change
 # without the object changing (where it sits in the export).
@@ -168,9 +191,27 @@ def page_url(base: str, page_path: str) -> str:
     return base + "#/" + "/".join(urllib.parse.quote(part, safe="") for part in page_path.split("/"))
 
 
+def check_result_args(tool: str, args: dict) -> None:
+    """Raise FmDocsError when the results page would reject ``args`` (or find nothing with them)."""
+    accepted, required = RESULT_TOOLS[tool]
+    unknown = sorted(set(args) - accepted)
+    if unknown:
+        hint = (" Objects are named by docId (field:Table::Field, script:Name, layout:Name...)."
+                if "docId" in accepted and {"name", "id", "field", "script", "layout"} & set(unknown) else "")
+        raise FmDocsError(f"{tool} takes no argument {', '.join(map(repr, unknown))}. "
+                          f"Arguments: {', '.join(sorted(accepted)) or 'none'}.{hint}")
+    missing = [k for k in required if args.get(k) in (None, "", [])]
+    if missing:
+        raise FmDocsError(f"{tool} needs {', '.join(missing)}.")
+    one_of = _RESULT_ONE_OF.get(tool)
+    if one_of and not any(all(args.get(k) not in (None, "", []) for k in keys) for keys in one_of):
+        raise FmDocsError(f"{tool} needs {' or '.join(' + '.join(keys) for keys in one_of)}.")
+
+
 def results_url(base: str, tool: str, args: dict, as_json: bool = False) -> str:
     if tool not in RESULT_TOOLS:
         raise FmDocsError(f"{tool!r} is not a WebMCP tool a results page can run. Tools: {', '.join(RESULT_TOOLS)}.")
+    check_result_args(tool, args)
     spec = json.dumps({"tool": tool, "args": args}, ensure_ascii=False, separators=(",", ":"))
     # encodeURIComponent: everything but A-Z a-z 0-9 - _ . ! ~ * ' ( )
     return base + "#/results?q=" + urllib.parse.quote(spec, safe="-_.!~*'()") + ("&format=json" if as_json else "")
