@@ -1402,6 +1402,11 @@ def _idle_watchdog(server, idle_timeout: int) -> None:
             return
 
 
+def _clipboard_script() -> str:
+    """clipboard.py, the one clipboard entry point; it picks the macOS or Windows backend."""
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "clipboard.py")
+
+
 # ---------------------------------------------------------------------------
 # Threading HTTP server (handles concurrent requests)
 # ---------------------------------------------------------------------------
@@ -2195,14 +2200,11 @@ class CompanionHandler(BaseHTTPRequestHandler):
             self._send_json({"success": False, "error": str(exc)}, status=500)
 
     def _handle_clipboard_read(self):
-        """Read FM objects from the macOS clipboard and return as XML."""
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        clipboard_py = os.path.join(script_dir, "clipboard.py")
-
+        """Read FM objects from the clipboard with clipboard.py (macOS or Windows) and return as XML."""
         try:
             result = subprocess.run(
-                [sys.executable, clipboard_py, "read"],
-                capture_output=True, text=True, timeout=10
+                [sys.executable, _clipboard_script(), "read"],
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10
             )
             if result.returncode == 0 and result.stdout.strip():
                 log.info("Clipboard read succeeded")
@@ -2224,7 +2226,7 @@ class CompanionHandler(BaseHTTPRequestHandler):
             self._send_json({"success": False, "error": str(exc)}, status=500)
 
     def _handle_clipboard(self):
-        """Accept XML content and write it to the clipboard via clipboard.py (macOS) or clipboard_win.py (WSL2/Windows)."""
+        """Accept XML content and write it to the clipboard with clipboard.py (macOS or Windows)."""
         try:
             body = self._read_body()
             payload = json.loads(body)
@@ -2237,16 +2239,7 @@ class CompanionHandler(BaseHTTPRequestHandler):
             self._send_json({"success": False, "error": "Missing required field: xml"}, status=400)
             return
 
-        import platform
         import tempfile
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-
-        # On Linux (WSL2), delegate to clipboard_win.py which uses powershell.exe.
-        # On macOS, use the original clipboard.py (osascript / NSPasteboard path).
-        if platform.system() == "Linux":
-            clipboard_py = os.path.join(script_dir, "clipboard_win.py")
-        else:
-            clipboard_py = os.path.join(script_dir, "clipboard.py")
 
         try:
             with tempfile.NamedTemporaryFile(
@@ -2256,8 +2249,8 @@ class CompanionHandler(BaseHTTPRequestHandler):
                 tmp_path = tmp.name
 
             result = subprocess.run(
-                [sys.executable, clipboard_py, "write", tmp_path],
-                capture_output=True, text=True
+                [sys.executable, _clipboard_script(), "write", tmp_path],
+                capture_output=True, text=True, encoding="utf-8", errors="replace"
             )
             os.unlink(tmp_path)
 

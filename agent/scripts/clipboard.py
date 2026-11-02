@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """
-clipboard.py -- Read and write FileMaker fmxmlsnippets via the macOS clipboard.
+clipboard.py -- Read and write FileMaker fmxmlsnippets via the macOS or Windows clipboard.
 
-FileMaker stores clipboard objects as proprietary AppleScript descriptor classes,
+This is the one clipboard entry point: on native Windows it hands every call to
+clipboard_win.py (Win32 through ctypes); on macOS it uses the code below. Other
+platforms (Linux, WSL) have no clipboard backend.
+
+On macOS, FileMaker stores clipboard objects as proprietary AppleScript descriptor classes,
 not as plain text. This script converts between those classes and fmxmlsnippet XML.
 
 Menu objects (CustomMenu, CustomMenuSet) are an exception: FileMaker stores them
@@ -42,6 +46,34 @@ try:
     _HAS_APPKIT = True
 except ImportError:
     _HAS_APPKIT = False
+
+
+def backend():
+    """The clipboard backend for this platform: 'windows', 'macos', or None."""
+    if sys.platform == 'win32':
+        return 'windows'
+    if sys.platform == 'darwin':
+        return 'macos'
+    return None
+
+
+def _require_backend():
+    """Exit with an error on a platform that has no clipboard backend."""
+    if backend() is None:
+        print(f'ERROR: No clipboard backend for {sys.platform}: clipboard.py works on macOS '
+              'and native Windows (not Linux or WSL).', file=sys.stderr)
+        sys.exit(1)
+
+
+def _on_windows(name, *args):
+    """Call clipboard_win.<name>, reporting its errors the way this script does."""
+    import clipboard_win
+    try:
+        return getattr(clipboard_win, name)(*args)
+    except clipboard_win.ClipboardError as exc:
+        print(f'ERROR: {exc}', file=sys.stderr)
+        sys.exit(1)
+
 
 # FileMaker clipboard class codes
 FM_CLASSES = {
@@ -129,6 +161,9 @@ def detect_clipboard_class():
     Returns 'ut16' when the clipboard holds FM menu objects (Unicode text),
     or a four-letter FM binary descriptor code (e.g. 'XMSS') otherwise.
     """
+    if backend() == 'windows':
+        return _on_windows('detect_clipboard_class')
+    _require_backend()
     if _HAS_APPKIT:
         return _nspasteboard_detect()
 
@@ -192,6 +227,8 @@ def detect_class_from_xml(xml_text):
 
 def read_from_clipboard(output_path=None):
     """Extract FM objects from clipboard and output as formatted XML."""
+    if backend() == 'windows':
+        return _on_windows('read_from_clipboard', output_path)
     cls = detect_clipboard_class()
     if not cls:
         print('ERROR: No FileMaker objects found on clipboard.', file=sys.stderr)
@@ -294,6 +331,9 @@ def _decode_file(raw_bytes):
 
 def write_to_clipboard(input_path, cls=None):
     """Write an fmxmlsnippet XML file to the clipboard as FM objects."""
+    if backend() == 'windows':
+        return _on_windows('write_to_clipboard', input_path, cls)
+    _require_backend()
     with open(input_path, 'rb') as f:
         raw_bytes = f.read()
 
@@ -352,7 +392,7 @@ def _write_ut16_to_clipboard(xml_text, input_path):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Read/write FileMaker fmxmlsnippets via the macOS clipboard',
+        description='Read/write FileMaker fmxmlsnippets via the macOS or Windows clipboard',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=f'FM class codes: {", ".join(f"{k}={v}" for k, v in FM_CLASSES.items())}'
     )

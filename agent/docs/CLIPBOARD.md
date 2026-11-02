@@ -45,7 +45,7 @@ When accessing the clipboard via the macOS Pasteboard API directly (e.g. via PyO
 
 ## Using clipboard.py
 
-A Python helper script is provided at `agent/scripts/clipboard.py`. It handles both read and write directions and auto-detects the correct class code from the XML content.
+A Python helper script is provided at `agent/scripts/clipboard.py`. It handles both read and write directions and auto-detects the correct class code from the XML content. It is the one clipboard entry point on both platforms: on native Windows it hands every call to `clipboard_win.py` (see [Windows clipboard](#windows-clipboard)), so the commands below are the same there (`python` instead of `python3`, Ctrl+C/Ctrl+V instead of ⌘C/⌘V). Under WSL or Linux it stops with an error.
 
 ### Read: FM objects on clipboard → XML file
 
@@ -239,7 +239,7 @@ python agent/scripts/clipboard_win.py detect
 
 If FileMaker does not accept a paste, copy the same kind of object in FileMaker Pro and run `detect` to compare the format names and sizes. `read` pretty-prints with `xmllint` when it is installed and returns the XML unchanged otherwise.
 
-The companion server's `/clipboard` endpoints do not use `clipboard_win.py` on native Windows yet; run it directly.
+Skills and the companion server's `/clipboard` endpoints call `clipboard.py`, which uses `clipboard_win.py` on Windows; call `clipboard_win.py` directly only for `detect`.
 
 ---
 

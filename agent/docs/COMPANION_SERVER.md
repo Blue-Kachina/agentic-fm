@@ -4,7 +4,7 @@ The companion server is a lightweight local HTTP server that runs host-side tool
 
 **Why this exists:** FileMaker has no built-in mechanism to execute arbitrary shell commands. The companion server fills this gap — no third-party plugin is required. As long as the server is running on the developer's machine, FileMaker can trigger XML conversion and context generation through a simple HTTP POST.
 
-**Platforms:** The companion runs on macOS and Windows. `POST /convert` (fm-saxml), `/context`, `/debug`, `/lint`, `/pending` and `/preview` work on both. Endpoints that drive FileMaker through AppleScript (`/trigger`, `GET /clipboard`) are macOS-only. `POST /clipboard` works on macOS; on Windows, run `clipboard_win.py` directly for now. `POST /webviewer/stop` needs macOS or Linux.
+**Platforms:** The companion runs on macOS and Windows. `POST /convert` (fm-saxml), `/context`, `/debug`, `/lint`, `/pending` and `/preview` work on both. `/trigger`, which drives FileMaker through AppleScript, is macOS-only. `GET` and `POST /clipboard` work on macOS and native Windows, not under WSL. `POST /webviewer/stop` needs macOS or Linux.
 
 ---
 
@@ -668,7 +668,7 @@ All fields are optional: `target` defaults to `""`, `auto_save` to `false`, `sel
 
 ### GET /clipboard
 
-Reads the FileMaker objects on the macOS clipboard with `clipboard.py read` and returns them as XML. macOS only.
+Reads the FileMaker objects on the clipboard with `clipboard.py read` and returns them as XML. Works on macOS and native Windows (`clipboard.py` picks the backend); not under WSL or Linux.
 
 **Response:** `{ "success": true, "xml": "<fmxmlsnippet ...>" }`. `404` when the clipboard holds no FileMaker objects; `500` when the read fails or takes over 10 seconds.
 
@@ -676,7 +676,7 @@ Reads the FileMaker objects on the macOS clipboard with `clipboard.py read` and 
 
 ### POST /clipboard
 
-Accepts fmxmlsnippet XML content and writes it to the clipboard as FileMaker objects: with `clipboard.py` on macOS. Under WSL it calls `clipboard_win.py`, which now needs native Windows, so the write fails there; native Windows is not routed yet. Used by `deploy.py` (Tier 1/2/3) so the agent container can load the clipboard without running `osascript` directly.
+Accepts fmxmlsnippet XML content and writes it to the clipboard as FileMaker objects with `clipboard.py write`, on macOS and native Windows (`clipboard.py` picks the backend); under WSL or Linux it returns `500` with the error. Used by `deploy.py` (Tier 1/2/3) so the agent container can load the clipboard without running `osascript` directly.
 
 **Request body:**
 ```json
