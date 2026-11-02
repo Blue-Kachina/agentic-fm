@@ -35,7 +35,7 @@ python3 agent/scripts/fmdocs.py base -s Invoices       # the viewer's address
 ## Answer rules
 
 1. **Name an object, link its page.** Each script, field, layout, table occurrence, value list or custom function named in an answer gets its page link (`fmdocs.py link`), as a Markdown link on its name.
-2. **List several objects, link the list.** An answer that lists more than three objects one WebMCP call can produce ends with "See all in the docs: <link>" (`fmdocs.py results` with the matching call below).
+2. **Many results, link the list.** When the answer comes from a question in the table below and the matching call returns more than three results, the answer ends with "See all in the docs: <link>" (`fmdocs.py results` with that call). Count what the call returns (references, objects, steps), not how the answer groups them: a field used by five layout objects, one relationship and one value list has seven results, not three.
 3. **Say how old the docs are.** Once per answer, give the `fmdocs.py age` line. Past 7 days, say the answer may be out of date and suggest exporting again.
 4. **No viewer, no links.** When `fmdocs.py` reports "no HTML viewer", answer without links and say once that converting from FileMaker (or with `--webmcp`) adds them.
 5. **List the links used** in the answer's closing notes, under "Docs links".
