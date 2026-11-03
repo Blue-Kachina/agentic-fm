@@ -61,7 +61,7 @@ RESULT_TOOLS: dict[str, tuple[set[str], tuple[str, ...]]] = {
     "describe_schema": ({"type", "file"}, ()),
     "get_solution_overview": (set(), ()),
     "search_entities": ({"query", "types", "deep", "file", "limit"} | _SHOWN, ("query",)),
-    "query_entities": ({"type", "where", "file", "fields", "limit"} | _SHOWN, ("type",)),
+    "query_entities": ({"type", "types", "where", "sort", "file", "fields", "limit"} | _SHOWN, ()),
     "find_script_steps": ({"stepName", "textContains", "regex", "scriptName", "scriptFolder", "targetDocId",
                            "enabled", "file", "limit"} | _SHOWN, ()),
     "get_entity": ({"docId", "file"}, ("docId",)),

@@ -53,6 +53,7 @@ Use the call in the results link; give the agent's own answer in the text. In a 
 | Steps of one kind, or that set field F | `find_script_steps {"stepName": "Set Field", "targetDocId": "field:T::F"}` |
 | Everything that calls, or is called by, script S | `traverse {"from": "script:S", "direction": "incoming", "relationshipTypes": ["usesScript", "triggersScript"]}` |
 | Objects with a property (global fields, triggers, layouts on a TO...) | `query_entities {"type": "field", "where": [{"field": "global", "op": "eq", "value": true}]}` |
+| Everything changed since a date, in any type, newest first | `query_entities {"where": [{"field": "modified.timestamp", "op": "gte", "value": "<YYYY-MM-DD>"}], "fields": ["modified.timestamp", "modified.accountName"], "sort": {"field": "modified.timestamp", "desc": true}}` (no `type` searches every type; types without a stamp are listed in `skippedTypes`) |
 | Who can run, view or edit X? | `who_can_access {"docId": "<docId>", "action": "run"}` |
 | What can account A or privilege set P do? | `what_can_access {"account": "A", "type": "script"}` |
 
